@@ -19,7 +19,8 @@ const GameState = {
     GAME_OVER: 'gameover',
     VICTORY: 'victory',
     ACHIEVEMENTS: 'achievements',
-    TROPHIES: 'trophies'  // ✅ SPRINT 1 FIX: Adicionado
+    TROPHIES: 'trophies',  // ✅ SPRINT 1 FIX: Adicionado
+    STAGE_SELECT: 'stage_select'
 };
 
 let gameState = GameState.LOADING; // Melhoria #19: Começar em loading
@@ -50,7 +51,18 @@ let enemySpawnDirector = null; // grupos liberados conforme avanço do jogador
 let levelLoadToken = 0; // invalida callbacks de fases antigas          // WaveSystem para fases 6-8
 let levelGateActive = false;    // Tela de gate de nível ativa
 let menuSelection = 0;
-let menuOptions = ['1 JOGADOR', '2 JOGADORES', 'COMO JOGAR: JOÃO & CRIST', 'CONFIGURAR CONTROLES', 'TROFÉUS', 'OPÇÕES'];
+let menuOptions = [];
+let stageSelectIndex = 0;
+let pendingStartLevel = 0;
+let stageSelectPlayers = 1;
+
+function refreshMenuOptions() {
+    const completed = !!saveSystem?.load?.().gameCompleted;
+    menuOptions = ['1 JOGADOR', '2 JOGADORES', 'COMO JOGAR: JOÃO & CRIST', 'CONFIGURAR CONTROLES', 'TROFÉUS', 'OPÇÕES'];
+    if (completed) menuOptions.push('SELECIONAR FASE');
+    if (menuSelection >= menuOptions.length) menuSelection = menuOptions.length - 1;
+}
+
 let controlsConfigPlayer = 1;
 let controlsConfigSelection = 0;
 let controlsConfigCapture = false;
@@ -90,6 +102,7 @@ let highContrastMode = false;
 // ========== NOVOS SISTEMAS ==========
 // Sistema unificado carregado via unified-achievements.js
 let saveSystem = new SaveSystem();
+refreshMenuOptions();
 let powerUps = [];
 let destructibles = []; // Caixas/barris que guardam power-ups
 
@@ -259,40 +272,8 @@ document.addEventListener('keydown', e => {
             soundSystem.playSound('menuMove');
         }
         if (e.key === 'Enter') {
-            soundSystem.playSound('menuSelect');
-            if (menuSelection === 0) {
-                // 1 jogador
-                playerCount = 1;
-                gameState = GameState.CHARACTER_SELECT;
-                selectedCharacters = [null, null];
-                characterSelectCursor = 0;
-                characterSelectReady = false; // Prevenir seleção imediata
-                setTimeout(() => { characterSelectReady = true; }, 300); // 300ms de delay
-            } else if (menuSelection === 1) {
-                // 2 jogadores
-                playerCount = 2;
-                gameState = GameState.CHARACTER_SELECT;
-                selectedCharacters = [null, null];
-                characterSelectCursor = 0;
-                characterSelectReady = false; // Prevenir seleção imediata
-                setTimeout(() => { characterSelectReady = true; }, 300); // 300ms de delay
-            } else if (menuSelection === 2) {
-                // Melhoria #20: Tutorial
-                gameState = GameState.TUTORIAL;
-            } else if (menuSelection === 3) {
-                gameState = GameState.CONTROLS_CONFIG;
-                controlsConfigPlayer = 1;
-                controlsConfigSelection = 0;
-                controlsConfigCapture = false;
-            } else if (menuSelection === 4) {
-                // Troféus
-                gameState = GameState.TROPHIES;
-                if (window.trophySystem) window.trophySystem.scrollOffset = 0;
-            } else if (menuSelection === 5) {
-                // Toggle som
-                soundSystem.toggle();
-                menuOptions[5] = soundSystem.enabled ? 'SOM: ON' : 'SOM: OFF';
-            }
+            activateMenuSelection();
+            return;
         }
         // Atalhos diretos
         if (e.key === '1') {
@@ -335,6 +316,27 @@ document.addEventListener('keydown', e => {
         }
     }
     
+    // Seletor de fases (desbloqueado apenas após zerar o jogo)
+    if (gameState === GameState.STAGE_SELECT) {
+        if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+            stageSelectIndex = (stageSelectIndex + LEVELS.length - 1) % LEVELS.length;
+            soundSystem.playSound('menuMove');
+        }
+        if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+            stageSelectIndex = (stageSelectIndex + 1) % LEVELS.length;
+            soundSystem.playSound('menuMove');
+        }
+        if (e.key === 'Tab') {
+            e.preventDefault(); stageSelectPlayers = stageSelectPlayers === 1 ? 2 : 1; soundSystem.playSound('menuMove');
+        }
+        if (e.key === 'Enter') {
+            pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers;
+            selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false;
+            gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect');
+        }
+        if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=6; soundSystem.playSound('menuBack'); }
+    }
+
     // Melhoria #20: Tela de tutorial
     if (gameState === GameState.TUTORIAL) {
         if (e.key === 'Escape' || e.key === 'Enter') {
@@ -587,11 +589,12 @@ function startGameWithCharacters() {
     // Limpar teclas do menu/seleção para evitar conflitos
     clearKeys();
     
-    // Mostrar história introdutória apenas na primeira vez
-    if (currentLevelIndex === 0) {
+    const startLevelIndex = Math.max(0, Math.min(LEVELS.length - 1, pendingStartLevel || 0));
+    // História completa apenas ao iniciar uma campanha nova. No seletor, vai direto à introdução da fase.
+    if (startLevelIndex === 0) {
         gameState = GameState.STORY_INTRO;
     } else {
-        gameState = GameState.LEVEL_INTRO;
+        gameState = GameState.STORY_LEVEL;
     }
     
     players.length = 0;
@@ -601,7 +604,7 @@ function startGameWithCharacters() {
     particles.length = 0; // Limpar array
     powerUps.length = 0;
     destructibles.length = 0;
-    currentLevelIndex = 0;
+    currentLevelIndex = startLevelIndex;
     levelIntroTimer = 0;
     gameStartTime = Date.now();
     totalGameDamage = 0;
@@ -650,8 +653,9 @@ function startGameWithCharacters() {
     // Salvar personagem favorito
     saveSystem.updateFavoriteCharacter(selectedCharacters[0]);
     
-    // Carregar primeira fase
-    loadLevel(0);
+    // Carregar a fase escolhida (0 em campanha normal).
+    loadLevel(startLevelIndex);
+    pendingStartLevel = 0;
 }
 
 function loadLevel(index) {
@@ -997,6 +1001,8 @@ function nextLevel() {
     const nextIndex = currentLevelIndex + 1;
 
     if (nextIndex >= LEVELS.length) {
+        if (saveSystem && typeof saveSystem.markGameCompleted === 'function') saveSystem.markGameCompleted();
+        refreshMenuOptions();
         gameState = GameState.VICTORY;
         return;
     }
@@ -1174,6 +1180,7 @@ function drawLoading() {
 }
 
 function drawMenu() {
+    refreshMenuOptions();
     // Fundo inspirado na estrada para Vegas: céu do deserto, asfalto e neon retrô.
     const sky = ctx.createLinearGradient(0, 0, 0, 650);
     sky.addColorStop(0, '#0c1026');
@@ -1225,7 +1232,8 @@ function drawMenu() {
 
     // Painel de menu de madeira/metal.
     ctx.fillStyle='rgba(12,12,16,.88)'; ctx.strokeStyle='#8c5a2b'; ctx.lineWidth=4;
-    ctx.beginPath(); ctx.roundRect(275,235,450,345,18); ctx.fill(); ctx.stroke();
+    const menuPanelH = menuOptions.length > 6 ? 365 : 345;
+    ctx.beginPath(); ctx.roundRect(275,225,450,menuPanelH,18); ctx.fill(); ctx.stroke();
 
     const savedData = saveSystem.load();
     if (savedData.highScore > 0) {
@@ -1234,7 +1242,8 @@ function drawMenu() {
     }
 
     menuOptions.forEach((option,i)=>{
-        const y=306+i*43;
+        const spacing = menuOptions.length > 6 ? 40 : 43;
+        const y=296+i*spacing;
         const selected=i===menuSelection;
         if(selected){
             ctx.save(); ctx.shadowBlur=14; ctx.shadowColor='#ff7b39';
@@ -1377,12 +1386,15 @@ function drawOptions() {
 }
 
 function activateMenuSelection() {
+    refreshMenuOptions();
     if (menuSelection===0 || menuSelection===1) {
+        pendingStartLevel=0;
         playerCount=menuSelection+1; gameState=GameState.CHARACTER_SELECT; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect');
     } else if(menuSelection===2){gameState=GameState.TUTORIAL;soundSystem.playSound('menuSelect');}
     else if(menuSelection===3){clearKeys();gameState=GameState.CONTROLS_CONFIG;controlsConfigPlayer=1;controlsConfigSelection=0;controlsConfigCapture=false;controlsConfigDevice='keyboard';controlsConfigMessage='';soundSystem.playSound('menuSelect');}
     else if(menuSelection===4){gameState=GameState.TROPHIES;if(window.trophySystem)window.trophySystem.scrollOffset=0;soundSystem.playSound('menuSelect');}
     else if(menuSelection===5){gameState=GameState.OPTIONS;optionsSelection=0;gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
+    else if(menuSelection===6 && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
 }
 
 function handleGamepadInput() {
@@ -1396,6 +1408,18 @@ function handleGamepadInput() {
     const back=gamepadSystem.wasPressed(p,1);
 
     if(gameState===GameState.MENU){if(up){menuSelection=(menuSelection+menuOptions.length-1)%menuOptions.length;soundSystem.playSound('menuMove');}if(down){menuSelection=(menuSelection+1)%menuOptions.length;soundSystem.playSound('menuMove');}if(accept)activateMenuSelection();}
+    else if(gameState===GameState.TROPHIES){
+        if(up&&window.trophySystem){window.trophySystem.scrollUp();soundSystem.playSound('menuMove');}
+        if(down&&window.trophySystem){window.trophySystem.scrollDown();soundSystem.playSound('menuMove');}
+        if(back||accept){gameState=GameState.MENU;menuSelection=4;soundSystem.playSound('menuBack');}
+    }
+    else if(gameState===GameState.STAGE_SELECT){
+        if(up||left){stageSelectIndex=(stageSelectIndex+LEVELS.length-1)%LEVELS.length;soundSystem.playSound('menuMove');}
+        if(down||right){stageSelectIndex=(stageSelectIndex+1)%LEVELS.length;soundSystem.playSound('menuMove');}
+        if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
+        if(accept){pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}
+        if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
+    }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
     else if(gameState===GameState.CHARACTER_SELECT){if(left){characterSelectCursor=0;soundSystem.playSound('menuMove');}if(right){characterSelectCursor=1;soundSystem.playSound('menuMove');}if(back){gameState=GameState.MENU;selectedCharacters=[null,null];soundSystem.playSound('menuBack');}if(accept&&characterSelectReady){if(selectedCharacters[0]===null){selectedCharacters[0]=characterSelectCursor===0?'João':'Crist';if(playerCount===1)startGameWithCharacters();else characterSelectCursor=selectedCharacters[0]==='João'?1:0;}else if(playerCount===2&&selectedCharacters[1]===null){selectedCharacters[1]=characterSelectCursor===0?'João':'Crist';startGameWithCharacters();}}}
     else if(gameState===GameState.OPTIONS){
@@ -1432,6 +1456,24 @@ function handleGamepadInput() {
     else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;}else nextLevel();soundSystem.playSound('menuSelect');}
     else if(gameState===GameState.PLAYING&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){gameState=GameState.PAUSED;soundSystem.playSound('menuSelect');}
     else if(gameState===GameState.PAUSED&&([0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))||back)){gameState=GameState.PLAYING;soundSystem.playSound('menuSelect');}
+}
+
+function drawStageSelect() {
+    const g=ctx.createLinearGradient(0,0,0,650); g.addColorStop(0,'#090d20'); g.addColorStop(.55,'#30133b'); g.addColorStop(1,'#6b2d1b'); ctx.fillStyle=g;ctx.fillRect(0,0,1000,650);
+    ctx.fillStyle='#fff1c8';ctx.font='bold 54px Bebas Neue';ctx.textAlign='center';ctx.fillText('SELECIONAR FASE',500,70);
+    ctx.fillStyle='#f5c04a';ctx.font='16px Righteous';ctx.fillText('DESBLOQUEADO POR ZERAR O JOGO',500,100);
+
+    const cardY=145, cardH=68;
+    LEVELS.forEach((level,i)=>{
+        const y=cardY+i*82, sel=i===stageSelectIndex;
+        ctx.fillStyle=sel?'rgba(168,50,37,.92)':'rgba(10,10,14,.82)'; ctx.strokeStyle=sel?'#ffd06a':'#65513f'; ctx.lineWidth=sel?3:2;
+        ctx.beginPath();ctx.roundRect(205,y,590,cardH,11);ctx.fill();ctx.stroke();
+        ctx.textAlign='left';ctx.fillStyle=sel?'#fff7db':'#ddd3c2';ctx.font='bold 25px Bebas Neue';ctx.fillText(`${i+1}. ${level.name}`,235,y+29);
+        ctx.fillStyle=sel?'#ffd06a':'#9eb2c7';ctx.font='13px Righteous';ctx.fillText(level.description||'Rumo a Vegas',235,y+51);
+        ctx.textAlign='right';ctx.fillStyle=sel?'#fff':'#8d8273';ctx.font='bold 17px Bebas Neue';ctx.fillText(sel?'▶ JOGAR':'',760,y+38);
+    });
+    ctx.textAlign='center';ctx.fillStyle='#8de3ff';ctx.font='16px Righteous';ctx.fillText(`MODO: ${stageSelectPlayers} JOGADOR${stageSelectPlayers>1?'ES':''}  •  TAB / X troca jogadores`,500,575);
+    ctx.fillStyle='#ded1bd';ctx.font='14px Righteous';ctx.fillText('↑↓ / ←→ escolher fase  •  ENTER / A confirmar  •  ESC / B voltar',500,610);
 }
 
 function drawAchievements() {
@@ -1788,6 +1830,7 @@ function drawGameOver() {
 }
 
 function drawVictory() {
+    if (saveSystem && typeof saveSystem.markGameCompleted === 'function' && !saveSystem.load().gameCompleted) { saveSystem.markGameCompleted(); refreshMenuOptions(); }
     // Fundo dourado
     const gradient = ctx.createLinearGradient(0, 0, 0, 650);
     gradient.addColorStop(0, '#ffd700');
@@ -1827,6 +1870,7 @@ function drawVictory() {
     const totalTime = ((Date.now() - gameStartTime) / 1000).toFixed(1);
     ctx.font = 'bold 32px Righteous';
     ctx.fillText(`Tempo total: ${totalTime}s`, 500, 400);
+    ctx.fillStyle='#3b1600';ctx.font='bold 22px Righteous';ctx.fillText('SELETOR DE FASES DESBLOQUEADO!',500,455);
     
     // Verificar conquista de vitória
     const totalLife = players.reduce((sum, p) => sum + p.life, 0);
@@ -2076,11 +2120,8 @@ function drawHUD() {
         }
     });
     
-    // Atualizar e desenhar notificações de conquistas
-    if (window.unifiedAchievements) {
-        window.trophySystem.updateNotifications();
-        window.trophySystem.drawNotifications(ctx);
-    }
+    // Notificações de troféus são atualizadas/desenhadas apenas pelo hud-v093.js.
+    // Evita atualização dupla e notificações aceleradas.
     
     // ========== CONTADOR DE INIMIGOS RESTANTES / ONDAS ==========
     if (!bossSpawned) {
@@ -2313,6 +2354,9 @@ function gameLoop() {
         if (window.trophySystem) {
             window.trophySystem.draw(ctx);
         }
+    }
+    else if (gameState === GameState.STAGE_SELECT) {
+        drawStageSelect();
     }
     else if (gameState === GameState.TROPHIES) {  // ✅ SPRINT 1 FIX
         if (window.trophySystem) {

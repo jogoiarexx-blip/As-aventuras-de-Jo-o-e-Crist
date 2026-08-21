@@ -1163,7 +1163,7 @@ const LEVELS = [
         bgColor1: '#0a0a1a',
         bgColor2: '#1a0a2e',
         groundColor: '#2a2a2a',
-        enemyTypes: ['ciclista', 'strong', 'fast', 'tank', 'berserker', 'sniper', 'healer', 'exploder', 'cowboy', 'cockroach'],
+        enemyTypes: ['turista', 'seguranca', 'elvis_fan', 'mulher_feia', 'travesti'],
         enemyCount: 25,
         hasFinalBoss: true,
         nextLevel: 6,
@@ -1176,56 +1176,17 @@ const LEVELS = [
 
     new Level({
         id: 6,
-        name: 'AS CATACUMBAS',
-        description: 'Sob Vegas existem corredores secretos... e guardiões letais!',
-        bgColor1: '#0d0d1a',
-        bgColor2: '#050510',
-        groundColor: '#1a1a2a',
-        enemyTypes: ['elite', 'ghost'],
-        enemyCount: 0,
+        name: 'DENTRO DO CASSINO',
+        description: 'João e Crist invadem o Royal Vegas. Entre mesas, caça-níqueis e seguranças, o caminho leva até a Arena VIP!',
+        backgroundImage: 'assets/backgrounds/fase6-cassino.png',
+        bgColor1: '#090716',
+        bgColor2: '#24102f',
+        groundColor: '#2a2019',
+        enemyTypes: ['turista', 'seguranca', 'elvis_fan', 'mulher_feia', 'travesti'],
+        enemyCount: 28,
         hasBoss: true,
-        hasTechBoss: true,
-        useWaves: true,
         nextLevel: 7,
-        levelRequirement: 14,
-        difficultyMultiplier: 2.5,
-        drawBackground(ctx, cameraX) {
-            const grad = ctx.createLinearGradient(0, 0, 0, 650);
-            grad.addColorStop(0, '#050510');
-            grad.addColorStop(1, '#0a0a1a');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 5000, 650);
-            // Estalactites
-            ctx.fillStyle = '#1a1a2e';
-            for (let i = 0; i < 5000; i += 120) {
-                const h = 40 + Math.sin(i * 0.3) * 20;
-                ctx.beginPath();
-                ctx.moveTo(i, 0);
-                ctx.lineTo(i + 30, 0);
-                ctx.lineTo(i + 15, h);
-                ctx.closePath();
-                ctx.fill();
-            }
-            // Tochas
-            for (let i = 400; i < 5000; i += 500) {
-                const flicker = Math.sin(Date.now() * 0.01 + i) * 0.3 + 0.7;
-                ctx.fillStyle = `rgba(255, 140, 0, ${0.8 * flicker})`;
-                ctx.shadowBlur = 30 * flicker;
-                ctx.shadowColor = '#ff8800';
-                ctx.fillRect(i, 350, 8, 20);
-                ctx.fillStyle = `rgba(255, 200, 0, ${flicker})`;
-                ctx.beginPath();
-                ctx.arc(i + 4, 345, 8 * flicker, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-            // Chão de pedra
-            const floorGrad = ctx.createLinearGradient(0, 510, 0, 650);
-            floorGrad.addColorStop(0, '#1a1a2e');
-            floorGrad.addColorStop(1, '#0d0d1a');
-            ctx.fillStyle = floorGrad;
-            ctx.fillRect(0, 510, 5000, 140);
-        }
+        difficultyMultiplier: 2.25
     }),
 
     new Level({

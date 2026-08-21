@@ -65,6 +65,21 @@ class EnemyFactory {
                     ? new CockroachEnemy(x, y)
                     : new Enemy(x, y, 'cockroach');
             
+            case 'turista':
+                return typeof TuristaEnemy !== 'undefined' ? new TuristaEnemy(x, y) : new Enemy(x, y, 'basic');
+
+            case 'seguranca':
+                return typeof SegurancaEnemy !== 'undefined' ? new SegurancaEnemy(x, y) : new Enemy(x, y, 'strong');
+
+            case 'elvis_fan':
+                return typeof ElvisFanEnemy !== 'undefined' ? new ElvisFanEnemy(x, y) : new Enemy(x, y, 'fast');
+
+            case 'mulher_feia':
+                return typeof MulherFeiaEnemy !== 'undefined' ? new MulherFeiaEnemy(x, y) : new Enemy(x, y, 'strong');
+
+            case 'travesti':
+                return typeof TravestiEnemy !== 'undefined' ? new TravestiEnemy(x, y) : new Enemy(x, y, 'fast');
+            
             case 'elite':
                 return typeof EliteEnemy !== 'undefined'
                     ? new EliteEnemy(x, y)

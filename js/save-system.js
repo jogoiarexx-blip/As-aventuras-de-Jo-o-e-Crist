@@ -7,6 +7,7 @@ class SaveSystem {
             totalPlaytime: 0,
             gamesPlayed: 0,
             favoriteCharacter: null,
+            gameCompleted: false,
             playerProgress: {
                 João: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] },
                 Crist: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] }
@@ -44,6 +45,14 @@ class SaveSystem {
     updateHighestLevel(level) {
         if (level > this.data.highestLevel) {
             this.data.highestLevel = level;
+            this.saveSave();
+        }
+    }
+    
+    markGameCompleted() {
+        if (!this.data.gameCompleted) {
+            this.data.gameCompleted = true;
+            this.data.completedAt = Date.now();
             this.saveSave();
         }
     }
@@ -89,6 +98,10 @@ class SaveSystem {
             const saved = localStorage.getItem('joaoCristSave');
             if (saved) {
                 this.data = JSON.parse(saved);
+                // Migração de saves antigos: quem já alcançou/zerou a última fase também recebe o seletor.
+                if (typeof this.data.gameCompleted !== 'boolean') {
+                    this.data.gameCompleted = Number(this.data.highestLevel || 0) >= 6;
+                }
             }
         } catch (e) {
             console.warn('Não foi possível carregar progresso');
@@ -103,6 +116,7 @@ class SaveSystem {
                 totalPlaytime: 0,
                 gamesPlayed: 0,
                 favoriteCharacter: null,
+                gameCompleted: false,
                 playerProgress: {
                     João: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] },
                     Crist: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] }
