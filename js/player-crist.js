@@ -366,7 +366,7 @@ class PlayerCrist {
 
     // ===== MÉTODO DE ATUALIZAÇÃO (MOVIMENTAÇÃO) =====
     update(keys) {
-        // Sistema de Dash (ArrowDown para Crist)
+        // Sistema de Dash (tecla configurável; padrão: ↓ no Jogador 2)
         if (sistemControles.acaoAtiva(this.controlPlayer, 'dash', keys) && !this.dashing && this.dashCooldown === 0 && !this.attacking) {
             this.dashing = true;
             this.dashTimer = this.dashDuration;

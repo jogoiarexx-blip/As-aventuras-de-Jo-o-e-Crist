@@ -16,6 +16,10 @@
     const w=286,h=62,y=10,x= total>1 && index===1 ? 704 : 10;
     panel(x,y,w,h);
     ctx.textAlign='left';ctx.fillStyle=p.name==='João'?'#58b8ff':'#ff7878';ctx.font='bold 17px Righteous';ctx.fillText(`${p.name}  P${index+1}`,x+10,y+20);
+    // Ícone 16-bit de vida no HUD + fallback em coração.
+    const lifeSprite=window.powerUpSprites&&window.powerUpSprites.health;
+    if(lifeSprite&&lifeSprite.complete&&lifeSprite.naturalWidth>0){ctx.imageSmoothingEnabled=false;ctx.drawImage(lifeSprite,x+w-78,y+4,18,18);}
+    else {ctx.fillStyle='#ff6767';ctx.font='14px Arial';ctx.textAlign='left';ctx.fillText('♥',x+w-78,y+19);}
     ctx.fillStyle='#fff';ctx.font='12px Righteous';ctx.textAlign='right';ctx.fillText(`${Math.max(0,Math.ceil(p.life))}/${p.maxLife}`,x+w-10,y+20);
     bar(x+10,y+28,w-20,13,p.life/p.maxLife,'life');
     if(p.evolution){

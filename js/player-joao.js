@@ -457,7 +457,7 @@ class PlayerJoao {
             this.dashTimer = 0;
         }
         
-        // Sistema de Dash (S para João)
+        // Sistema de Dash (tecla configurável; padrão: SHIFT no Jogador 1)
         if (sistemControles.acaoAtiva(this.controlPlayer, 'dash', keys) && !this.dashing && this.dashCooldown === 0 && !this.attacking && !this.rangedCharging && this.rangedRecovery === 0) {
             this.dashing = true;
             this.dashTimer = this.dashDuration;

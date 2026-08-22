@@ -26,7 +26,11 @@ class TrophySystem {
             // Stats especiais
             noDamageLevels: 0,
             noDeathRun: false,
-            unlockedSkills: 0
+            unlockedSkills: 0,
+            busCompleted: 0,
+            busBestResistance: 0,
+            busNoCollision: false,
+            busBestTime: Infinity
         };
         
         this.notifications = [];
@@ -101,6 +105,10 @@ class TrophySystem {
                 reward: { xp: 100, points: 200 }
             },
             
+            {
+                id: 'bus_road_trip', name: 'PEGANDO A ESTRADA', description: 'Complete o minigame Estrada para Vegas',
+                tier: 'bronze', icon: '🚌', color: '#CD7F32', requirement: { type: 'bus_complete', value: 1 }, reward: { xp: 250, points: 500 }
+            },
             // ==================== PRATA 🥈 ====================
             {
                 id: 'veteran',
@@ -183,6 +191,10 @@ class TrophySystem {
                 reward: { xp: 800, points: 1600 }
             },
             
+            {
+                id: 'bus_good_driver', name: 'BOM MOTORISTA', description: 'Complete com pelo menos 75% da resistência',
+                tier: 'silver', icon: '🚌', color: '#C0C0C0', requirement: { type: 'bus_resistance', value: 75 }, reward: { xp: 600, points: 1200 }
+            },
             // ==================== OURO 🥇 ====================
             {
                 id: 'destroyer',
@@ -265,6 +277,14 @@ class TrophySystem {
                 reward: { xp: 4000, points: 8000 }
             },
             
+            {
+                id: 'bus_road_king', name: 'REI DA ESTRADA', description: 'Complete o percurso sem nenhuma colisão',
+                tier: 'gold', icon: '👑', color: '#FFD700', requirement: { type: 'bus_no_collision', value: true }, reward: { xp: 1500, points: 3000 }
+            },
+            {
+                id: 'bus_pedal_down', name: 'PÉ EMBAIXO', description: 'Complete Estrada para Vegas em até 72 segundos',
+                tier: 'gold', icon: '⚡', color: '#FFD700', requirement: { type: 'bus_time', value: 72 }, reward: { xp: 1800, points: 3600 }
+            },
             // ==================== PLATINA 🏆 ====================
             {
                 id: 'the_legend',
@@ -365,6 +385,14 @@ class TrophySystem {
                 return stats.fastestGameTime <= requirement.value;
             case 'score':
                 return stats.score >= requirement.value;
+            case 'bus_complete':
+                return (stats.busCompleted || 0) >= requirement.value;
+            case 'bus_resistance':
+                return (stats.busBestResistance || 0) >= requirement.value;
+            case 'bus_no_collision':
+                return stats.busNoCollision === true;
+            case 'bus_time':
+                return Number.isFinite(stats.busBestTime) && stats.busBestTime <= requirement.value;
             case 'all_trophies':
                 const nonPlatinum = this.trophies.filter(t => t.tier !== 'platinum');
                 const unlockedNonPlatinum = nonPlatinum.filter(t => 
@@ -534,6 +562,10 @@ class TrophySystem {
             case 'boss_defeated': current = this.stats.bossesDefeated || 0; break;
             case 'all_skills': current = this.stats.unlockedSkills || 0; break;
             case 'score': current = this.stats.score || 0; break;
+            case 'bus_complete': current = this.stats.busCompleted || 0; break;
+            case 'bus_resistance': current = this.stats.busBestResistance || 0; break;
+            case 'bus_no_collision': current = this.stats.busNoCollision ? 1 : 0; percent=current*100; label=`${current}/1 percurso perfeito`; break;
+            case 'bus_time': { const best=this.stats.busBestTime; if(Number.isFinite(best)){percent=best<=target?100:Math.max(5,Math.min(99,(target/best)*100));label=`Melhor: ${this.formatTime(best)}  •  Meta: ${this.formatTime(target)}`;} else {percent=0;label=`Melhor: --:--  •  Meta: ${this.formatTime(target)}`;} break; }
             case 'no_death_run':
                 current = this.stats.noDeathRun ? 1 : 0;
                 percent = current * 100;
@@ -793,7 +825,11 @@ class TrophySystem {
             fastestGameTime: Infinity,
             noDamageLevels: 0,
             noDeathRun: false,
-            unlockedSkills: 0
+            unlockedSkills: 0,
+            busCompleted: 0,
+            busBestResistance: 0,
+            busNoCollision: false,
+            busBestTime: Infinity
         };
         this.saveProgress();
         console.log('🔄 Troféus resetados');

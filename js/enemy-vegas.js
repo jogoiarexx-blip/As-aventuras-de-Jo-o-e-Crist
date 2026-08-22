@@ -1,5 +1,6 @@
 /* João e Crist v0.9.3 — inimigos exclusivos de Vegas / Fases 5 e 6 */
 (() => {
+  const fallbackEnemyDraw = (typeof Enemy !== 'undefined' && Enemy.prototype.draw) ? Enemy.prototype.draw : null;
   const CONFIG = {
     turista: {
       cls: 'TuristaEnemy', name: 'Turista de Vegas', file: 'turista-16bit.png',
@@ -26,6 +27,7 @@
   const images = {};
   Object.entries(CONFIG).forEach(([type,c]) => {
     const img = new Image();
+    img.onerror = () => console.warn('[sprite-vegas] Falha ao carregar:', c.file);
     img.src = 'assets/enemies/' + c.file;
     images[type] = img;
   });
@@ -66,7 +68,11 @@
     draw(ctx) {
       const c = CONFIG[this.__vegasType];
       const img = images[this.__vegasType];
-      if (!c || !img || !img.complete || !img.naturalWidth) return;
+      if (!c || !img || !img.complete || !img.naturalWidth) {
+        // Nunca deixa o inimigo invisível enquanto o sprite carrega ou se houver erro de asset.
+        if (fallbackEnemyDraw) fallbackEnemyDraw.call(this, ctx);
+        return;
+      }
 
       let state = 'idle';
       if (this.life <= 0 || this.dead) state = 'dead';

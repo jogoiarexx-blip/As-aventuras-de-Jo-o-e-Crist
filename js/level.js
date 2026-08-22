@@ -15,6 +15,12 @@ class Level {
         this._backgroundImg = null;
         if (this.backgroundImage) {
             this._backgroundImg = new Image();
+            this._backgroundFailed = false;
+            this._backgroundImg.onload = () => { this._backgroundFailed = false; };
+            this._backgroundImg.onerror = () => {
+                this._backgroundFailed = true;
+                console.warn('[background] Falha ao carregar:', this.backgroundImage);
+            };
             this._backgroundImg.src = this.backgroundImage;
         }
         this.description = config.description;
@@ -34,22 +40,23 @@ class Level {
         // Não altera largura, física, câmera nem lógica da fase.
         if (this._backgroundImg && this._backgroundImg.complete && this._backgroundImg.naturalWidth) {
             const worldW = this.width || 5000;
+            const canvasW = ctx.canvas ? ctx.canvas.width : 1000;
             const canvasH = ctx.canvas ? ctx.canvas.height : 650;
+            const imgW = this._backgroundImg.naturalWidth;
+            const imgH = this._backgroundImg.naturalHeight;
+
+            // PERFORMANCE: desenha somente o trecho visível do background.
+            // Antes o navegador escalava uma imagem de ~2000px para 5000px em TODO frame,
+            // mesmo com quase tudo fora da tela. Isso gerava travadas nas fases avançadas.
+            const safeCameraX = Math.max(0, Math.min(Number(cameraX) || 0, Math.max(0, worldW - canvasW)));
+            const sx = Math.max(0, Math.min(imgW - 1, (safeCameraX / worldW) * imgW));
+            const sw = Math.max(1, Math.min(imgW - sx, (canvasW / worldW) * imgW));
 
             ctx.save();
             ctx.imageSmoothingEnabled = false;
-
-            // O jogo já aplica translate(-cameraX, 0) antes de chamar drawBackground.
-            // Desenhamos a imagem no espaço do mundo, ocupando a largura atual da fase.
-            ctx.drawImage(
-                this._backgroundImg,
-                0, 0,
-                this._backgroundImg.naturalWidth,
-                this._backgroundImg.naturalHeight,
-                0, 0,
-                worldW, canvasH
-            );
-
+            // O contexto já está translate(-cameraX,0). Desenhar em safeCameraX faz
+            // o recorte cair exatamente no viewport 0..canvasW.
+            ctx.drawImage(this._backgroundImg, sx, 0, sw, imgH, safeCameraX, 0, canvasW, canvasH);
             ctx.restore();
             return;
         }

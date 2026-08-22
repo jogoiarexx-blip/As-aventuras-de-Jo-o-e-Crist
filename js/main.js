@@ -20,7 +20,10 @@ const GameState = {
     VICTORY: 'victory',
     ACHIEVEMENTS: 'achievements',
     TROPHIES: 'trophies',  // ✅ SPRINT 1 FIX: Adicionado
-    STAGE_SELECT: 'stage_select'
+    STAGE_SELECT: 'stage_select',
+    BUS_BOARDING: 'bus_boarding',
+    BUS_MINIGAME: 'bus_minigame',
+    BUS_ARRIVAL: 'bus_arrival'
 };
 
 let gameState = GameState.LOADING; // Melhoria #19: Começar em loading
@@ -55,11 +58,14 @@ let menuOptions = [];
 let stageSelectIndex = 0;
 let pendingStartLevel = 0;
 let stageSelectPlayers = 1;
+function getStageSelectCount(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0); }
+function stageSelectIsBusBonus(){ return saveSystem?.load?.().busMinigameUnlocked && stageSelectIndex === LEVELS.length; }
 
 function refreshMenuOptions() {
     const completed = !!saveSystem?.load?.().gameCompleted;
     menuOptions = ['1 JOGADOR', '2 JOGADORES', 'COMO JOGAR: JOÃO & CRIST', 'CONFIGURAR CONTROLES', 'TROFÉUS', 'OPÇÕES'];
     if (completed) menuOptions.push('SELECIONAR FASE');
+    if (saveSystem?.load?.().busMinigameUnlocked) menuOptions.push('BÔNUS — ESTRADA PARA VEGAS');
     if (menuSelection >= menuOptions.length) menuSelection = menuOptions.length - 1;
 }
 
@@ -119,6 +125,7 @@ window.containerSprites = containerSprites;
 const powerUpSprites = {};
 ['health', 'speed', 'strength', 'invincible', 'score'].forEach(type => {
     const img = new Image();
+    img.onerror = () => console.warn('[powerup-sprite] Falha ao carregar:', type);
     img.src = `assets/powerups/${type}-16bit.png`;
     powerUpSprites[type] = img;
 });
@@ -252,7 +259,7 @@ document.addEventListener('keydown', e => {
         }
         return;
     }
-    if (gameState === GameState.PLAYING && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Tab'].includes(e.key)) e.preventDefault();
+    if ((gameState === GameState.PLAYING || gameState === GameState.BUS_MINIGAME) && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Tab'].includes(e.key)) e.preventDefault();
     keys[normalizedKey] = true;
     
     // Melhoria #19: Pular loading screen com qualquer tecla
@@ -319,20 +326,19 @@ document.addEventListener('keydown', e => {
     // Seletor de fases (desbloqueado apenas após zerar o jogo)
     if (gameState === GameState.STAGE_SELECT) {
         if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-            stageSelectIndex = (stageSelectIndex + LEVELS.length - 1) % LEVELS.length;
+            stageSelectIndex = (stageSelectIndex + getStageSelectCount() - 1) % getStageSelectCount();
             soundSystem.playSound('menuMove');
         }
         if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-            stageSelectIndex = (stageSelectIndex + 1) % LEVELS.length;
+            stageSelectIndex = (stageSelectIndex + 1) % getStageSelectCount();
             soundSystem.playSound('menuMove');
         }
         if (e.key === 'Tab') {
             e.preventDefault(); stageSelectPlayers = stageSelectPlayers === 1 ? 2 : 1; soundSystem.playSound('menuMove');
         }
         if (e.key === 'Enter') {
-            pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers;
-            selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false;
-            gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect');
+            if (stageSelectIsBusBonus()) { window.busSequence?.startMinigame(true); gameState=GameState.BUS_MINIGAME; soundSystem.playSound('menuSelect'); }
+            else { pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect'); }
         }
         if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=6; soundSystem.playSound('menuBack'); }
     }
@@ -925,8 +931,11 @@ function spawnBoss() {
 
 function spawnPowerUps(count) {
     const types = ['health', 'speed', 'strength', 'invincible', 'score'];
+    // Sempre existe pelo menos 1 item de vida por fase. Antes era 100% aleatório,
+    // então era possível passar várias fases sem o sprite de vida aparecer.
+    const guaranteed = ['health'];
     for (let i = 0; i < count; i++) {
-        const itemType = types[Math.floor(Math.random() * types.length)];
+        const itemType = guaranteed[i] || types[Math.floor(Math.random() * types.length)];
         const containerType = Math.random() < 0.58 ? 'crate' : 'barrel';
         const w = containerType === 'crate' ? 58 : 50;
         const h = containerType === 'crate' ? 58 : 62;
@@ -1387,15 +1396,18 @@ function drawOptions() {
 
 function activateMenuSelection() {
     refreshMenuOptions();
-    if (menuSelection===0 || menuSelection===1) {
+    const option = menuOptions[menuSelection];
+    if (option==='1 JOGADOR' || option==='2 JOGADORES') {
         pendingStartLevel=0;
-        playerCount=menuSelection+1; gameState=GameState.CHARACTER_SELECT; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect');
-    } else if(menuSelection===2){gameState=GameState.TUTORIAL;soundSystem.playSound('menuSelect');}
-    else if(menuSelection===3){clearKeys();gameState=GameState.CONTROLS_CONFIG;controlsConfigPlayer=1;controlsConfigSelection=0;controlsConfigCapture=false;controlsConfigDevice='keyboard';controlsConfigMessage='';soundSystem.playSound('menuSelect');}
-    else if(menuSelection===4){gameState=GameState.TROPHIES;if(window.trophySystem)window.trophySystem.scrollOffset=0;soundSystem.playSound('menuSelect');}
-    else if(menuSelection===5){gameState=GameState.OPTIONS;optionsSelection=0;gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
-    else if(menuSelection===6 && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
+        playerCount=option==='2 JOGADORES'?2:1; gameState=GameState.CHARACTER_SELECT; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect');
+    } else if(option==='COMO JOGAR: JOÃO & CRIST'){gameState=GameState.TUTORIAL;soundSystem.playSound('menuSelect');}
+    else if(option==='CONFIGURAR CONTROLES'){clearKeys();gameState=GameState.CONTROLS_CONFIG;controlsConfigPlayer=1;controlsConfigSelection=0;controlsConfigCapture=false;controlsConfigDevice='keyboard';controlsConfigMessage='';soundSystem.playSound('menuSelect');}
+    else if(option==='TROFÉUS'){gameState=GameState.TROPHIES;if(window.trophySystem)window.trophySystem.scrollOffset=0;soundSystem.playSound('menuSelect');}
+    else if(option==='OPÇÕES'){gameState=GameState.OPTIONS;optionsSelection=0;gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
+    else if(option==='SELECIONAR FASE' && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
+    else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}
 }
+window.refreshMenuOptions = refreshMenuOptions;
 
 function handleGamepadInput() {
     const pads=gamepadSystem.getPads(); if(!pads.length)return;
@@ -1414,10 +1426,10 @@ function handleGamepadInput() {
         if(back||accept){gameState=GameState.MENU;menuSelection=4;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.STAGE_SELECT){
-        if(up||left){stageSelectIndex=(stageSelectIndex+LEVELS.length-1)%LEVELS.length;soundSystem.playSound('menuMove');}
-        if(down||right){stageSelectIndex=(stageSelectIndex+1)%LEVELS.length;soundSystem.playSound('menuMove');}
+        if(up||left){stageSelectIndex=(stageSelectIndex+getStageSelectCount()-1)%getStageSelectCount();soundSystem.playSound('menuMove');}
+        if(down||right){stageSelectIndex=(stageSelectIndex+1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
-        if(accept){pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}
+        if(accept){if(stageSelectIsBusBonus()){window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
@@ -1460,20 +1472,14 @@ function handleGamepadInput() {
 
 function drawStageSelect() {
     const g=ctx.createLinearGradient(0,0,0,650); g.addColorStop(0,'#090d20'); g.addColorStop(.55,'#30133b'); g.addColorStop(1,'#6b2d1b'); ctx.fillStyle=g;ctx.fillRect(0,0,1000,650);
-    ctx.fillStyle='#fff1c8';ctx.font='bold 54px Bebas Neue';ctx.textAlign='center';ctx.fillText('SELECIONAR FASE',500,70);
-    ctx.fillStyle='#f5c04a';ctx.font='16px Righteous';ctx.fillText('DESBLOQUEADO POR ZERAR O JOGO',500,100);
-
-    const cardY=145, cardH=68;
-    LEVELS.forEach((level,i)=>{
-        const y=cardY+i*82, sel=i===stageSelectIndex;
-        ctx.fillStyle=sel?'rgba(168,50,37,.92)':'rgba(10,10,14,.82)'; ctx.strokeStyle=sel?'#ffd06a':'#65513f'; ctx.lineWidth=sel?3:2;
-        ctx.beginPath();ctx.roundRect(205,y,590,cardH,11);ctx.fill();ctx.stroke();
-        ctx.textAlign='left';ctx.fillStyle=sel?'#fff7db':'#ddd3c2';ctx.font='bold 25px Bebas Neue';ctx.fillText(`${i+1}. ${level.name}`,235,y+29);
-        ctx.fillStyle=sel?'#ffd06a':'#9eb2c7';ctx.font='13px Righteous';ctx.fillText(level.description||'Rumo a Vegas',235,y+51);
-        ctx.textAlign='right';ctx.fillStyle=sel?'#fff':'#8d8273';ctx.font='bold 17px Bebas Neue';ctx.fillText(sel?'▶ JOGAR':'',760,y+38);
-    });
-    ctx.textAlign='center';ctx.fillStyle='#8de3ff';ctx.font='16px Righteous';ctx.fillText(`MODO: ${stageSelectPlayers} JOGADOR${stageSelectPlayers>1?'ES':''}  •  TAB / X troca jogadores`,500,575);
-    ctx.fillStyle='#ded1bd';ctx.font='14px Righteous';ctx.fillText('↑↓ / ←→ escolher fase  •  ENTER / A confirmar  •  ESC / B voltar',500,610);
+    ctx.fillStyle='#fff1c8';ctx.font='bold 48px Bebas Neue';ctx.textAlign='center';ctx.fillText('SELECIONAR FASE',500,58);
+    ctx.fillStyle='#f5c04a';ctx.font='14px Righteous';ctx.fillText(saveSystem.load().busMinigameUnlocked?'FASES + CONTEÚDO BÔNUS DESBLOQUEADO':'DESBLOQUEADO POR ZERAR O JOGO',500,84);
+    const entries=LEVELS.map((level,i)=>({title:`${i+1}. ${level.name}`,desc:level.description||'Rumo a Vegas',bonus:false}));
+    if(saveSystem.load().busMinigameUnlocked)entries.push({title:'BÔNUS — ESTRADA PARA VEGAS',desc:'Rejogue o minigame do ônibus sem repetir a Fase 2',bonus:true});
+    const cardY=105, cardH=45, gap=7;
+    entries.forEach((entry,i)=>{const y=cardY+i*(cardH+gap),sel=i===stageSelectIndex;ctx.fillStyle=sel?(entry.bonus?'rgba(45,115,108,.94)':'rgba(168,50,37,.92)'):'rgba(10,10,14,.82)';ctx.strokeStyle=sel?'#ffd06a':'#65513f';ctx.lineWidth=sel?3:1;ctx.beginPath();ctx.roundRect(175,y,650,cardH,9);ctx.fill();ctx.stroke();ctx.textAlign='left';ctx.fillStyle=sel?'#fff7db':'#ddd3c2';ctx.font='bold 19px Bebas Neue';ctx.fillText(entry.title,198,y+20);ctx.fillStyle=sel?'#ffd06a':'#9eb2c7';ctx.font='11px Righteous';ctx.fillText(entry.desc.slice(0,74),198,y+37);ctx.textAlign='right';ctx.fillStyle=sel?'#fff':'#8d8273';ctx.font='bold 15px Bebas Neue';ctx.fillText(sel?'▶ JOGAR':'',795,y+27);});
+    ctx.textAlign='center';ctx.fillStyle='#8de3ff';ctx.font='14px Righteous';ctx.fillText(`MODO: ${stageSelectPlayers} JOGADOR${stageSelectPlayers>1?'ES':''}  •  TAB / X troca jogadores`,500,595);
+    ctx.fillStyle='#ded1bd';ctx.font='13px Righteous';ctx.fillText('↑↓ / ←→ escolher  •  ENTER / A confirmar  •  ESC / B voltar',500,622);
 }
 
 function drawAchievements() {
@@ -2429,6 +2435,7 @@ function gameLoop() {
         if (window.GraphicsUpgrade) {
             window.GraphicsUpgrade.drawBackdropAtmosphere(ctx, currentLevel, cameraX);
         }
+        if (currentLevelIndex === 1 && window.busSequence?.isPhase2Waiting?.()) window.busSequence.drawPhase2Bus(ctx);
         
         // Caixas e barris quebráveis que guardam os power-ups
         destructibles.forEach(obj => {
@@ -2601,7 +2608,7 @@ function gameLoop() {
                     const lifeAfter = Number.isFinite(enemy.life) ? enemy.life : null;
                     if (proj.owner?.name === 'João' || proj.owner?.constructor?.name?.toLowerCase().includes('joao')) {
                         const enemyName = enemy.type || enemy.name || enemy.constructor?.name || 'inimigo';
-                        console.log(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
+                        if (window.DEBUG_GAME) console.log(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
                     }
                     score += killed ? 30 : 8;
                     if (proj.owner?.addCombo) proj.owner.addCombo();
@@ -2698,9 +2705,15 @@ function gameLoop() {
                 enemy.dead = true;
             }
             try {
-                if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
-                enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
-                if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPost(ctx, enemy);
+                // PERFORMANCE: atualiza todos, mas só desenha quem está próximo do viewport.
+                // Isso evita dezenas de drawImage/gradientes para inimigos a milhares de px da câmera.
+                const enemyW = enemy.w || 60;
+                const visible = enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180;
+                if (visible) {
+                    if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
+                    enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
+                    if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPost(ctx, enemy);
+                }
             } catch (enemyDrawError) {
                 const enemyLabel = enemy?.type || enemy?.name || (enemy?.constructor && enemy.constructor.name) || 'desconhecido';
                 console.error('[enemy-draw] Falha ao desenhar inimigo:', enemyLabel,
@@ -2982,6 +2995,9 @@ function gameLoop() {
         }
         // Lógica de progresso de fase com sistema de boss
         else {
+            if (currentLevelIndex === 1 && window.busSequence?.isPhase2Waiting?.()) {
+                if (window.busSequence.updatePhase2Waiting(players)) gameState = GameState.BUS_BOARDING;
+            }
             const hasBossThisLevel = currentLevel.hasBoss || currentLevel.hasFinalBoss || 
                                      currentLevel.hasTechBoss || currentLevel.hasShadowBoss || currentLevel.hasGodBoss;
             
@@ -3078,6 +3094,14 @@ function gameLoop() {
                 const allEnemiesDead = enemies.length === 0 || enemies.every(e => e.dead || e.life <= 0);
                 const allScheduledEnemiesSpawned = !enemySpawnDirector || enemySpawnDirector.allSpawned;
                 if (allEnemiesDead && allScheduledEnemiesSpawned) {
+                    if (currentLevelIndex === 1) {
+                        if (gameState === GameState.PLAYING && !window.busSequence?.isPhase2Waiting?.()) {
+                            if (window.trophySystem) window.trophySystem.stats.levelsCompleted++;
+                            players.forEach(player => { if (player.evolution) saveSystem.savePlayerProgress(player.name, player.evolution.save()); });
+                            enemySpawnDirector = null;
+                            window.busSequence?.preparePhase2Exit(currentLevel, players);
+                        }
+                    } else {
                     if (window.trophySystem) window.trophySystem.stats.levelsCompleted++;
                     
                     if (currentLevel.nextLevel) {
@@ -3101,9 +3125,30 @@ function gameLoop() {
                             }
                         });
                     }
+                    }
                 }
             }
         }
+    }
+    else if (gameState === GameState.BUS_BOARDING) {
+        const busResult = window.busSequence?.updateDrawBoarding(ctx, currentLevel, players);
+        if (busResult === 'MINIGAME') gameState = GameState.BUS_MINIGAME;
+        else if (busResult === 'ERROR') gameState = GameState.BUS_MINIGAME;
+    }
+    else if (gameState === GameState.BUS_MINIGAME) {
+        const busResult = window.busSequence?.updateDrawMinigame(ctx, keys, gamepadSystem, sistemControles);
+        if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
+        if (busResult === 'ARRIVAL') {
+            loadLevel(2);
+            gameState = GameState.BUS_ARRIVAL;
+            window.busSequence?.startArrival(players);
+        } else if (busResult === 'BONUS_DONE') {
+            gameState = GameState.MENU; refreshMenuOptions(); menuSelection = Math.max(0, menuOptions.indexOf('BÔNUS — ESTRADA PARA VEGAS'));
+        }
+    }
+    else if (gameState === GameState.BUS_ARRIVAL) {
+        const busResult = window.busSequence?.updateDrawArrival(ctx, currentLevel, players);
+        if (busResult === 'DONE') { levelStartTime = Date.now(); levelDamageTaken = 0; gameState = GameState.PLAYING; }
     }
     else if (gameState === GameState.LEVEL_COMPLETE) {
         // Mostrar jogo ao fundo
