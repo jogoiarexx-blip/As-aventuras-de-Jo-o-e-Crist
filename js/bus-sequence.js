@@ -80,10 +80,19 @@
             return false;
         }
 
+        drawBusFacingRight(ctx, sprite, x, y, w=BUS_W, h=BUS_H) {
+            if (!sprite?.complete || !sprite.naturalWidth) return;
+            ctx.save();
+            ctx.translate(x + w, y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(sprite, 0, 0, w, h);
+            ctx.restore();
+        }
+
         drawPhase2Bus(ctx) {
             if (!this.phase2Waiting) return;
             const img = this.sprites.idle;
-            if (img?.complete && img.naturalWidth) ctx.drawImage(img, this.busWorldX - BUS_W, 454, BUS_W, BUS_H);
+            this.drawBusFacingRight(ctx, img, this.busWorldX - BUS_W, 454);
             ctx.save();
             ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(this.busWorldX - 285, 400, 260, 38);
             ctx.strokeStyle = '#ffd66b'; ctx.strokeRect(this.busWorldX - 285, 400, 260, 38);
@@ -120,7 +129,7 @@
                 else sprite=this.sprites.leaving;
                 let busX = bx - BUS_W;
                 if (t > .74) busX += (t-.74)/.26 * 600;
-                if (sprite?.complete && sprite.naturalWidth) ctx.drawImage(sprite, busX,454,BUS_W,BUS_H);
+                this.drawBusFacingRight(ctx, sprite, busX, 454);
 
                 b.players.forEach((entry, i) => {
                     const p = entry.p; const enterStart=.26+i*.07, enterEnd=.57+i*.07;
@@ -306,7 +315,7 @@
                 level?.drawBackground?.(ctx,0);
                 let bx=-BUS_W+Math.min(1,t/.28)*500; if(t>.72)bx=308+(t-.72)/.28*620;
                 let spr=t<.24?this.sprites.arriving:t<.38?this.sprites.braking:t<.48?this.sprites.doorOpening:t<.67?this.sprites.doorOpen:t<.73?this.sprites.doorClosing:this.sprites.leaving;
-                if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,bx,454,BUS_W,BUS_H);
+                this.drawBusFacingRight(ctx, spr, bx, 454);
                 a.players.forEach((entry,i)=>{const p=entry.p;const s=.49+i*.055,e=.64+i*.055;if(t<s)return;const q=Math.min(1,(t-s)/(e-s));p.x=365+i*60+q*70;p.y=455;p.draw?.(ctx);});
                 if(t>.76)this.drawDust(ctx,bx+45,535,3);
                 this.drawFade(ctx,t<.08?1-t/.08:0);
@@ -332,7 +341,7 @@
             r.obstacles.forEach(o=>{const img=this.obstacleSprites[o.type];if(img?.complete&&img.naturalWidth)ctx.drawImage(img,o.x,o.y-o.h/2,o.w,o.h);});
             // bus sprite
             let spr=this.sprites.moving;if(r.collisionFlash>0)spr=this.sprites.collision;else if(r.resistance<=30)spr=this.sprites.critical;else if(r.resistance<=60)spr=this.sprites.damaged;else if(r.turbo>0||r.speed>1.2)spr=this.sprites.accelerating;else if(r.speed<.75)spr=this.sprites.braking;else if(Math.abs(LANES[r.targetLane]-r.y)>4)spr=this.sprites.turning;
-            ctx.save();ctx.translate(BUS_X,r.y-BUS_H/2);if(r.invincible>0&&Math.floor(r.elapsed*10)%2===0)ctx.globalAlpha=.55;if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,0,0,BUS_W,BUS_H);ctx.restore();
+            ctx.save();ctx.translate(BUS_X + BUS_W,r.y-BUS_H/2);ctx.scale(-1,1);if(r.invincible>0&&Math.floor(r.elapsed*10)%2===0)ctx.globalAlpha=.55;if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,0,0,BUS_W,BUS_H);ctx.restore();
             if(r.speed>1.18)this.drawDust(ctx,BUS_X+28,r.y+44,2);
             ctx.restore();
             this.drawBusHUD(ctx,r,finishing);
