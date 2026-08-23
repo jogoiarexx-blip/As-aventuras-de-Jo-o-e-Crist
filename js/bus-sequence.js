@@ -1,3 +1,4 @@
+// Assets extras do ônibus adicionados: carros coloridos, motos, cones e buracos.
 /* João & Crist v0.9.3 - sequência modular do ônibus / minigame Estrada para Vegas */
 (function () {
     'use strict';
@@ -7,17 +8,37 @@
     const BUS_X = 245;
     const BUS_W = 220;
     const BUS_H = 94;
+    const BUS_PHASE_W = 280;
+    const BUS_PHASE_H = 120;
+    const BUS_PHASE_Y = 428;
     const COURSE_DISTANCE = 100;
     const SPEEDRUN_TARGET = 72; // segundos; equilibrado para percurso nominal de ~75s
 
     const spritePaths = {
-        idle: 'assets/bus/idle.png', moving: 'assets/bus/andando.png', accelerating: 'assets/bus/acelerando.png', braking: 'assets/bus/freando.png',
-        turning: 'assets/bus/virando.png', collision: 'assets/bus/colisao.png', damaged: 'assets/bus/danificado.png', critical: 'assets/bus/muito-danificado.png',
-        doorClosed: 'assets/bus/porta-fechada.png', doorOpening: 'assets/bus/porta-abrindo.png', doorOpen: 'assets/bus/porta-aberta.png', doorClosing: 'assets/bus/porta-fechando.png',
-        leaving: 'assets/bus/saida.png', arriving: 'assets/bus/chegada.png'
+        idle: 'assets/bus/idle.webp', moving: 'assets/bus/andando.webp', accelerating: 'assets/bus/acelerando.webp', braking: 'assets/bus/freando.webp',
+        turning: 'assets/bus/virando.webp', collision: 'assets/bus/colisao.webp', damaged: 'assets/bus/danificado.webp', critical: 'assets/bus/muito-danificado.webp',
+        doorClosed: 'assets/bus/porta-fechada.webp', doorOpening: 'assets/bus/porta-abrindo.webp', doorOpen: 'assets/bus/porta-aberta.webp', doorClosing: 'assets/bus/porta-fechando.webp',
+        leaving: 'assets/bus/saida.webp', arriving: 'assets/bus/chegada.webp'
     };
-    const obstaclePaths = { cone:'assets/bus/obstacles/cone.png', pothole:'assets/bus/obstacles/pothole.png', rock:'assets/bus/obstacles/rock.png', car:'assets/bus/obstacles/car.png', moto:'assets/bus/obstacles/moto.png' };
-    const itemPaths = { repair:'assets/bus/items/repair.png', money:'assets/bus/items/money.png', star:'assets/bus/items/star.png', turbo:'assets/bus/items/turbo.png' };
+    const obstaclePaths = {
+        cone:'assets/bus/cone-1.webp',
+        cone1:'assets/bus/cone-1.webp', cone2:'assets/bus/cone-2.webp', cone3:'assets/bus/cone-3.webp', coneLight:'assets/bus/cone-light.webp',
+        pothole:'assets/bus/pothole-deep.webp',
+        potholeWater:'assets/bus/pothole-water.webp', potholeDeep:'assets/bus/pothole-deep.webp', potholeCracked:'assets/bus/pothole-cracked.webp',
+        rock:'assets/bus/obstacles/rock.webp',
+        car:'assets/bus/cars/car-red.webp',
+        carRed:'assets/bus/cars/car-red.webp', carBlue:'assets/bus/cars/car-blue.webp', carYellow:'assets/bus/cars/car-yellow.webp',
+        carGreen:'assets/bus/cars/car-green.webp', carBlack:'assets/bus/cars/car-black.webp', carWhite:'assets/bus/cars/car-white.webp',
+        moto:'assets/bus/moto-red.webp',
+        motoRed:'assets/bus/moto-red.webp', motoBrown:'assets/bus/moto-brown.webp', motoGreen:'assets/bus/moto-green.webp'
+    };
+    const obstacleVariants = {
+        car:['carRed','carBlue','carYellow','carGreen','carBlack','carWhite'],
+        moto:['motoRed','motoBrown','motoGreen'],
+        cone:['cone1','cone2','cone3','coneLight'],
+        pothole:['potholeWater','potholeDeep','potholeCracked']
+    };
+    const itemPaths = { repair:'assets/bus/items/repair.webp', money:'assets/bus/items/money.webp', star:'assets/bus/items/star.webp', turbo:'assets/bus/items/turbo.webp' };
 
     function loadImages(map) {
         const result = {};
@@ -32,6 +53,8 @@
             this.sprites = loadImages(spritePaths);
             this.obstacleSprites = loadImages(obstaclePaths);
             this.itemSprites = loadImages(itemPaths);
+            this.runBackground = new Image();
+            this.runBackground.src = 'assets/backgrounds/bus-bonus-vegas.webp';
             this.phase2Waiting = false;
             this.boarding = null;
             this.arrival = null;
@@ -92,17 +115,18 @@
         drawPhase2Bus(ctx) {
             if (!this.phase2Waiting) return;
             const img = this.sprites.idle;
-            this.drawBusFacingRight(ctx, img, this.busWorldX - BUS_W, 454);
+            this.drawBusFacingRight(ctx, img, this.busWorldX - BUS_PHASE_W, BUS_PHASE_Y, BUS_PHASE_W, BUS_PHASE_H);
             ctx.save();
             ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(this.busWorldX - 285, 400, 260, 38);
             ctx.strokeStyle = '#ffd66b'; ctx.strokeRect(this.busWorldX - 285, 400, 260, 38);
             ctx.fillStyle = '#fff5d6'; ctx.font = 'bold 17px Righteous'; ctx.textAlign='center';
-            ctx.fillText('VÁ ATÉ O ÔNIBUS', this.busWorldX - 155, 425);
+            ctx.fillText('VÁ ATÉ O ÔNIBUS', this.busWorldX - 170, 418);
             ctx.restore();
         }
 
         startBoarding(players) {
-            this.boarding = { start:performance.now(), duration:6200, players:players.map((p,i)=>({p, startX:p.x, startY:p.y, index:i})) };
+            this.boarding = { start:performance.now(), duration:6200, players:players.map((p,i)=>({p, startX:p.x, startY:p.y, index:i})), doorOpenSfx:false, doorCloseSfx:false };
+            window.soundSystem?.startLoop?.('busEngine', .45);
             this.log('[BUS] Cutscene de embarque iniciada');
         }
 
@@ -117,6 +141,8 @@
                 if (!b) return 'MINIGAME';
                 const elapsed = performance.now() - b.start;
                 const t = Math.min(1, elapsed / b.duration);
+                if(t>=.16 && !b.doorOpenSfx){b.doorOpenSfx=true;window.soundSystem?.playSound?.('busDoorOpen');}
+                if(t>=.68 && !b.doorCloseSfx){b.doorCloseSfx=true;window.soundSystem?.playSound?.('busDoorClose');}
                 const cam = this.getBoardingCameraX(level);
                 ctx.save(); ctx.translate(-cam,0);
                 level?.drawBackground?.(ctx, cam);
@@ -127,20 +153,20 @@
                 else if (t < .62) sprite=this.sprites.doorOpen;
                 else if (t < .73) sprite=this.sprites.doorClosing;
                 else sprite=this.sprites.leaving;
-                let busX = bx - BUS_W;
+                let busX = bx - BUS_PHASE_W;
                 if (t > .74) busX += (t-.74)/.26 * 600;
-                this.drawBusFacingRight(ctx, sprite, busX, 454);
+                this.drawBusFacingRight(ctx, sprite, busX, BUS_PHASE_Y, BUS_PHASE_W, BUS_PHASE_H);
 
                 b.players.forEach((entry, i) => {
                     const p = entry.p; const enterStart=.26+i*.07, enterEnd=.57+i*.07;
                     if (t < enterStart) { p.draw?.(ctx); return; }
                     if (t <= enterEnd) {
                         const q=Math.min(1,(t-enterStart)/(enterEnd-enterStart));
-                        p.x=entry.startX+(bx-115-entry.startX)*q; p.y=entry.startY+(482-entry.startY)*q;
+                        p.x=entry.startX+(busX+132-entry.startX)*q; p.y=entry.startY+(489-entry.startY)*q;
                         p.draw?.(ctx);
                     }
                 });
-                if (t > .76) this.drawDust(ctx, busX+42, 535, 3);
+                if (t > .76) this.drawDust(ctx, busX+54, 535, 3);
                 ctx.restore();
                 this.drawFade(ctx, t > .88 ? (t-.88)/.12 : 0);
                 if (t >= 1) { this.boarding=null; this.startMinigame(false); return 'MINIGAME'; }
@@ -152,32 +178,33 @@
             this.bonusMode=!!bonusMode;
             const progress = checkpoint ? checkpoint.progress : 0;
             const elapsed = checkpoint ? checkpoint.elapsed : 0;
+            const restoredResistance = checkpoint ? Math.max(1, checkpoint.resistance ?? 100) : 100;
+            const restoredCollisions = checkpoint ? Math.max(0, checkpoint.collisions ?? 0) : 0;
+            const restoredScore = checkpoint ? Math.max(0, checkpoint.score ?? 0) : 0;
             this.run = {
-                progress, elapsed, resistance:100, lane:1, targetLane:1, y:LANES[1], speed:1, score:0,
+                progress, elapsed, resistance:restoredResistance, lane:checkpoint?.lane ?? 1, targetLane:checkpoint?.lane ?? 1, y:LANES[checkpoint?.lane ?? 1], speed:1, score:restoredScore,
                 obstacles:[], items:[], spawnTimer:.6, itemTimer:6, hornCooldown:0, hornText:0,
-                invincible:0, turbo:0, collisionFlash:0, collisions:0, checkpointReached:!!checkpoint,
+                invincible:0, turbo:0, collisionFlash:0, collisions:restoredCollisions, checkpointReached:!!checkpoint,
                 checkpoint: checkpoint || null, state:'running', stateTimer:0, distanceLabel:'12 km', shake:0,
                 roadsideSeed:Math.random()*10000, safeLane:1, safeLaneWaves:0, nextSafeLane:null, safeLaneTransition:0
             };
             this.lastTime=performance.now(); this.hornWasDown=false; this.errorMessage=null;
+            window.soundSystem?.startLoop?.('busEngine', .48);
+            window.soundSystem?.playSound?.('busAccelerate');
             this.log('[BUS] Minigame iniciado');
         }
 
         input(keys, gamepadSystem, controls) {
             const pad=gamepadSystem?.getPadForPlayer?.(1);
             const ax=pad?.axes?.[0]||0, ay=pad?.axes?.[1]||0;
-            const cfg=controls?.obterControles?.(1)||{};
-            const downKey = !!keys.ArrowDown || !!keys.s;
-            const upKey = !!keys.ArrowUp || !!keys.w;
-            const leftKey = !!keys.ArrowLeft || !!keys.a;
-            const rightKey = !!keys.ArrowRight || !!keys.d;
-            const attackKey = cfg.attack ? !!keys[cfg.attack] : !!keys[' '];
+            const action = a => !!controls?.acaoAtiva?.(1,a,keys);
+            const keyDown = k => !!keys?.[k];
             return {
-                up: upKey || ay < -.45,
-                down: downKey || ay > .45,
-                left: leftKey || ax < -.45,
-                right: rightKey || ax > .45,
-                horn: attackKey || !!gamepadSystem?.isActionDown?.(1,'attack')
+                up: action('up') || keyDown('ArrowUp') || keyDown('w') || ay < -.45,
+                down: action('dash') || keyDown('ArrowDown') || keyDown('s') || ay > .45,
+                left: action('left') || keyDown('ArrowLeft') || keyDown('a') || ax < -.45,
+                right: action('right') || keyDown('ArrowRight') || keyDown('d') || ax > .45,
+                horn: action('attack') || keyDown('Enter') || keyDown(' ') || !!gamepadSystem?.isActionDown?.(1,'attack')
             };
         }
 
@@ -190,6 +217,10 @@
                 if (r.state==='broken') { this.updateBroken(ctx,dt); return null; }
                 if (r.state==='finish') { this.updateFinish(ctx,dt); return r.stateTimer>2.8 ? (this.bonusMode?'BONUS_DONE':'ARRIVAL') : null; }
                 const inp=this.input(keys,gamepadSystem,controls);
+                if(inp.right && !r._accelSfx){window.soundSystem?.playSound?.('busAccelerate');r._accelSfx=true;}
+                if(!inp.right)r._accelSfx=false;
+                if(inp.left && !r._brakeSfx){window.soundSystem?.playSound?.('busBrake');r._brakeSfx=true;}
+                if(!inp.left)r._brakeSfx=false;
 
                 if (inp.up && !r._upLatch) { r.targetLane=Math.max(0,r.targetLane-1); r._upLatch=true; }
                 if (!inp.up) r._upLatch=false;
@@ -216,12 +247,18 @@
                 if(r.spawnTimer<=0){ this.spawnSafePattern(difficulty); r.spawnTimer=Math.max(.62,1.35-difficulty*.22)+Math.random()*.35; }
                 r.itemTimer-=dt; if(r.itemTimer<=0){this.spawnItem();r.itemTimer=7+Math.random()*5;}
                 this.updateObjects(dt);
-                if(!r.checkpointReached && r.progress>=50){r.checkpointReached=true;r.checkpoint={progress:50,elapsed:r.elapsed};this.log('[BUS] Checkpoint alcançado');}
+                if(!r.checkpointReached && r.progress>=50){r.checkpointReached=true;r.checkpoint={progress:50,elapsed:r.elapsed,resistance:r.resistance,collisions:r.collisions,score:r.score,lane:r.targetLane};window.soundSystem?.playSound?.('busCheckpoint');this.log('[BUS] Checkpoint alcançado');}
                 if(r.progress>=COURSE_DISTANCE){r.progress=COURSE_DISTANCE;r.state='finish';r.stateTimer=0;this.completeRun();}
 
                 this.drawRoadScene(ctx,r);
                 return null;
             } catch(e){ this.reportError(e); this.drawError(ctx); return 'ERROR'; }
+        }
+
+        pickObstacleSprite(type) {
+            const variants = obstacleVariants[type];
+            if (!variants || !variants.length) return type;
+            return variants[Math.floor(Math.random() * variants.length)];
         }
 
         spawnSafePattern(difficulty) {
@@ -249,7 +286,7 @@
             lanes.forEach((lane,idx)=>{
                 const roll=Math.random(); let type='cone';
                 if(roll<.18)type='pothole';else if(roll<.35)type='rock';else if(roll<.68)type='car';else if(roll<.86)type='moto';
-                r.obstacles.push({type,lane,x:1060+idx*62,y:LANES[lane],w:type==='car'?58:48,h:type==='car'?58:48,hit:false,drift:type==='moto'?(Math.random()-.5)*8:0});
+                r.obstacles.push({type,spriteKey:this.pickObstacleSprite(type),lane,x:1060+idx*62,y:LANES[lane],w:type==='car'?92:48,h:type==='car'?48:48,hit:false,drift:type==='moto'?(Math.random()-.5)*8:0});
             });
         }
 
@@ -282,16 +319,25 @@
             const r=this.run;if(r.invincible>0)return;
             const damage={cone:2,pothole:5,rock:10,car:15,moto:10}[type]||5;
             r.resistance=Math.max(0,r.resistance-damage);r.collisions++;r.speed=Math.max(.45,r.speed*.62);r.collisionFlash=.32;r.shake=7;
+            window.soundSystem?.playSound?.('busCollision');
             this.log(`[BUS] Colisão: ${type} -${damage}`);
             window.gamepadSystem?.rumble?.(1,130,.48,.28);
-            if(r.resistance<=0){r.state='broken';r.stateTimer=0;}
+            if(r.resistance<=0){r.state='broken';r.stateTimer=0;window.soundSystem?.stopLoop?.('busEngine');window.soundSystem?.playSound?.('busBroken');}
         }
 
-        collect(type){const r=this.run;if(type==='repair')r.resistance=Math.min(100,r.resistance+20);else if(type==='money')r.score+=250;else if(type==='star')r.invincible=5;else if(type==='turbo')r.turbo=4;}
+        collect(type){const r=this.run;if(type==='repair'){r.resistance=Math.min(100,r.resistance+20);window.soundSystem?.playSound?.('busRepair');}else if(type==='money'){r.score+=250;window.soundSystem?.playSound?.('busMoney');}else if(type==='star'){r.invincible=5;window.soundSystem?.playSound?.('busStar');}else if(type==='turbo'){r.turbo=4;window.soundSystem?.playSound?.('busTurbo');}}
 
         honk(){
-            const r=this.run;r.hornCooldown=2;r.hornText=.8;let affected=0;
-            r.obstacles.forEach(o=>{if(o.x>BUS_X+120&&o.x<BUS_X+430&&(o.type==='cone'||o.type==='moto'||o.type==='car')){if(o.type==='cone'||o.type==='moto')o.removed=true;else{o.lane=(o.lane+1)%3;o.y=LANES[o.lane];}affected++;}});
+            const r=this.run;r.hornCooldown=2;r.hornText=.8;let affected=0;window.soundSystem?.playSound?.('busHorn');
+            r.obstacles.forEach(o=>{
+                if(!(o.x>BUS_X+120&&o.x<BUS_X+430&&(o.type==='cone'||o.type==='moto'||o.type==='car')))return;
+                if(o.type==='cone'||o.type==='moto'){o.removed=true;affected++;return;}
+                const occupied=new Set(r.obstacles.filter(x=>x!==o&&!x.removed&&!x.hit&&Math.abs(x.x-o.x)<150).map(x=>x.lane));
+                const candidates=[r.safeLane,0,1,2].filter((l,i,a)=>l!=null&&a.indexOf(l)===i&&l!==o.lane&&!occupied.has(l)&&l!==r.targetLane);
+                if(candidates.length){o.lane=candidates[0];o.y=LANES[o.lane];affected++;}
+                else { o.x += 180; o.vx = 0; } // sem faixa segura: recua em vez de cortar o jogador
+            });
+            this.ensureSafeRoute();
             r.score+=affected*100;
         }
 
@@ -299,7 +345,7 @@
         updateFinish(ctx,dt){const r=this.run;r.stateTimer+=dt;this.drawRoadScene(ctx,r,true);this.drawFade(ctx,Math.max(0,(r.stateTimer-1.7)/1.1));}
 
         completeRun(){
-            const r=this.run;this.log('[BUS] Minigame concluído');
+            const r=this.run;window.soundSystem?.stopLoop?.('busEngine');window.soundSystem?.playSound?.('busArrival');this.log('[BUS] Minigame concluído');
             const save=window.saveSystem; if(save?.recordBusResult) save.recordBusResult({time:r.elapsed,resistance:r.resistance,noCollision:r.collisions===0});
             if(window.trophySystem){
                 const ts=window.trophySystem;ts.stats.busCompleted=Math.max(1,ts.stats.busCompleted||0);ts.stats.busBestResistance=Math.max(ts.stats.busBestResistance||0,r.resistance);ts.stats.busNoCollision=!!(ts.stats.busNoCollision||r.collisions===0);ts.stats.busBestTime=Math.min(Number.isFinite(ts.stats.busBestTime)?ts.stats.busBestTime:Infinity,r.elapsed);ts.checkTrophies();ts.saveProgress();
@@ -307,38 +353,109 @@
             window.refreshMenuOptions?.();
         }
 
-        startArrival(players){this.arrival={start:performance.now(),duration:6500,players:(players||[]).map((p,i)=>({p,index:i}))};this.log('[BUS] Iniciando Fase 3');}
+        startArrival(players){this.arrival={start:performance.now(),duration:6500,players:(players||[]).map((p,i)=>({p,index:i})),doorOpenSfx:false,doorCloseSfx:false};window.soundSystem?.startLoop?.('busEngine',.42);this.log('[BUS] Iniciando Fase 3');}
 
         updateDrawArrival(ctx, level, players){
             try{
                 if(!this.arrival)this.startArrival(players);const a=this.arrival;const t=Math.min(1,(performance.now()-a.start)/a.duration);
+                if(t>=.38&&!a.doorOpenSfx){a.doorOpenSfx=true;window.soundSystem?.playSound?.('busDoorOpen');}
+                if(t>=.68&&!a.doorCloseSfx){a.doorCloseSfx=true;window.soundSystem?.playSound?.('busDoorClose');}
                 level?.drawBackground?.(ctx,0);
-                let bx=-BUS_W+Math.min(1,t/.28)*500; if(t>.72)bx=308+(t-.72)/.28*620;
+                let bx=-BUS_PHASE_W+Math.min(1,t/.28)*500; if(t>.72)bx=308+(t-.72)/.28*620;
                 let spr=t<.24?this.sprites.arriving:t<.38?this.sprites.braking:t<.48?this.sprites.doorOpening:t<.67?this.sprites.doorOpen:t<.73?this.sprites.doorClosing:this.sprites.leaving;
-                this.drawBusFacingRight(ctx, spr, bx, 454);
+                this.drawBusFacingRight(ctx, spr, bx, BUS_PHASE_Y, BUS_PHASE_W, BUS_PHASE_H);
                 a.players.forEach((entry,i)=>{const p=entry.p;const s=.49+i*.055,e=.64+i*.055;if(t<s)return;const q=Math.min(1,(t-s)/(e-s));p.x=365+i*60+q*70;p.y=455;p.draw?.(ctx);});
-                if(t>.76)this.drawDust(ctx,bx+45,535,3);
+                if(t>.76)this.drawDust(ctx,bx+58,535,3);
                 this.drawFade(ctx,t<.08?1-t/.08:0);
-                if(t>=1){this.arrival=null;return 'DONE';}return null;
+                if(t>=1){window.soundSystem?.stopLoop?.('busEngine');this.arrival=null;return 'DONE';}return null;
             }catch(e){this.reportError(e);this.drawError(ctx);return 'ERROR';}
+        }
+
+        drawRunBackground(ctx, r){
+            const bg = this.runBackground;
+            if (bg?.complete && bg.naturalWidth) {
+                // O panorama serve SOMENTE como cenário do deserto. A estrada do
+                // minigame precisa continuar sendo desenhada pelo jogo, pois é ela
+                // que define visualmente as 3 faixas usadas pela lógica/colisões.
+                const srcW = Math.max(1000, Math.min(bg.naturalWidth, Math.floor(bg.naturalWidth / 5)));
+                const maxX = Math.max(0, bg.naturalWidth - srcW);
+                const srcX = Math.max(0, Math.min(maxX, Math.floor((r.progress / 100) * maxX)));
+                const scenicSrcH = Math.max(1, Math.floor(bg.naturalHeight * 0.58));
+                ctx.drawImage(bg, srcX, 0, srcW, scenicSrcH, 0, 0, W, 305);
+                return true;
+            }
+            return false;
+        }
+
+        drawThreeLaneRoad(ctx, r){
+            // Transição do deserto para o asfalto em estilo 16-bit.
+            ctx.fillStyle='#91663f';
+            ctx.fillRect(0,285,W,10);
+            ctx.fillStyle='#e1bf82';
+            ctx.fillRect(0,295,W,10);
+
+            // Pista física do bônus: continua alinhada às LANES [335, 430, 525].
+            ctx.fillStyle='#d9c8ad';
+            ctx.fillRect(0,305,W,8);
+            ctx.fillRect(0,582,W,8);
+            ctx.fillStyle='#a39279';
+            for(let x=0;x<W;x+=16){
+                ctx.fillRect(x,308,8,2);
+                ctx.fillRect(x+4,585,8,2);
+            }
+
+            // Asfalto principal em blocos retro.
+            ctx.fillStyle='#44464f';
+            ctx.fillRect(0,313,W,269);
+            ctx.fillStyle='#4d505a';
+            for(let y=313;y<582;y+=18){
+                for(let x=((y/18)%2)*12;x<W;x+=24){
+                    ctx.fillRect(x,y,10,2);
+                }
+            }
+            ctx.fillStyle='#3a3c44';
+            for(let y=322;y<575;y+=24) ctx.fillRect(0,y,W,2);
+
+            // Linhas divisórias das 3 pistas em pixel-art.
+            const dashOff=(r.elapsed*265*r.speed)%112;
+            ctx.fillStyle='#f7ebc7';
+            for(const y of [382,477]){
+                for(let x=-112;x<W+112;x+=112){
+                    ctx.fillRect(x-dashOff,y,60,8);
+                    ctx.fillRect(x-dashOff+2,y+1,56,2);
+                }
+            }
+
+            // Linhas laterais contínuas.
+            ctx.fillStyle='#f0e0ba';
+            ctx.fillRect(0,314,W,3);
+            ctx.fillRect(0,578,W,3);
+
+            // Pequenos elementos no acostamento; nunca entram nas 3 faixas.
+            const roadOff=(r.elapsed*120*r.speed)%220;
+            for(let x=-220;x<W+220;x+=220){
+                const px=x-roadOff;
+                ctx.fillStyle='#356b3c';
+                ctx.fillRect(px,266,9,28);
+                ctx.fillRect(px-8,276,10,6);
+                ctx.fillRect(px+7,281,10,6);
+                ctx.fillStyle='#5c452f';
+                ctx.fillRect(px+125,270,5,24);
+            }
+            this.drawRoadSign(ctx,840-roadOff*.3,214,r.progress>88?'LAS VEGAS':'ROUTE 66');
         }
 
         drawRoadScene(ctx,r,finishing=false){
             const sx=r.shake?(Math.random()-.5)*r.shake:0, sy=r.shake?(Math.random()-.5)*r.shake*.5:0;ctx.save();ctx.translate(sx,sy);
-            const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,'#4d78a8');grad.addColorStop(.48,'#e4aa61');grad.addColorStop(1,'#bb6f3d');ctx.fillStyle=grad;ctx.fillRect(-20,-20,W+40,H+40);
-            // montanhas parallax
-            const off1=(r.progress*8)%360;ctx.fillStyle='#9c684e';for(let x=-360;x<W+360;x+=360){ctx.beginPath();ctx.moveTo(x-off1,300);ctx.lineTo(x+130-off1,145);ctx.lineTo(x+280-off1,300);ctx.fill();}
-            const off2=(r.progress*18)%260;ctx.fillStyle='#c88a55';for(let x=-260;x<W+260;x+=260){ctx.beginPath();ctx.moveTo(x-off2,320);ctx.lineTo(x+100-off2,220);ctx.lineTo(x+220-off2,320);ctx.fill();}
-            ctx.fillStyle='#d99b56';ctx.fillRect(0,300,W,350);
-            // road
-            ctx.fillStyle='#393a3f';ctx.fillRect(0,305,W,285);ctx.fillStyle='#d6c5a2';ctx.fillRect(0,300,W,8);ctx.fillRect(0,590,W,8);
-            const dashOff=(r.elapsed*280*r.speed)%110;ctx.fillStyle='#f5e9c7';for(const y of [382,477])for(let x=-110;x<W+110;x+=110)ctx.fillRect(x-dashOff,y,58,6);
-            // roadside cacti/posts/Route 66
-            const roadOff=(r.elapsed*120*r.speed)%220;for(let x=-220;x<W+220;x+=220){const px=x-roadOff;ctx.fillStyle='#356b3c';ctx.fillRect(px,255,9,43);ctx.fillRect(px-10,267,12,7);ctx.fillRect(px+7,275,12,7);ctx.fillStyle='#5c452f';ctx.fillRect(px+125,260,5,42);}
-            this.drawRoadSign(ctx,840-roadOff*.3,230,r.progress>88?'LAS VEGAS':'ROUTE 66');
+            if(!this.drawRunBackground(ctx,r)){
+                const grad=ctx.createLinearGradient(0,0,0,305);grad.addColorStop(0,'#4d78a8');grad.addColorStop(.65,'#e4aa61');grad.addColorStop(1,'#c98b50');ctx.fillStyle=grad;ctx.fillRect(-20,-20,W+40,325);
+                const off1=(r.progress*8)%360;ctx.fillStyle='#9c684e';for(let x=-360;x<W+360;x+=360){ctx.beginPath();ctx.moveTo(x-off1,300);ctx.lineTo(x+130-off1,145);ctx.lineTo(x+280-off1,300);ctx.fill();}
+                const off2=(r.progress*18)%260;ctx.fillStyle='#c88a55';for(let x=-260;x<W+260;x+=260){ctx.beginPath();ctx.moveTo(x-off2,305);ctx.lineTo(x+100-off2,220);ctx.lineTo(x+220-off2,305);ctx.fill();}
+            }
+            this.drawThreeLaneRoad(ctx,r);
             // objects
             r.items.forEach(i=>{const img=this.itemSprites[i.type];if(img?.complete&&img.naturalWidth)ctx.drawImage(img,i.x,i.y-i.h/2,i.w,i.h);});
-            r.obstacles.forEach(o=>{const img=this.obstacleSprites[o.type];if(img?.complete&&img.naturalWidth)ctx.drawImage(img,o.x,o.y-o.h/2,o.w,o.h);});
+            r.obstacles.forEach(o=>{const img=this.obstacleSprites[o.spriteKey]||this.obstacleSprites[o.type];if(img?.complete&&img.naturalWidth)ctx.drawImage(img,o.x,o.y-o.h/2,o.w,o.h);});
             // bus sprite
             let spr=this.sprites.moving;if(r.collisionFlash>0)spr=this.sprites.collision;else if(r.resistance<=30)spr=this.sprites.critical;else if(r.resistance<=60)spr=this.sprites.damaged;else if(r.turbo>0||r.speed>1.2)spr=this.sprites.accelerating;else if(r.speed<.75)spr=this.sprites.braking;else if(Math.abs(LANES[r.targetLane]-r.y)>4)spr=this.sprites.turning;
             ctx.save();ctx.translate(BUS_X + BUS_W,r.y-BUS_H/2);ctx.scale(-1,1);if(r.invincible>0&&Math.floor(r.elapsed*10)%2===0)ctx.globalAlpha=.55;if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,0,0,BUS_W,BUS_H);ctx.restore();

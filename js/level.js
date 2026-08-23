@@ -13,20 +13,31 @@ class Level {
         this.nextLevel = config.nextLevel;
         this.backgroundImage = config.backgroundImage || null;
         this._backgroundImg = null;
-        if (this.backgroundImage) {
-            this._backgroundImg = new Image();
-            this._backgroundFailed = false;
-            this._backgroundImg.onload = () => { this._backgroundFailed = false; };
-            this._backgroundImg.onerror = () => {
-                this._backgroundFailed = true;
-                console.warn('[background] Falha ao carregar:', this.backgroundImage);
-            };
-            this._backgroundImg.src = this.backgroundImage;
-        }
+        this._backgroundFailed = false;
+        // v0.9.3 stability: carregamento preguiçoso. Evita decodificar todos os
+        // backgrounds grandes logo ao abrir o index.html.
         this.description = config.description;
         this.width = Number.isFinite(config.width) ? config.width : 5000;
         this._visualSeed = (this.id || 1) * 7919;
     }
+
+    ensureBackground() {
+        if (!this.backgroundImage) return null;
+        if (this._backgroundImg) return this._backgroundImg;
+        const manager = window.assetManager;
+        if (manager?.image) {
+            this._backgroundImg = manager.image(this.backgroundImage);
+            return this._backgroundImg;
+        }
+        const img = new Image();
+        img.onload = () => { this._backgroundFailed = false; };
+        img.onerror = () => { this._backgroundFailed = true; console.warn('[background] Falha ao carregar:', this.backgroundImage); };
+        img.src = this.backgroundImage;
+        this._backgroundImg = img;
+        return img;
+    }
+
+    preload() { return this.ensureBackground(); }
 
     // Aleatoriedade determinística para o cenário. Evita prédios/janelas/cactos
     // mudando de forma a cada frame (flicker visual).
@@ -37,6 +48,7 @@ class Level {
 
     drawBackground(ctx, cameraX) {
         // Background customizado por fase (somente quando configurado).
+        this.ensureBackground();
         // Não altera largura, física, câmera nem lógica da fase.
         if (this._backgroundImg && this._backgroundImg.complete && this._backgroundImg.naturalWidth) {
             const worldW = this.width || 5000;
@@ -1126,7 +1138,7 @@ const LEVELS = [
         id: 2,
         name: 'A Cidade',
         description: 'Atravesse a cidade sem ser pego!',
-        backgroundImage: 'assets/backgrounds/fase2-cidade.png',
+        backgroundImage: 'assets/backgrounds/fase2-cidade.webp',
         bgColor1: '#34495e',
         bgColor2: '#5d6d7e',
         groundColor: '#2c2c2c',
@@ -1139,7 +1151,7 @@ const LEVELS = [
         id: 3,
         name: 'O Deserto',
         description: 'Sobreviva ao calor escaldante do deserto!',
-        backgroundImage: 'assets/backgrounds/fase3-deserto.png',
+        backgroundImage: 'assets/backgrounds/fase3-deserto.webp',
         bgColor1: '#f39c12',
         bgColor2: '#f8c471',
         groundColor: '#e5c29f',
@@ -1153,7 +1165,7 @@ const LEVELS = [
         id: 4,
         name: 'A Estrada',
         description: 'Vegas está próxima! Continue em frente!',
-        backgroundImage: 'assets/backgrounds/fase4-estrada-vegas.png',
+        backgroundImage: 'assets/backgrounds/fase4-estrada-vegas.webp',
         bgColor1: '#2c3e50',
         bgColor2: '#34495e',
         groundColor: '#3a3a3a',
@@ -1166,7 +1178,7 @@ const LEVELS = [
         id: 5,
         name: 'VEGAS!',
         description: 'A batalha final nas luzes de Vegas! Derrote o REI DE VEGAS!',
-        backgroundImage: 'assets/backgrounds/fase5-vegas.png',
+        backgroundImage: 'assets/backgrounds/fase5-vegas.webp',
         bgColor1: '#0a0a1a',
         bgColor2: '#1a0a2e',
         groundColor: '#2a2a2a',
@@ -1185,7 +1197,7 @@ const LEVELS = [
         id: 6,
         name: 'DENTRO DO CASSINO',
         description: 'João e Crist invadem o Royal Vegas. Entre mesas, caça-níqueis e seguranças, o caminho leva até a Arena VIP!',
-        backgroundImage: 'assets/backgrounds/fase6-cassino.png',
+        backgroundImage: 'assets/backgrounds/fase6-cassino.webp',
         bgColor1: '#090716',
         bgColor2: '#24102f',
         groundColor: '#2a2019',

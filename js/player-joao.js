@@ -1,8 +1,8 @@
 const JOAO_SPRITE_SHEET = new Image();
-JOAO_SPRITE_SHEET.src = 'assets/joao-16bit.png';
+JOAO_SPRITE_SHEET.src = 'assets/joao-16bit.webp';
 
 const JOAO_RANGED_SPRITE_SHEET = new Image();
-JOAO_RANGED_SPRITE_SHEET.src = 'assets/joao-16bit.png';
+JOAO_RANGED_SPRITE_SHEET.src = 'assets/joao-16bit.webp';
 const JOAO_16_FRAMES = {"idle":[[35,6,70,128],[149,8,69,126],[261,8,69,126],[374,8,70,126]],"walk":[[501,8,86,126],[615,7,83,126],[727,7,82,126],[836,6,81,127],[944,6,83,127],[1057,6,85,128]],"run":[[944,6,83,127],[1057,6,85,128],[1182,8,80,126],[1301,8,70,126],[1419,8,70,126]],"jump":[[21,165,99,122],[127,164,99,122],[236,166,96,120],[348,166,99,121],[456,166,108,125]],"attack":[[20,308,94,124],[118,315,90,117],[222,318,99,116],[323,321,159,115],[118,315,90,117]],"ranged":[[18,478,144,120],[174,480,118,117],[291,485,163,113]],"hurt":[[20,626,94,104],[31,747,94,109],[135,624,95,105]],"dead":[[659,755,142,101],[841,762,142,96],[995,624,126,108],[1031,771,140,91]],"dash":[[31,891,103,104],[152,902,88,91],[268,896,104,96],[405,915,164,76],[611,909,173,83],[813,910,177,86]]};
 
 
@@ -59,6 +59,9 @@ class PlayerJoao {
         // Sistema de combate
         this.combo = 0;
         this.invulnerable = 0;
+        this.coyoteFrames = 0;
+        this.jumpBufferFrames = 0;
+        this._jumpHeldLast = false;
         this.walkCycle = 0;
         this.comboTimer = 0;
         this.activePowerUps = [];
@@ -244,7 +247,8 @@ class PlayerJoao {
 
     fireRangedAttack(charged = false) {
         const direction = this.facingRight ? 1 : -1;
-        const damage = charged ? 42 : 18;
+        const baseDamage = charged ? 42 : 18;
+        const damage = Math.max(1, Math.round(baseDamage * (this.evolution?.getRangedDamageMultiplier?.() || 1)));
         const speed = charged ? 18 : 14;
         const muzzleX = this.x + this.w/2 + direction * 34;
         const muzzleY = this.y + 31;
@@ -253,23 +257,13 @@ class PlayerJoao {
             return false;
         }
         const shotId = ++this.rangedShotSerial;
-        window.projectiles.push({
-            type: 'player_projectile',
-            shotId,
-            owner: this,
-            x: muzzleX,
-            y: muzzleY,
-            vx: speed * direction,
-            vy: 0,
-            w: charged ? 18 : 10,
-            h: charged ? 10 : 6,
-            life: charged ? 95 : 75,
-            damage,
-            charged,
-            pierce: charged ? 3 : 1,
-            hitEnemies: new Set(),
-            color: charged ? '#ffd23f' : '#f4f1df'
-        });
+        const projectileData = {
+            type: 'player_projectile', shotId, owner: this, x: muzzleX, y: muzzleY,
+            vx: speed * direction, vy: 0, w: charged ? 18 : 10, h: charged ? 10 : 6,
+            life: charged ? 95 : 75, damage, charged, pierce: charged ? 3 : 1,
+            hitEnemies: new Set(), color: charged ? '#ffd23f' : '#f4f1df'
+        };
+        window.projectiles.push(window.acquireProjectile ? window.acquireProjectile(projectileData) : projectileData);
         console.log(`[TIRO JOAO] CRIADO id=${shotId} carregado=${charged ? 'sim' : 'nao'} x=${Math.round(muzzleX)} y=${Math.round(muzzleY)} dir=${direction > 0 ? 'direita' : 'esquerda'} dano=${damage}`);
         if (window.soundSystem?.playSound) window.soundSystem.playSound('hit');
         if (window.gamepadSystem?.rumble) window.gamepadSystem.rumble(this.controlPlayer || 1, charged ? 110 : 60, charged ? .45 : .2, charged ? .2 : .08);
@@ -509,10 +503,19 @@ class PlayerJoao {
         this.isRunning = this.isMoving && (this.moveHoldFrames > 22 || currentSpeed > this.speed + 0.01);
         if (this.isMoving) this.walkCycle += this.isRunning ? 0.5 : 0.3; else this.walkCycle = 0;
 
-        // Pulo
-        if (sistemControles.acaoAtiva(this.controlPlayer, 'up', keys) && !this.isJumping && this.y + this.h >= this.groundY && !this.dashing && !this.rangedCharging && this.rangedRecovery === 0) {
-            this.jumpPower = -18;
+        // Pulo com jump-buffer (~100ms) e coyote-time (~100ms).
+        const jumpHeld = sistemControles.acaoAtiva(this.controlPlayer, 'up', keys);
+        if (jumpHeld && !this._jumpHeldLast) this.jumpBufferFrames = 6;
+        this._jumpHeldLast = jumpHeld;
+        if (this.jumpBufferFrames > 0) this.jumpBufferFrames--;
+        const groundedNow = this.y + this.h >= this.groundY - 1;
+        if (groundedNow) this.coyoteFrames = 6; else if (this.coyoteFrames > 0) this.coyoteFrames--;
+        if (this.jumpBufferFrames > 0 && this.coyoteFrames > 0 && !this.dashing && !this.rangedCharging && this.rangedRecovery === 0) {
+            this.jumpPower = -18 * (this._superJumpMultiplier || 1);
             this.isJumping = true;
+            this.jumpBufferFrames = 0;
+            this.coyoteFrames = 0;
+            window.soundSystem?.playSound?.('jump');
         }
 
         // Aplicar gravidade
@@ -655,18 +658,17 @@ class PlayerJoao {
 
     takeDamage(damage) {
         if (this.invulnerable > 0 || this.hasActivePowerUp('invincible')) return false;
-        
-        this.life -= damage;
+        if (this.evolution?.tryEvade?.()) return false;
+        if (this.evolution?.tryShield?.()) return false;
+        const actualDamage = Math.max(1, Math.round(this.evolution?.calculateDamageReduction?.(damage) ?? damage));
+        this.life -= actualDamage;
         if (window.gamepadSystem?.rumble) window.gamepadSystem.rumble(this.controlPlayer || 1, 130, 0.7, 0.35);
         this.invulnerable = 40;
         this.combo = Math.floor(this.combo / 2);
         this.comboTimer = 0;
         if (this.life < 0) this.life = 0;
-        
-        if (this.life === 0) {
-            console.log(`💀 ${this.name} MORREU!`);
-        }
-        
+        if (this.life === 0 && this.evolution?.tryRevive?.()) return true;
+        if (this.life === 0) console.log(`💀 ${this.name} MORREU!`);
         return true;
     }
 

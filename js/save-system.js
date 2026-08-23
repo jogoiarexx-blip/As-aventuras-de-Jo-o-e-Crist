@@ -8,14 +8,15 @@ class SaveSystem {
             gamesPlayed: 0,
             favoriteCharacter: null,
             gameCompleted: false,
+            lastSessionStartedAt: null,
             busMinigameUnlocked: false,
             busBestTime: null,
             busBestResistance: 0,
             busNoCollision: false,
             busTrophies: [],
             playerProgress: {
-                João: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] },
-                Crist: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] }
+                João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
+                Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
             }
         };
         this.loadSave();
@@ -35,7 +36,7 @@ class SaveSystem {
         if (gameData.playerCharacter) {
             this.updateFavoriteCharacter(gameData.playerCharacter);
         }
-        this.incrementGamesPlayed();
+        // save() persiste estado; não contabiliza uma nova partida.
     }
     
     updateHighScore(score) {
@@ -79,6 +80,20 @@ class SaveSystem {
         this.saveSave();
     }
 
+
+    beginGame() {
+        this.data.gamesPlayed = (Number(this.data.gamesPlayed) || 0) + 1;
+        this.data.lastSessionStartedAt = Date.now();
+        this.saveSave();
+    }
+
+    addPlaytime(seconds) {
+        const safe = Math.max(0, Number(seconds) || 0);
+        if (!safe) return;
+        this.data.totalPlaytime = (Number(this.data.totalPlaytime) || 0) + safe;
+        this.saveSave();
+    }
+
     incrementGamesPlayed() {
         this.data.gamesPlayed++;
         this.saveSave();
@@ -92,8 +107,8 @@ class SaveSystem {
     savePlayerProgress(characterName, evolutionData) {
         if (!this.data.playerProgress) {
             this.data.playerProgress = {
-                João: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] },
-                Crist: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] }
+                João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
+                Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
             };
         }
         this.data.playerProgress[characterName] = evolutionData;
@@ -102,7 +117,7 @@ class SaveSystem {
     
     loadPlayerProgress(characterName) {
         if (!this.data.playerProgress || !this.data.playerProgress[characterName]) {
-            return { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] };
+            return { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] };
         }
         return this.data.playerProgress[characterName];
     }
@@ -145,14 +160,16 @@ class SaveSystem {
                 gamesPlayed: 0,
                 favoriteCharacter: null,
                 gameCompleted: false,
+                lastSessionStartedAt: null,
+            lastSessionStartedAt: null,
                 busMinigameUnlocked: false,
                 busBestTime: null,
                 busBestResistance: 0,
                 busNoCollision: false,
                 busTrophies: [],
                 playerProgress: {
-                    João: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] },
-                    Crist: { level: 1, xp: 0, xpToNextLevel: 100, unlockedSkills: [] }
+                    João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
+                    Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
                 }
             };
             this.saveSave();
@@ -161,6 +178,7 @@ class SaveSystem {
             localStorage.removeItem('joaoCristAchievements');
             localStorage.removeItem('joaoCristStats');
             localStorage.removeItem('trophies');
+            localStorage.removeItem('game_trophies');
         }
     }
 }

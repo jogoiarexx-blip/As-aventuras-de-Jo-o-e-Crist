@@ -23,7 +23,8 @@ const GameState = {
     STAGE_SELECT: 'stage_select',
     BUS_BOARDING: 'bus_boarding',
     BUS_MINIGAME: 'bus_minigame',
-    BUS_ARRIVAL: 'bus_arrival'
+    BUS_ARRIVAL: 'bus_arrival',
+    CUTSCENE: 'cutscene'
 };
 
 let gameState = GameState.LOADING; // Melhoria #19: Começar em loading
@@ -86,6 +87,74 @@ let characterSelectCursor = 0; // Qual jogador está selecionando (0 ou 1)
 let characterSelectReady = false; // Evita seleção imediata ao entrar na tela
 let screenShake = 0; // Intensidade do screen shake
 let hitStopFrames = 0; // Freeze frames em hits fortes
+let pauseReturnState = GameState.PLAYING;
+let pauseStartedAt = 0;
+let pauseSnapshot = null;
+
+function capturePauseSnapshot() {
+    try {
+        if (!pauseSnapshot) pauseSnapshot = document.createElement('canvas');
+        pauseSnapshot.width = canvas.width;
+        pauseSnapshot.height = canvas.height;
+        const pctx = pauseSnapshot.getContext('2d');
+        pctx.imageSmoothingEnabled = false;
+        pctx.clearRect(0,0,pauseSnapshot.width,pauseSnapshot.height);
+        pctx.drawImage(canvas,0,0);
+    } catch (_) { pauseSnapshot = null; }
+}
+
+function shiftPauseSensitiveTimestamps(obj, deltaMs, depth=0, seen=new Set()) {
+    if (!obj || typeof obj !== 'object' || depth > 2 || seen.has(obj)) return;
+    seen.add(obj);
+    for (const key of Object.keys(obj)) {
+        let value;
+        try { value = obj[key]; } catch (_) { continue; }
+        if (typeof value === 'number') {
+            const looksLikeTimestamp = /(?:time|start|started|last|next|aim|laser|meteor|teleport|cooldown|anim)/i.test(key);
+            if (looksLikeTimestamp && value > 1000) obj[key] = value + deltaMs;
+        } else if (value && typeof value === 'object' && !Array.isArray(value) && depth < 1) {
+            shiftPauseSensitiveTimestamps(value, deltaMs, depth + 1, seen);
+        }
+    }
+}
+
+function enterTruePause(fromState=gameState) {
+    if (gameState === GameState.PAUSED) return;
+    pauseReturnState = fromState || GameState.PLAYING;
+    pauseStartedAt = performance.now();
+    capturePauseSnapshot();
+    gameState = GameState.PAUSED;
+    soundSystem?.pauseAll?.();
+    clearKeys();
+    if (window.GameDebugConsole) window.GameDebugConsole.log('[PAUSE] Simulação congelada');
+}
+
+function resumeTruePause() {
+    if (gameState !== GameState.PAUSED) return;
+    const pausedMs = Math.max(0, performance.now() - pauseStartedAt);
+    if (gameStartTime) gameStartTime += pausedMs;
+    if (levelStartTime) levelStartTime += pausedMs;
+    if (lastPlaytimeSaveAt) lastPlaytimeSaveAt += pausedMs;
+    for (const p of players) shiftPauseSensitiveTimestamps(p, pausedMs);
+    for (const e of enemies) shiftPauseSensitiveTimestamps(e, pausedMs);
+    if (waveSystem) shiftPauseSensitiveTimestamps(waveSystem, pausedMs);
+    if (enemySpawnDirector) shiftPauseSensitiveTimestamps(enemySpawnDirector, pausedMs);
+    if (window.busSequence) {
+        if (window.busSequence.lastTime) window.busSequence.lastTime += pausedMs;
+        if (window.busSequence.boarding?.start) window.busSequence.boarding.start += pausedMs;
+        if (window.busSequence.arrival?.start) window.busSequence.arrival.start += pausedMs;
+    }
+    if (window.storyCutscenes?.active) {
+        if (window.storyCutscenes.startedAt) window.storyCutscenes.startedAt += pausedMs;
+        if (window.storyCutscenes.lineStartedAt) window.storyCutscenes.lineStartedAt += pausedMs;
+    }
+    gameState = pauseReturnState || GameState.PLAYING;
+    pauseStartedAt = 0;
+    soundSystem?.resumeAll?.();
+    clearKeys();
+    try { __fixedAccum = 0; __fixedLast = performance.now(); } catch (_) {}
+    if (window.GameDebugConsole) window.GameDebugConsole.log('[PAUSE] Simulação retomada');
+}
 
 // Bug #2: Modal customizado para substituir confirm()
 let showModal = false;
@@ -116,7 +185,7 @@ let destructibles = []; // Caixas/barris que guardam power-ups
 const containerSprites = {};
 ['crate', 'barrel'].forEach(type => {
     const img = new Image();
-    img.src = type === 'crate' ? 'assets/objects/wood-crate-16bit.png' : 'assets/objects/wood-barrel-16bit.png';
+    img.src = type === 'crate' ? 'assets/objects/wood-crate-16bit.webp' : 'assets/objects/wood-barrel-16bit.webp';
     containerSprites[type] = img;
 });
 window.containerSprites = containerSprites;
@@ -126,7 +195,7 @@ const powerUpSprites = {};
 ['health', 'speed', 'strength', 'invincible', 'score'].forEach(type => {
     const img = new Image();
     img.onerror = () => console.warn('[powerup-sprite] Falha ao carregar:', type);
-    img.src = `assets/powerups/${type}-16bit.png`;
+    img.src = `assets/powerups/${type}-16bit.webp`;
     powerUpSprites[type] = img;
 });
 window.powerUpSprites = powerUpSprites;
@@ -135,6 +204,13 @@ let projectiles = [];  // NOVO: Sistema de projéteis para Sniper
 let levelStartTime = 0;
 let levelDamageTaken = 0;
 let gameStartTime = 0;
+let victoryCommitted = false;
+let gameOverCommitted = false;
+let completedLevelStats = new Set();
+let sessionPlaytimeSeconds = 0;
+let lastPlaytimeSaveAt = 0;
+const particlePool = [];
+const projectilePool = [];
 let totalGameDamage = 0;
 
 // Sistema de Troféus (inicializado depois)
@@ -145,6 +221,9 @@ let gameOverScreen = new GameOverScreen();
 
 // Tornar variáveis acessíveis globalmente para os novos sistemas
 window.particles = particles;
+window.getGameScore = () => score;
+window.addGameScore = (value) => { score += Number(value) || 0; return score; };
+window.acquireProjectile = (data={}) => { const p=projectilePool.pop() || {}; if(p.hitEnemies?.clear)p.hitEnemies.clear(); Object.assign(p,data); return p; };
 Object.defineProperty(window, 'enemies', { configurable: true, get: () => enemies, set: value => { enemies = value; } });
 Object.defineProperty(window, 'players', { configurable: true, get: () => players, set: value => { players = value; } });
 window.soundSystem = soundSystem;
@@ -178,9 +257,11 @@ for (let i = 0; i < 50; i++) {
  * Limpa partículas mortas e excesso de partículas
  */
 function cleanupParticles() {
-    // Remover partículas mortas
+    // Remover partículas mortas sem criar um novo array; objetos simples são reciclados.
     const before = particles.length;
-    particles.splice(0, particles.length, ...particles.filter(p => p.life > 0));
+    let w=0;
+    for(let i=0;i<particles.length;i++){ const p=particles[i]; if(p.life>0) particles[w++]=p; else if(particlePool.length<MAX_PARTICLES) particlePool.push(p); }
+    particles.length=w;
     
     // Limitar tamanho máximo (prevenir memory leak)
     if (particles.length > MAX_PARTICLES) {
@@ -203,26 +284,14 @@ function cleanupParticles() {
 function cleanupProjectiles() {
     const before = projectiles.length;
     
-    const filteredProjectiles = projectiles.filter(p => {
-        // Remover se morto
-        if (p.dead) return false;
-
-        // IMPORTANTE: p.x está em coordenadas do MUNDO, não da tela.
-        // O código antigo comparava com canvas.width e apagava instantaneamente
-        // tiros feitos mais adiante nas fases (ex.: x > ~1200), dando a impressão
-        // de que o João atirava sem criar projétil/dano.
-        const camX = (typeof cameraX === 'number' && Number.isFinite(cameraX)) ? cameraX : 0;
-        const leftWorld = camX - 350;
-        const rightWorld = camX + canvas.width + 350;
-        if (p.x < leftWorld || p.x > rightWorld) return false;
-        if (p.y < -250 || p.y > canvas.height + 250) return false;
-
-        // Remover se tempo de vida expirou
-        if (p.life !== undefined && p.life <= 0) return false;
-
-        return true;
-    });
-    projectiles.splice(0, projectiles.length, ...filteredProjectiles);
+    const kept=[];
+    for(const p of projectiles){
+        const camX=(typeof cameraX==='number'&&Number.isFinite(cameraX))?cameraX:0;
+        const invalid=p.dead || p.x<camX-350 || p.x>camX+canvas.width+350 || p.y<-250 || p.y>canvas.height+250 || (p.life!==undefined&&p.life<=0);
+        if(invalid){ if(projectilePool.length<160){ if(p.hitEnemies?.clear)p.hitEnemies.clear(); projectilePool.push(p); } }
+        else kept.push(p);
+    }
+    projectiles.splice(0,projectiles.length,...kept);
     
     const removed = before - projectiles.length;
     if (debugMode && removed > 0) {
@@ -261,6 +330,12 @@ document.addEventListener('keydown', e => {
     }
     if ((gameState === GameState.PLAYING || gameState === GameState.BUS_MINIGAME) && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Tab'].includes(e.key)) e.preventDefault();
     keys[normalizedKey] = true;
+
+    if (gameState === GameState.CUTSCENE) {
+        e.preventDefault();
+        window.storyCutscenes?.handleKey?.(e.key);
+        return;
+    }
     
     // Melhoria #19: Pular loading screen com qualquer tecla
     if (gameState === GameState.LOADING && loadingProgress >= 1) {
@@ -470,6 +545,7 @@ document.addEventListener('keydown', e => {
         gameState = GameState.PLAYING;
         levelStartTime = Date.now();
         levelDamageTaken = 0;
+        startLevelMusic();
         soundSystem.playSound('menuSelect');
     }
     
@@ -497,13 +573,12 @@ document.addEventListener('keydown', e => {
         }
     }
     
-    // Pausar
-    if (gameState === GameState.PLAYING && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
-        gameState = GameState.PAUSED;
-        soundSystem.playSound('menuSelect');
+    // Pause real: congela simulação, animações e áudio.
+    const canPauseNow = [GameState.PLAYING, GameState.BUS_MINIGAME].includes(gameState);
+    if (canPauseNow && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
+        enterTruePause(gameState);
     } else if (gameState === GameState.PAUSED && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
-        gameState = GameState.PLAYING;
-        soundSystem.playSound('menuSelect');
+        resumeTruePause();
     }
     
     // Voltar ao menu de pausa
@@ -512,6 +587,10 @@ document.addEventListener('keydown', e => {
         showModal = true;
         modalMessage = 'Deseja voltar ao menu principal?\nSeu progresso será perdido.';
         modalCallback = () => {
+            soundSystem?.stopAllLoops?.();
+            soundSystem?.resumeAll?.();
+            pauseStartedAt = 0;
+            pauseSnapshot = null;
             gameState = GameState.MENU;
             menuSelection = 0;
         };
@@ -613,6 +692,8 @@ function startGameWithCharacters() {
     currentLevelIndex = startLevelIndex;
     levelIntroTimer = 0;
     gameStartTime = Date.now();
+    victoryCommitted = false; gameOverCommitted=false; completedLevelStats.clear(); sessionPlaytimeSeconds=0; lastPlaytimeSaveAt=Date.now();
+    saveSystem.beginGame?.();
     totalGameDamage = 0;
     
     // Resetar stats de conquistas para nova partida
@@ -662,6 +743,14 @@ function startGameWithCharacters() {
     // Carregar a fase escolhida (0 em campanha normal).
     loadLevel(startLevelIndex);
     pendingStartLevel = 0;
+
+    // Abertura cinematográfica da campanha. No seletor de fases mantemos o fluxo direto.
+    if (startLevelIndex === 0) {
+        startStoryScene('intro', () => {
+            gameState = GameState.LEVEL_INTRO;
+            levelIntroTimer = 180;
+        });
+    }
 }
 
 function loadLevel(index) {
@@ -672,6 +761,8 @@ function loadLevel(index) {
     
     currentLevelIndex = index;
     currentLevel = LEVELS[index];
+    window.assetManager?.preloadLevel?.(currentLevel);
+    window.assetManager?.preloadNext?.(LEVELS,index);
     levelLoadToken++;
     const thisLevelToken = levelLoadToken;
 
@@ -740,6 +831,9 @@ function loadLevel(index) {
         if ('rangedChargeFrames' in player) player.rangedChargeFrames = 0;
     });
     
+    // NPC amigável exclusivo da Fase 1
+    window.farmDogNPCManager?.initForLevel?.(currentLevel);
+
     // Spawn de inimigos (apenas para fases sem ondas)
     if (!currentLevel.useWaves) {
         spawnEnemies();
@@ -778,6 +872,54 @@ function createEnemySafe(type, x, y) {
     if (enemy.damage) enemy.damage = Math.floor(enemy.damage * difficultyMult);
     if (enemy.score) enemy.score = Math.floor(enemy.score * difficultyMult);
     return enemy;
+}
+
+function getEnemyXPKey(enemy) {
+    if (!enemy) return 'basic';
+    if (enemy.isBoss && !enemy.isBossMinion) {
+        if (enemy.name === 'REI DE VEGAS') return 'final_boss';
+        if (enemy.name === 'O ENGENHEIRO') return 'tech_boss';
+        if (enemy.name === 'A SOMBRA') return 'shadow_boss';
+        if (enemy.name === 'DEUS DAS APOSTAS') return 'god_boss';
+        return 'boss';
+    }
+    if (typeof EliteEnemy !== 'undefined' && enemy instanceof EliteEnemy) return 'elite';
+    if (typeof GhostEnemy !== 'undefined' && enemy instanceof GhostEnemy) return 'ghost';
+    if (typeof AssassinEnemy !== 'undefined' && enemy instanceof AssassinEnemy) return 'assassin';
+    return String(enemy.type || 'basic').toLowerCase();
+}
+
+function awardEnemyXP(enemy, killer, context = {}) {
+    // Um inimigo só distribui XP uma vez, independentemente de tiro/melee/efeitos simultâneos.
+    if (!enemy || enemy._xpAwarded) return [];
+    enemy._xpAwarded = true;
+    const xpKey = getEnemyXPKey(enemy);
+    const baseXP = (window.XP_REWARDS || (typeof XP_REWARDS !== 'undefined' ? XP_REWARDS : {}))[xpKey] || 10;
+    const boss = !!(enemy.isBoss && !enemy.isBossMinion);
+    const awards = [];
+    const activePlayers = players.filter(p => p && p.life > 0 && p.evolution);
+
+    activePlayers.forEach(player => {
+        const isKiller = player === killer;
+        let rawXP;
+        if (isKiller) rawXP = baseXP;
+        else rawXP = Math.max(1, Math.round(baseXP * (boss ? 0.70 : 0.30)));
+
+        const gained = player.evolution.addXP(rawXP, {
+            melee: isKiller && !!context.melee,
+            ranged: isKiller && !!context.ranged,
+            combo: isKiller ? (Number(context.combo) || 0) : 0,
+            assist: !isKiller,
+            boss
+        });
+        if (gained > 0) {
+            awards.push({ player, gained, assist:!isKiller });
+            const popupX = enemy.x + enemy.w / 2 + (player.controlPlayer === 2 ? 28 : -28);
+            const popupY = enemy.y - 70 - (player.controlPlayer === 2 ? 18 : 0);
+            createTextPopup(popupX, popupY, `${!isKiller ? 'ASSIST ' : ''}+${gained} XP`, !isKiller ? '#8fdcff' : '#00ffff');
+        }
+    });
+    return awards;
 }
 
 function buildEnemySpawnDirector() {
@@ -965,54 +1107,111 @@ function breakPowerUpContainer(obj) {
     });
     createParticle(obj.x + obj.w/2, obj.y + obj.h/2, '#b97836', 12, 'spark');
     createTextPopup(obj.x + obj.w/2, obj.y - 8, 'ITEM!', '#ffd76a');
-    if (window.soundSystem) window.soundSystem.playSound('hit');
+    if (window.soundSystem) window.soundSystem.playSound(obj.type === 'barrel' ? 'barrelBreak' : 'crateBreak');
 }
 
 function damagePowerUpContainer(obj, damage) {
     if (!obj || obj.broken) return;
     obj.life -= Math.max(1, damage || 20);
     obj.hitFlash = 6;
+    if (obj.life > 0) window.soundSystem?.playSound?.(obj.type === 'barrel' ? 'barrelHit' : 'crateHit');
     if (obj.life <= 0) breakPowerUpContainer(obj);
 }
 
-function nextLevel() {
-    // Calcular estatísticas da fase
-    const levelTime = (Date.now() - levelStartTime) / 1000;
-    
-    // Atualizar stats para conquistas
-    if (window.trophySystem) {
-        window.trophySystem.stats.levelsCompleted++;
-        
-        if (levelDamageTaken === 0) {
-            window.trophySystem.stats.noDamageLevels++;
-        }
-        
-        if (levelTime < window.trophySystem.stats.fastestLevelTime) {
-            window.trophySystem.stats.fastestLevelTime = levelTime;
-        }
-        
-        if (players[0] && players[0].evolution) {
-            window.trophySystem.stats.playerLevel = players[0].evolution.level;
-            window.trophySystem.stats.unlockedSkills = players[0].evolution.unlockedSkills.length;
-        }
-        
-        // Verificar conquistas
-        window.trophySystem.checkTrophies({
-            score: score,
-            enemiesKilled: window.trophySystem.stats.enemiesKilled
-        });
+
+function startLevelMusic() {
+    if (!window.soundSystem) return;
+    window.soundSystem.initAudioContext?.();
+    window.soundSystem.stopMusic?.();
+    const id=currentLevel?.id||1;
+    const tempo=id>=5?'vegas':id===3?'desert':id===4?'fast':'normal';
+    setTimeout(()=>window.soundSystem?.startMusic?.(tempo),40);
+}
+
+function recordLevelCompletion(index=currentLevelIndex) {
+    if (completedLevelStats.has(index)) return false;
+    completedLevelStats.add(index);
+    const levelTime=Math.max(0,(Date.now()-levelStartTime)/1000);
+    if(window.trophySystem){
+        const st=window.trophySystem.stats;
+        st.levelsCompleted=(st.levelsCompleted||0)+1;
+        if(levelDamageTaken===0)st.noDamageLevels=(st.noDamageLevels||0)+1;
+        if(!Number.isFinite(st.fastestLevelTime)||levelTime<st.fastestLevelTime)st.fastestLevelTime=levelTime;
+        if(players[0]?.evolution){st.playerLevel=players[0].evolution.level;st.unlockedSkills=players[0].evolution.unlockedSkills.length;}
+        window.trophySystem.checkTrophies({score,enemiesKilled:st.enemiesKilled});
+        window.trophySystem.saveProgress?.();
     }
-    
-    // Atualizar nível mais alto
-    saveSystem.updateHighestLevel(currentLevelIndex + 2);
-    
+    saveSystem.updateHighestLevel(Math.min(LEVELS.length,index+2));
+    return true;
+}
+
+function commitVictoryOnce(){
+    if(victoryCommitted)return;
+    victoryCommitted=true;
+    recordLevelCompletion(currentLevelIndex);
+    const elapsed=Math.max(0,(Date.now()-gameStartTime)/1000);
+    if(saveSystem){saveSystem.addPlaytime?.(Math.max(0,elapsed-sessionPlaytimeSeconds));sessionPlaytimeSeconds=elapsed;saveSystem.markGameCompleted?.();saveSystem.save({score,level:LEVELS.length,playerCharacter:selectedCharacters[0],victory:true});}
+    refreshMenuOptions?.();
+    soundSystem?.stopMusic?.();
+    soundSystem?.playSound?.('victory');
+}
+
+function drawGameplayHitboxes(ctx){
+    if(!debugMode)return;
+    ctx.save();ctx.lineWidth=2;
+    const box=(o,stroke)=>{if(!o)return;ctx.strokeStyle=stroke;ctx.strokeRect(Math.round(o.x),Math.round(o.y),Math.round(o.w),Math.round(o.h));};
+    players.forEach(p=>{box(p,'#00ff88');const h=p.getHitbox?.();if(h)box(h,'#00ffff');});
+    enemies.forEach(e=>{box(e.getCollisionBox?.()||e,'#ff5555');const h=e.getHitbox?.();if(h)box(h,'#ffcc00');});
+    powerUps.forEach(p=>box(p,'#cc66ff'));destructibles.forEach(o=>box(o,'#ffaa33'));
+    ctx.restore();
+}
+
+function startStoryScene(sceneId, onComplete) {
+    clearKeys?.();
+    soundSystem?.stopMusic?.();
+    const started = window.storyCutscenes?.start?.(sceneId, () => {
+        clearKeys?.();
+        onComplete?.();
+    });
+    if (started) {
+        gameState = GameState.CUTSCENE;
+        return true;
+    }
+    onComplete?.();
+    return false;
+}
+
+function finishGameWithStory() {
+    if (window.storyCutscenes && !window.storyCutscenes.hasSeen?.('ending')) {
+        startStoryScene('ending', () => {
+            if (saveSystem?.markGameCompleted) saveSystem.markGameCompleted();
+            refreshMenuOptions();
+            gameState = GameState.VICTORY;
+        });
+        return;
+    }
+    if (saveSystem?.markGameCompleted) saveSystem.markGameCompleted();
+    refreshMenuOptions();
+    gameState = GameState.VICTORY;
+}
+
+function nextLevel() {
+    recordLevelCompletion(currentLevelIndex);
+    soundSystem?.stopMusic?.();
+
+    // Cutscenes narrativas pós-fase. Cada uma roda uma única vez por sessão.
+    const postSceneByLevel = {0:'farmFarewell', 2:'desertClue', 3:'vegasArrival', 4:'victorReveal', 5:'secretDoor', 6:'shadowTruth'};
+    const postScene = postSceneByLevel[currentLevelIndex];
+    if (postScene && window.storyCutscenes && !window.storyCutscenes.hasSeen?.(postScene)) {
+        startStoryScene(postScene, () => nextLevel());
+        return;
+    }
+
     // Próxima fase com reset de estado consistente.
     const nextIndex = currentLevelIndex + 1;
 
     if (nextIndex >= LEVELS.length) {
-        if (saveSystem && typeof saveSystem.markGameCompleted === 'function') saveSystem.markGameCompleted();
-        refreshMenuOptions();
-        gameState = GameState.VICTORY;
+        finishGameWithStory();
         return;
     }
 
@@ -1020,12 +1219,20 @@ function nextLevel() {
 
     loadLevel(nextIndex);
 
+    // Entrada especial da Fase 8: confronto com o Deus das Apostas.
+    if (nextIndex === 7 && gameState !== GameState.GAME_OVER && window.storyCutscenes && !window.storyCutscenes.hasSeen?.('godIntro')) {
+        startStoryScene('godIntro', () => { gameState = GameState.LEVEL_INTRO; levelIntroTimer = 180; });
+        return;
+    }
+
     // Só entra na tela de história se o carregamento não tiver acionado um gate.
     if (gameState !== GameState.GAME_OVER && gameState !== GameState.VICTORY) {
         gameState = GameState.STORY_LEVEL;
         levelIntroTimer = 180;
     }
 }
+
+function acquireParticle(data){const p=particlePool.pop()||{};Object.keys(p).forEach(k=>delete p[k]);Object.assign(p,data);return p;}
 
 function createParticle(x, y, color, count, type = 'normal') {
     // Bug #5: Limitar número de partículas para evitar memory leak
@@ -1038,7 +1245,7 @@ function createParticle(x, y, color, count, type = 'normal') {
         const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
         const speed = type === 'explosion' ? 5 + Math.random() * 5 : 3 + Math.random() * 3;
         
-        particles.push({
+        particles.push(acquireParticle({
             x: x,
             y: y,
             vx: Math.cos(angle) * speed,
@@ -1047,7 +1254,7 @@ function createParticle(x, y, color, count, type = 'normal') {
             size: type === 'explosion' ? 3 + Math.random() * 4 : 2 + Math.random() * 3,
             life: type === 'explosion' ? 40 : 30,
             type: type
-        });
+        }));
     }
 }
 
@@ -1057,7 +1264,7 @@ function createTextPopup(x, y, text, color, size = 24) {
         particles.splice(0, 1);
     }
     
-    particles.push({
+    particles.push(acquireParticle({
         x: x,
         y: y,
         vx: 0,
@@ -1067,7 +1274,7 @@ function createTextPopup(x, y, text, color, size = 24) {
         life: 60,
         type: 'text',
         text: text
-    });
+    }));
 }
 
 // Criar wrapper de particles para compatibilidade com novos sistemas
@@ -1110,7 +1317,7 @@ if (!window.particles.createText) {
 // Melhoria #19: Splash screen com loading
 // Imagem oficial da tela de carregamento
 const loadingScreenImage = new Image();
-loadingScreenImage.src = 'assets/ui/loading-screen.png';
+loadingScreenImage.src = 'assets/ui/loading-screen.webp';
 
 function drawLoading() {
     ctx.save();
@@ -1419,7 +1626,8 @@ function handleGamepadInput() {
     const accept=gamepadSystem.wasPressed(p,0);
     const back=gamepadSystem.wasPressed(p,1);
 
-    if(gameState===GameState.MENU){if(up){menuSelection=(menuSelection+menuOptions.length-1)%menuOptions.length;soundSystem.playSound('menuMove');}if(down){menuSelection=(menuSelection+1)%menuOptions.length;soundSystem.playSound('menuMove');}if(accept)activateMenuSelection();}
+    if(gameState===GameState.CUTSCENE){if(accept)window.storyCutscenes?.advance?.();if(back||gamepadSystem.wasPressed(p,9))window.storyCutscenes?.skip?.();}
+    else if(gameState===GameState.MENU){if(up){menuSelection=(menuSelection+menuOptions.length-1)%menuOptions.length;soundSystem.playSound('menuMove');}if(down){menuSelection=(menuSelection+1)%menuOptions.length;soundSystem.playSound('menuMove');}if(accept)activateMenuSelection();}
     else if(gameState===GameState.TROPHIES){
         if(up&&window.trophySystem){window.trophySystem.scrollUp();soundSystem.playSound('menuMove');}
         if(down&&window.trophySystem){window.trophySystem.scrollDown();soundSystem.playSound('menuMove');}
@@ -1429,7 +1637,7 @@ function handleGamepadInput() {
         if(up||left){stageSelectIndex=(stageSelectIndex+getStageSelectCount()-1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(down||right){stageSelectIndex=(stageSelectIndex+1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
-        if(accept){if(stageSelectIsBusBonus()){window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
+        if(accept){if(stageSelectIsBusBonus()){soundSystem?.stopMusic?.();window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
@@ -1465,9 +1673,9 @@ function handleGamepadInput() {
             if(back){gameState=GameState.MENU;menuSelection=3;soundSystem.playSound('menuBack');}
         }
     }
-    else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;}else nextLevel();soundSystem.playSound('menuSelect');}
-    else if(gameState===GameState.PLAYING&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){gameState=GameState.PAUSED;soundSystem.playSound('menuSelect');}
-    else if(gameState===GameState.PAUSED&&([0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))||back)){gameState=GameState.PLAYING;soundSystem.playSound('menuSelect');}
+    else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;startLevelMusic();}else nextLevel();soundSystem.playSound('menuSelect');}
+    else if([GameState.PLAYING,GameState.BUS_MINIGAME].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
+    else if(gameState===GameState.PAUSED&&([0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))||back)){resumeTruePause();}
 }
 
 function drawStageSelect() {
@@ -1661,6 +1869,8 @@ function drawLevelIntro() {
     if (levelIntroTimer <= 0) {
         gameState = GameState.PLAYING;
         levelStartTime = Date.now();
+        levelDamageTaken = 0;
+        startLevelMusic();
     }
 }
 
@@ -1783,7 +1993,16 @@ function drawModal() {
     ctx.fillText('[N] NÃO', 600, modalY + modalH - 40);
 }
 
+function commitGameOverOnce(){
+    if(gameOverCommitted)return;
+    gameOverCommitted=true;
+    const elapsed=gameStartTime?Math.max(0,(Date.now()-gameStartTime)/1000):0;
+    if(saveSystem){saveSystem.addPlaytime?.(Math.max(0,elapsed-sessionPlaytimeSeconds));sessionPlaytimeSeconds=elapsed;saveSystem.save({score,level:currentLevelIndex+1,playerCharacter:selectedCharacters[0]});}
+    soundSystem?.stopMusic?.();soundSystem?.playSound?.('gameOver');
+}
+
 function drawGameOver() {
+    commitGameOverOnce();
     // Fundo vermelho escuro
     const gradient = ctx.createLinearGradient(0, 0, 0, 650);
     gradient.addColorStop(0, '#4a0000');
@@ -1819,16 +2038,6 @@ function drawGameOver() {
         ctx.fillText('🎉 NOVO RECORDE! 🎉', 500, 440);
     }
     
-    // Salvar progresso
-    saveSystem.save({
-        score: score,
-        level: currentLevelIndex + 1,
-        playerCharacter: selectedCharacters[0]
-    });
-    
-    // Tocar som de game over
-    soundSystem.playSound('gameOver');
-    
     // Instruções
     ctx.fillStyle = '#00ffff';
     ctx.font = '24px Righteous';
@@ -1836,7 +2045,7 @@ function drawGameOver() {
 }
 
 function drawVictory() {
-    if (saveSystem && typeof saveSystem.markGameCompleted === 'function' && !saveSystem.load().gameCompleted) { saveSystem.markGameCompleted(); refreshMenuOptions(); }
+    commitVictoryOnce();
     // Fundo dourado
     const gradient = ctx.createLinearGradient(0, 0, 0, 650);
     gradient.addColorStop(0, '#ffd700');
@@ -1888,17 +2097,6 @@ function drawVictory() {
     if (totalLife / maxLife < 0.2) {
     }
     
-    
-    // Salvar progresso
-    saveSystem.save({
-        score: score,
-        level: LEVELS.length,
-        playerCharacter: selectedCharacters[0],
-        victory: true
-    });
-    
-    // Tocar som de vitória
-    soundSystem.playSound('victory');
     
     // Instruções
     ctx.fillStyle = '#000';
@@ -2270,30 +2468,30 @@ function drawHUD() {
     }
 }
 
-function safeGameLoopFrame() {
+let __fixedLast=performance.now(), __fixedAccum=0;
+function safeGameLoopFrame(timestamp=performance.now()) {
+    const step=window.GameRuntime?.fixedStepMs || (1000/60);
+    let dt=Math.min(100,Math.max(0,timestamp-__fixedLast));__fixedLast=timestamp;__fixedAccum+=dt;
+    let steps=Math.min(3,Math.floor(__fixedAccum/step));
+    if(steps===0){requestAnimationFrame(safeGameLoopFrame);return;}
     try {
-        gameLoop();
+        while(steps-->0){gameLoop();__fixedAccum-=step;}
     } catch (fatalError) {
-        const details = {
-            state: (typeof gameState !== 'undefined' ? gameState : 'desconhecido'),
-            level: (typeof currentLevelIndex !== 'undefined' ? currentLevelIndex + 1 : '?'),
-            enemies: (typeof enemies !== 'undefined' && enemies ? enemies.length : '?'),
-            players: (typeof players !== 'undefined' && players ? players.length : '?'),
-            cameraX: (typeof cameraX !== 'undefined' ? Math.round(cameraX) : '?')
-        };
-        const stack = fatalError && (fatalError.stack || fatalError.message) ? (fatalError.stack || fatalError.message) : String(fatalError);
-        if (window.GameDebugConsole) {
-            window.GameDebugConsole.error('ERRO FATAL NO GAME LOOP | contexto=' + JSON.stringify(details) + '\n' + stack);
-        }
-        console.error('[game-loop-fatal]', details, fatalError);
-        window.__gameDebugFatal = { details, stack, time: Date.now() };
-        // Não agenda outro frame aqui: preserva o ponto exato do erro no console interno.
+        const details={state:(typeof gameState!=='undefined'?gameState:'desconhecido'),level:(typeof currentLevelIndex!=='undefined'?currentLevelIndex+1:'?'),enemies:(typeof enemies!=='undefined'&&enemies?enemies.length:'?'),players:(typeof players!=='undefined'&&players?players.length:'?'),cameraX:(typeof cameraX!=='undefined'?Math.round(cameraX):'?')};
+        const stack=fatalError&&(fatalError.stack||fatalError.message)?(fatalError.stack||fatalError.message):String(fatalError);
+        window.GameDebugConsole?.error?.('ERRO FATAL NO GAME LOOP | contexto='+JSON.stringify(details)+'\n'+stack);console.error('[game-loop-fatal]',details,fatalError);window.__gameDebugFatal={details,stack,time:Date.now()};return;
     }
+    requestAnimationFrame(safeGameLoopFrame);
 }
 
 function gameLoop() {
+    window.sceneManager?.enter?.(gameState);
     // Heartbeat para o console interno detectar travamentos do loop
     window.__gameDebugLastFrame = Date.now();
+    if ([GameState.PLAYING,GameState.BUS_MINIGAME,GameState.BUS_BOARDING,GameState.BUS_ARRIVAL].includes(gameState) && gameStartTime) {
+        const elapsed=(Date.now()-gameStartTime)/1000;
+        if(Date.now()-lastPlaytimeSaveAt>30000){const delta=Math.max(0,elapsed-sessionPlaytimeSeconds);saveSystem.addPlaytime?.(delta);sessionPlaytimeSeconds=elapsed;lastPlaytimeSaveAt=Date.now();}
+    }
     // Melhoria #14: Calcular FPS
     fpsCounter++;
     const now = Date.now();
@@ -2310,7 +2508,6 @@ function gameLoop() {
     // Hit stop
     if (hitStopFrames > 0) {
         hitStopFrames--;
-        requestAnimationFrame(safeGameLoopFrame);
         return;
     }
     
@@ -2398,6 +2595,9 @@ function gameLoop() {
             }
         });
         
+        // NPC cachorra da fazenda (apenas Fase 1)
+        window.farmDogNPCManager?.update?.(players, keys);
+
         // Câmera segue jogadores vivos
         const alivePlayers = players.filter(p => p.life > 0);
         if (alivePlayers.length > 0) {
@@ -2557,7 +2757,7 @@ function gameLoop() {
                     
                     // Efeitos visuais
                     createParticle(powerUp.x + powerUp.w / 2, powerUp.y + powerUp.h / 2, colors[powerUp.type], 8, 'spark');
-                    soundSystem.playSound('powerup');
+                    soundSystem.playSound({health:'pickupHealth',speed:'pickupSpeed',strength:'pickupStrength',invincible:'pickupInvincible',score:'pickupScore'}[powerUp.type] || 'powerup');
                     
                     // Rastrear para conquista
                     if (window.trophySystem) {
@@ -2611,6 +2811,9 @@ function gameLoop() {
                         if (window.DEBUG_GAME) console.log(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
                     }
                     score += killed ? 30 : 8;
+                    if (killed || (lifeAfter !== null && lifeAfter <= 0)) {
+                        awardEnemyXP(enemy, proj.owner, { ranged:true, combo:proj.owner?.combo || 0 });
+                    }
                     if (proj.owner?.addCombo) proj.owner.addCombo();
                     createParticle(proj.x, proj.y, proj.charged ? '#ffd23f' : '#f4f1df', proj.charged ? 5 : 2, 'spark');
                     createTextPopup(enemy.x + enemy.w/2, enemy.y, `-${proj.damage}`, proj.charged ? '#ffd23f' : '#fff0c7');
@@ -2688,6 +2891,9 @@ function gameLoop() {
         projectiles.length = 0;
         activeProjectiles.forEach(p => projectiles.push(p));
         
+        // Desenhar NPC cachorra amigável da fazenda
+        window.farmDogNPCManager?.draw?.(ctx);
+
         // Desenhar jogadores
         players.forEach(player => {
             if (player.life > 0) {
@@ -2695,6 +2901,8 @@ function gameLoop() {
             }
         });
         
+        // Diretor de combate: limita quantos inimigos entram em ataque simultaneamente.
+        window.attackDirector?.assign?.(enemies, players);
         // Atualizar e desenhar inimigos
         enemies.forEach((enemy, index) => {
             try {
@@ -2757,7 +2965,8 @@ function gameLoop() {
                     const baseDamage = 20;
                     const comboDamage = player.combo * 2;
                     const strengthBonus = player.hasActivePowerUp('strength') ? baseDamage : 0;
-                    const damage = baseDamage + comboDamage + strengthBonus;
+                    const levelBonus = player.evolution?.getMeleeDamageBonus?.() || 0;
+                    const damage = Math.round(baseDamage + comboDamage + strengthBonus + levelBonus);
                     
                     // Usar takeDamage ao invés de hit
                     if (typeof enemy.takeDamage === 'function') {
@@ -2811,31 +3020,14 @@ function gameLoop() {
                         if (isBossKill) createParticle(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, '#f0d28a', 6, 'spark');
                         screenShake = isBossKill ? 7 : Math.min(1.5 + player.combo * 0.12, 3.5);
                         
-                        // Sistema de XP - usar isBoss para lookup correto
-                        if (player.evolution) {
-                            let xpKey = enemy.type || 'basic';
-                            if (enemy.isBoss && !enemy.isBossMinion) {
-                                if (enemy.name === 'REI DE VEGAS') xpKey = 'final_boss';
-                                else if (enemy.name === 'O ENGENHEIRO') xpKey = 'tech_boss';
-                                else if (enemy.name === 'A SOMBRA') xpKey = 'shadow_boss';
-                                else if (enemy.name === 'DEUS DAS APOSTAS') xpKey = 'god_boss';
-                                else xpKey = 'boss';
-                            }
-                            // Novos tipos de inimigo
-                            if (enemy instanceof EliteEnemy) xpKey = 'elite';
-                            else if (typeof GhostEnemy !== 'undefined' && enemy instanceof GhostEnemy) xpKey = 'ghost';
-                            else if (typeof AssassinEnemy !== 'undefined' && enemy instanceof AssassinEnemy) xpKey = 'assassin';
+                        // XP centralizado: funciona para João/Crist, melee/tiro e multiplayer.
+                        awardEnemyXP(enemy, player, { melee:true, combo:player.combo || 0 });
 
-                            const xpAmount = XP_REWARDS[xpKey] || 10;
-                            player.evolution.addXP(xpAmount);
-                            createTextPopup(enemy.x + enemy.w / 2, enemy.y - 70, `+${xpAmount} XP`, '#00ffff');
-
-                            // Vampirismo: recuperar vida ao matar
-                            if (player._vampirism && !enemy.isBoss) {
-                                const heal = Math.ceil(player.maxLife * 0.05);
-                                player.life = Math.min(player.maxLife, player.life + heal);
-                                createTextPopup(player.x + player.w / 2, player.y - 20, `+${heal} HP`, '#00ff44');
-                            }
+                        // Vampirismo: recuperar vida ao matar
+                        if (player._vampirism && !enemy.isBoss) {
+                            const heal = Math.ceil(player.maxLife * 0.05);
+                            player.life = Math.min(player.maxLife, player.life + heal);
+                            createTextPopup(player.x + player.w / 2, player.y - 20, `+${heal} HP`, '#00ff44');
                         }
                         
                         // Sons
@@ -2880,8 +3072,8 @@ function gameLoop() {
                         levelDamageTaken += enemy.damage;
                         totalGameDamage += enemy.damage;
                         
-                        // Som
-                        soundSystem.playSound('hit');
+                        // Som de dano do jogador separado do impacto no inimigo.
+                        soundSystem.playSound('playerHurt');
                     }
                 }
             });
@@ -2949,12 +3141,14 @@ function gameLoop() {
                 }
                 return true;
             }
+            if(particlePool.length<MAX_PARTICLES)particlePool.push(p);
             return false;
         });
         
         if (window.GraphicsUpgrade) {
             window.GraphicsUpgrade.drawForeground(ctx, currentLevel, cameraX);
         }
+        drawGameplayHitboxes(ctx);
         ctx.restore();
         if (window.GraphicsUpgrade) {
             window.GraphicsUpgrade.drawScreenFinish(ctx, currentLevel);
@@ -2990,6 +3184,8 @@ function gameLoop() {
                 }
             });
             
+            soundSystem?.stopMusic?.();
+            commitGameOverOnce();
             gameState = GameState.GAME_OVER;
             if (window.trophySystem) window.trophySystem.stats.deaths++;
         }
@@ -3064,7 +3260,7 @@ function gameLoop() {
                         score += 2000;
                         createTextPopup(500 + cameraX, 350, '+2000 BÔNUS!', '#00ffff', 28);
                         
-                        if (window.trophySystem) window.trophySystem.stats.levelsCompleted++;
+                        recordLevelCompletion(currentLevelIndex);
                         
                         // Pequeno delay antes de completar a fase
                         setTimeout(() => {
@@ -3079,7 +3275,7 @@ function gameLoop() {
                                     }
                                 });
                             } else {
-                                gameState = GameState.VICTORY;
+                                finishGameWithStory();
                                 players.forEach(player => {
                                     if (player.evolution) {
                                         saveSystem.savePlayerProgress(player.name, player.evolution.save());
@@ -3096,13 +3292,13 @@ function gameLoop() {
                 if (allEnemiesDead && allScheduledEnemiesSpawned) {
                     if (currentLevelIndex === 1) {
                         if (gameState === GameState.PLAYING && !window.busSequence?.isPhase2Waiting?.()) {
-                            if (window.trophySystem) window.trophySystem.stats.levelsCompleted++;
+                            recordLevelCompletion(currentLevelIndex);
                             players.forEach(player => { if (player.evolution) saveSystem.savePlayerProgress(player.name, player.evolution.save()); });
                             enemySpawnDirector = null;
                             window.busSequence?.preparePhase2Exit(currentLevel, players);
                         }
                     } else {
-                    if (window.trophySystem) window.trophySystem.stats.levelsCompleted++;
+                    recordLevelCompletion(currentLevelIndex);
                     
                     if (currentLevel.nextLevel) {
                         gameState = GameState.LEVEL_COMPLETE;
@@ -3116,7 +3312,7 @@ function gameLoop() {
                             }
                         });
                     } else {
-                        gameState = GameState.VICTORY;
+                        finishGameWithStory();
                         
                         players.forEach(player => {
                             if (player.evolution) {
@@ -3132,7 +3328,7 @@ function gameLoop() {
     }
     else if (gameState === GameState.BUS_BOARDING) {
         const busResult = window.busSequence?.updateDrawBoarding(ctx, currentLevel, players);
-        if (busResult === 'MINIGAME') gameState = GameState.BUS_MINIGAME;
+        if (busResult === 'MINIGAME') { soundSystem?.stopMusic?.(); gameState = GameState.BUS_MINIGAME; }
         else if (busResult === 'ERROR') gameState = GameState.BUS_MINIGAME;
     }
     else if (gameState === GameState.BUS_MINIGAME) {
@@ -3148,7 +3344,17 @@ function gameLoop() {
     }
     else if (gameState === GameState.BUS_ARRIVAL) {
         const busResult = window.busSequence?.updateDrawArrival(ctx, currentLevel, players);
-        if (busResult === 'DONE') { levelStartTime = Date.now(); levelDamageTaken = 0; gameState = GameState.PLAYING; }
+        if (busResult === 'DONE') {
+            levelStartTime = Date.now(); levelDamageTaken = 0;
+            if (window.storyCutscenes && !window.storyCutscenes.hasSeen?.('desertArrival')) {
+                startStoryScene('desertArrival', () => { gameState = GameState.PLAYING; levelStartTime = Date.now(); startLevelMusic(); });
+            } else { gameState = GameState.PLAYING; startLevelMusic(); }
+        }
+    }
+    else if (gameState === GameState.CUTSCENE) {
+        window.storyCutscenes?.update?.();
+        window.storyCutscenes?.draw?.(ctx, currentLevel, players, LEVELS);
+        if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
     }
     else if (gameState === GameState.LEVEL_COMPLETE) {
         // Mostrar jogo ao fundo
@@ -3166,32 +3372,16 @@ function gameLoop() {
         drawLevelComplete();
     }
     else if (gameState === GameState.PAUSED) {
-        // Mostrar jogo ao fundo
-        ctx.save();
-        ctx.translate(-cameraX, 0);
-        if (currentLevel && currentLevel.drawBackground) {
-
-            currentLevel.drawBackground(ctx, cameraX);
-
+        // PAUSE REAL: não redesenha entidades nem cenário animado. Mostra exatamente
+        // o frame capturado no instante da pausa, congelando toda a apresentação.
+        if (pauseSnapshot) {
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(pauseSnapshot, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        } else {
+            ctx.fillStyle = '#111'; ctx.fillRect(0,0,canvas.width,canvas.height);
         }
-        players.forEach(p => p.draw(ctx));
-        enemies.forEach(e => e.draw(ctx));
-        powerUps.forEach(powerUp => {
-            if (!powerUp.collected) {
-                const colors = {
-                    health: '#00ff00',
-                    speed: '#00ffff',
-                    strength: '#ff8800',
-                    invincible: '#ffd700',
-                    score: '#ff00ff'
-                };
-                ctx.fillStyle = colors[powerUp.type];
-                ctx.fillRect(powerUp.x, powerUp.y, powerUp.w, powerUp.h);
-            }
-        });
-        ctx.restore();
-        drawHUD();
-        
         drawPaused();
     }
     else if (gameState === GameState.GAME_OVER) {
@@ -3232,7 +3422,6 @@ function gameLoop() {
     // Restaurar contexto do shake
     ctx.restore();
     
-    requestAnimationFrame(safeGameLoopFrame);
 }
 
 // Iniciar o jogo

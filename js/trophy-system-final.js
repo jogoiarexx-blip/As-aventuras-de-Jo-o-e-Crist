@@ -431,15 +431,14 @@ class TrophySystem {
     giveReward(reward) {
         if (!reward) return;
         
-        if (reward.xp && window.players && window.players[0]) {
-            const player = window.players[0];
-            if (player.evolution) {
-                player.evolution.addXP(reward.xp);
-            }
+        if (reward.xp && Array.isArray(window.players)) {
+            window.players.forEach(player => {
+                if (player?.evolution) player.evolution.addXP(reward.xp, { trophy:true });
+            });
         }
         
-        if (reward.points && window.score !== undefined) {
-            window.score = (window.score || 0) + reward.points;
+        if (reward.points) {
+            if (typeof window.addGameScore === 'function') window.addGameScore(reward.points);
         }
     }
     

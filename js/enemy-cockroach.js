@@ -58,7 +58,75 @@ class CockroachEnemy extends Enemy {
         }
     }
     
+
     draw(ctx) {
+        // Tenta usar primeiro o sprite 16-bit real do Homem-Barata.
+        const sprite = window.__cockroach16bitSprite || (() => {
+            const img = new Image();
+            img.src = 'assets/enemies/cockroach-16bit.webp';
+            window.__cockroach16bitSprite = img;
+            return img;
+        })();
+        const frames = {
+            idle:[[15,175,106,144],[36,10,81,144],[154,173,94,145]],
+            walk:[[156,10,80,146],[276,10,79,146],[295,166,93,130],[400,10,95,147]],
+            run:[[1146,178,89,170],[1203,8,147,153],[1273,179,96,185],[1354,10,149,152]],
+            attack:[[27,530,102,140],[29,370,160,140],[170,530,106,140],[193,374,158,136],[311,532,89,138]],
+            hurt:[[26,680,96,133],[160,680,116,134],[312,714,177,101]],
+            dead:[[312,714,177,101],[536,755,157,70],[820,708,187,122],[1041,714,217,116]],
+            dash:[[378,860,200,130],[606,864,216,129],[826,861,236,135],[1057,861,249,135],[1302,861,215,132]]
+        };
+        if (sprite.complete && sprite.naturalWidth) {
+            const prevX = this._spritePrevX ?? this.x;
+            const dxMove = this.x - prevX;
+            this._spritePrevX = this.x;
+            if (Math.abs(dxMove) > 0.01) this._spriteFacing = dxMove > 0 ? 1 : -1;
+            const state = (this.life <= 0 || this.dead) ? 'dead'
+                : (this.hitFlash > 0) ? 'hurt'
+                : (this.attacking ? 'attack' : (this.dashing ? 'dash' : (Math.abs(dxMove) > 2.2 ? 'run' : (Math.abs(dxMove) > 0.08 ? 'walk' : 'idle'))));
+            const list = frames[state] || frames.idle;
+            const idx = state === 'dead'
+                ? Math.min(list.length - 1, Math.floor((this.deathAnim || 0) / 9))
+                : Math.floor(performance.now() / (state === 'attack' ? 100 : state === 'run' ? 80 : 140)) % list.length;
+            const [sx, sy, sw, sh] = list[idx];
+            const ground = Number.isFinite(this.groundY) ? this.groundY : this.y + this.h;
+            let th = state === 'dead' ? 74 : 96;
+            let tw = th * (sw / sh);
+            if (tw > 154) { tw = 154; th = tw / (sw / sh); }
+            const cx = this.x + this.w / 2;
+            const bottom = (this.isJumping || Math.abs(this.vy || 0) > 0.1) ? this.y + this.h : ground;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.24)';
+            ctx.beginPath();
+            ctx.ellipse(cx, ground + 2, Math.max(11, this.w * 0.36), 3.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            const facing = this._spriteFacing ?? (this.facingRight ? 1 : -1);
+            if (facing > 0) {
+                ctx.translate(cx, 0);
+                ctx.scale(-1, 1);
+                ctx.translate(-cx, 0);
+            }
+            ctx.drawImage(sprite, sx, sy, sw, sh, cx - tw / 2, bottom - th, tw, th);
+            ctx.restore();
+
+            if (this.life > 0) {
+                const barWidth = Math.max(30, Math.min(56, this.w));
+                const barX = this.x + this.w / 2 - barWidth / 2;
+                const barY = bottom - th - 8;
+                const lifePercent = this.life / Math.max(1, this.maxLife);
+                ctx.fillStyle = 'rgba(0,0,0,.65)';
+                ctx.fillRect(barX - 1, barY - 1, barWidth + 2, 5);
+                ctx.fillStyle = lifePercent > 0.6 ? '#31d158' : lifePercent > 0.3 ? '#ffb020' : '#ff453a';
+                ctx.fillRect(barX, barY, barWidth * lifePercent, 3);
+            }
+            return;
+        }
+
         if (this.life <= 0 && this.deathAnim >= 30) return;
         
         ctx.save();

@@ -3,13 +3,39 @@
  * O jogador ganha XP matando inimigos e sobe de nível
  */
 
+const EVOLUTION_VERSION = 2;
+const CHARACTER_GROWTH = {
+    'João': {
+        maxLife: 10,
+        meleeDamagePerLevel: 0.65,
+        rangedDamagePerLevel: 0.018,
+        speed: 0.045,
+        defense: 0.70,
+        rangedXpBonus: 0.15,
+        comboXpBonus: 0.006
+    },
+    'Crist': {
+        maxLife: 12,
+        meleeDamagePerLevel: 0.85,
+        rangedDamagePerLevel: 0,
+        speed: 0.035,
+        defense: 1.05,
+        rangedXpBonus: 0,
+        comboXpBonus: 0.018
+    }
+};
+
 class PlayerEvolution {
     constructor(player) {
         this.player = player;
+        this.version = EVOLUTION_VERSION;
         this.level = 1;
         this.xp = 0;
-        this.xpToNextLevel = 100;
         this.maxLevel = 50;
+        this.profile = CHARACTER_GROWTH[player.name] || CHARACTER_GROWTH['João'];
+        this.xpToNextLevel = this.getXPRequirement(1);
+        this.totalXpEarned = 0;
+        this.killStats = { melee:0, ranged:0, assist:0, boss:0 };
         
         // Stats base do personagem
         this.baseStats = {
@@ -19,12 +45,13 @@ class PlayerEvolution {
             defense: 0
         };
         
-        // Multiplicadores por nível
+        // Crescimento próprio de cada personagem. João favorece tiro/mobilidade;
+        // Crist favorece resistência e dano corpo a corpo.
         this.growthRates = {
-            maxLife: 10,        // +10 HP por nível
-            attackDamage: 2,    // +2 dano por nível
-            speed: 0.1,         // +0.1 velocidade por nível
-            defense: 1          // +1% redução de dano por nível
+            maxLife: this.profile.maxLife,
+            attackDamage: this.profile.meleeDamagePerLevel,
+            speed: this.profile.speed,
+            defense: this.profile.defense
         };
         
         // Skills desbloqueadas
@@ -58,41 +85,83 @@ class PlayerEvolution {
     /**
      * Adiciona XP e verifica se subiu de nível
      */
-    addXP(amount) {
-        if (this.level >= this.maxLevel) return;
-        
-        this.xp += amount;
-        
-        // Verificar level up
+    getXPRequirement(level = this.level) {
+        // Curva determinística: cresce de forma suave no início e mais forte no fim.
+        // Mantém os gates das fases 7/8 alcançáveis sem grind excessivo.
+        const n = Math.max(0, level - 1);
+        return Math.max(100, Math.round(100 + 20 * n + 5 * Math.pow(n, 1.5)));
+    }
+
+    getXPMultiplier(context = {}) {
+        let mult = 1;
+        if (context.assist) mult *= 1.0; // o valor de assist já chega reduzido pelo distribuidor.
+        if (this.player.name === 'João' && context.ranged) mult += this.profile.rangedXpBonus;
+        if (this.player.name === 'Crist' && context.melee) {
+            mult += Math.min(0.20, Math.max(0, Number(context.combo) || 0) * this.profile.comboXpBonus);
+        }
+        // Catch-up leve no multiplayer: evita que o segundo personagem fique inutilizável.
+        const team = window.players || [];
+        const highest = team.reduce((m,p)=>Math.max(m,p?.evolution?.level||1),1);
+        if (highest - this.level >= 3) mult += 0.15;
+        return Math.max(0.25, mult);
+    }
+
+    addXP(amount, context = {}) {
+        if (this.level >= this.maxLevel) return 0;
+        const raw = Math.max(0, Number(amount) || 0);
+        if (!raw) return 0;
+        const gained = Math.max(1, Math.round(raw * this.getXPMultiplier(context)));
+        this.xp += gained;
+        this.totalXpEarned += gained;
+        if (context.assist) this.killStats.assist++;
+        else if (context.ranged) this.killStats.ranged++;
+        else if (context.melee) this.killStats.melee++;
+        if (context.boss) this.killStats.boss++;
+
         while (this.xp >= this.xpToNextLevel && this.level < this.maxLevel) {
             this.levelUp();
         }
+        this.persistSoon();
+        return gained;
     }
-    
+
+    persistSoon() {
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => {
+            try { window.saveSystem?.savePlayerProgress?.(this.player.name, this.save()); } catch (_) {}
+        }, 250);
+    }
+
+    getMeleeDamageBonus() {
+        return Math.max(0, (this.level - 1) * this.profile.meleeDamagePerLevel);
+    }
+
+    getRangedDamageMultiplier() {
+        return 1 + Math.max(0, this.level - 1) * this.profile.rangedDamagePerLevel;
+    }
+
     /**
      * Sobe de nível e melhora stats
      */
     levelUp() {
         this.level++;
         this.xp -= this.xpToNextLevel;
-        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.15); // +15% XP necessário
+        this.xpToNextLevel = this.getXPRequirement(this.level);
         
-        // Aumentar stats
+        // Aumentar stats sem transformar level-up em cura completa explorável.
+        const oldMaxLife = this.player.maxLife;
         this.player.maxLife += this.growthRates.maxLife;
-        
-        // ✅ CORREÇÃO: Garantir que a vida seja restaurada completamente ao subir de nível
-        this.player.life = this.player.maxLife; 
+        const levelHeal = Math.max(this.growthRates.maxLife, Math.round(this.player.maxLife * 0.25));
+        this.player.life = Math.min(this.player.maxLife, this.player.life + levelHeal);
         
         // Remover invulnerabilidade se tiver (para evitar bugs)
         if (this.player.invulnerable) {
-            this.player.invulnerable = false;
+            this.player.invulnerable = 0;
             this.player.invulnerableTimer = 0;
         }
         
-        if (this.player.attackDamage) {
-            this.player.attackDamage += this.growthRates.attackDamage;
-        }
-        
+        // O dano é calculado dinamicamente por getMeleeDamageBonus/getRangedDamageMultiplier,
+        // evitando stats que existiam no save mas não eram usados pelo combate real.
         this.player.speed += this.growthRates.speed;
         
         // Verificar skills desbloqueadas
@@ -117,7 +186,7 @@ class PlayerEvolution {
         }
         
         if (window.soundSystem) {
-            window.soundSystem.playSound('powerup');
+            window.soundSystem.playSound('levelUp');
         }
         
         // Notificar evento
@@ -140,7 +209,7 @@ class PlayerEvolution {
         
         switch(skill.name) {
             case 'Super Pulo':
-                this.player.jumpPower = (this.player.jumpPower || 15) * 1.5;
+                this.player._superJumpMultiplier = 1.35;
                 break;
             case 'Aura Protetora':
                 this.player._auraProtection = true;
@@ -177,7 +246,7 @@ class PlayerEvolution {
      * Calcula redução de dano baseada em defesa
      */
     calculateDamageReduction(damage) {
-        const defensePercent = Math.min(this.level * this.growthRates.defense, 75); // Max 75% redução
+        const defensePercent = Math.min((this.level - 1) * this.growthRates.defense, 45); // limite equilibrado
         const reduction = damage * (defensePercent / 100);
         return Math.max(1, damage - reduction);
     }
@@ -317,10 +386,13 @@ class PlayerEvolution {
      */
     save() {
         return {
+            version: EVOLUTION_VERSION,
             level: this.level,
             xp: this.xp,
             xpToNextLevel: this.xpToNextLevel,
-            unlockedSkills: this.unlockedSkills
+            totalXpEarned: this.totalXpEarned,
+            killStats: { ...this.killStats },
+            unlockedSkills: [...this.unlockedSkills]
         };
     }
     
@@ -330,10 +402,21 @@ class PlayerEvolution {
     load(data) {
         if (!data) return;
         
-        this.level = data.level || 1;
-        this.xp = data.xp || 0;
-        this.xpToNextLevel = data.xpToNextLevel || 100;
-        this.unlockedSkills = data.unlockedSkills || [];
+        this.level = Math.max(1, Math.min(this.maxLevel, Number(data.level) || 1));
+        const newRequirement = this.getXPRequirement(this.level);
+        if ((Number(data.version) || 1) < EVOLUTION_VERSION) {
+            // Migração retrocompatível: preserva aproximadamente o percentual de XP
+            // já conquistado no nível atual do save antigo.
+            const oldNeed = Math.max(1, Number(data.xpToNextLevel) || 100);
+            const ratio = Math.max(0, Math.min(0.9999, (Number(data.xp) || 0) / oldNeed));
+            this.xp = Math.floor(newRequirement * ratio);
+        } else {
+            this.xp = Math.max(0, Math.min(newRequirement - 1, Number(data.xp) || 0));
+        }
+        this.xpToNextLevel = newRequirement;
+        this.totalXpEarned = Math.max(0, Number(data.totalXpEarned) || 0);
+        this.killStats = { melee:0, ranged:0, assist:0, boss:0, ...(data.killStats || {}) };
+        this.unlockedSkills = Array.isArray(data.unlockedSkills) ? [...data.unlockedSkills] : [];
         
         // Reaplicar stats
         const levelDiff = this.level - 1;
@@ -342,9 +425,6 @@ class PlayerEvolution {
         // ✅ CORREÇÃO: Sempre começar com vida cheia ao iniciar novo jogo
         this.player.life = this.player.maxLife;
         
-        if (this.player.attackDamage) {
-            this.player.attackDamage = this.baseStats.attackDamage + (levelDiff * this.growthRates.attackDamage);
-        }
         this.player.speed = this.baseStats.speed + (levelDiff * this.growthRates.speed);
         
         // Reaplicar skills
@@ -362,9 +442,16 @@ const XP_REWARDS = {
     'basic': 10,
     'ciclista': 12,
     'fast': 15,
+    'cockroach': 18,
     'strong': 20,
-    'tank': 30,
+    'cowboy': 22,
     'berserker': 25,
+    'tank': 30,
+    'turista': 14,
+    'seguranca': 24,
+    'elvis_fan': 18,
+    'mulher_feia': 22,
+    'travesti': 22,
     'elite': 40,
     'ghost': 35,
     'assassin': 50,
@@ -374,3 +461,4 @@ const XP_REWARDS = {
     'shadow_boss': 2000,
     'god_boss': 5000
 };
+window.XP_REWARDS = XP_REWARDS;

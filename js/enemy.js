@@ -271,7 +271,7 @@ class Enemy {
         // IA baseada em distância
         this.aiTimer--;
         
-        if (distance < 70 && this.attackCooldown === 0 && !this.attacking) {
+        if (distance < 70 && this.attackCooldown === 0 && !this.attacking && this.__attackAllowed !== false) {
             // Atacar
             this.performAttack(nearestPlayer);
         } else if (distance < 400) {

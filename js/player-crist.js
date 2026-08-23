@@ -1,5 +1,5 @@
 const CRIST_SPRITE_SHEET = new Image();
-CRIST_SPRITE_SHEET.src = 'assets/crist-16bit.png';
+CRIST_SPRITE_SHEET.src = 'assets/crist-16bit.webp';
 const CRIST_16_FRAMES = {"idle":[[29,10,80,107],[155,10,78,107],[280,10,76,107],[408,10,76,107]],"walk":[[24,132,91,111],[150,130,88,112],[273,130,90,112],[408,135,90,107],[540,135,87,108],[670,135,83,108]],"run":[[16,260,102,105],[144,260,107,105],[270,260,110,103],[402,258,116,196],[540,259,118,103]],"jump":[[23,387,82,93],[156,384,79,95],[276,376,80,104],[546,377,80,102]],"attack":[[629,502,186,218],[796,501,157,220],[919,500,153,220],[1063,624,76,96],[1072,501,86,96]],"hurt":[[26,840,85,99],[32,732,82,97],[170,846,82,93]],"dead":[[19,1072,102,77],[156,959,111,94],[171,1074,100,75]],"dash":[[19,1173,129,104],[157,1173,144,104],[314,1173,152,104],[492,1170,162,107],[671,1173,168,103],[854,1174,136,102]]};
 
 // Classe específica para o personagem CRIST
@@ -55,6 +55,9 @@ class PlayerCrist {
         // Sistema de combate
         this.combo = 0;
         this.invulnerable = 0;
+        this.coyoteFrames = 0;
+        this.jumpBufferFrames = 0;
+        this._jumpHeldLast = false;
         this.walkCycle = 0;
         this.animTimer = 0;
         this.isMoving = false;
@@ -425,10 +428,19 @@ class PlayerCrist {
             if (!this.isJumping) this.animTimer = 0;
         }
 
-        // Pulo
-        if (sistemControles.acaoAtiva(this.controlPlayer, 'up', keys) && !this.isJumping && this.y + this.h >= this.groundY && !this.dashing) {
-            this.jumpPower = -18;
+        // Pulo com jump-buffer (~100ms) e coyote-time (~100ms).
+        const jumpHeld = sistemControles.acaoAtiva(this.controlPlayer, 'up', keys);
+        if (jumpHeld && !this._jumpHeldLast) this.jumpBufferFrames = 6;
+        this._jumpHeldLast = jumpHeld;
+        if (this.jumpBufferFrames > 0) this.jumpBufferFrames--;
+        const groundedNow = this.y + this.h >= this.groundY - 1;
+        if (groundedNow) this.coyoteFrames = 6; else if (this.coyoteFrames > 0) this.coyoteFrames--;
+        if (this.jumpBufferFrames > 0 && this.coyoteFrames > 0 && !this.dashing) {
+            this.jumpPower = -18 * (this._superJumpMultiplier || 1);
             this.isJumping = true;
+            this.jumpBufferFrames = 0;
+            this.coyoteFrames = 0;
+            window.soundSystem?.playSound?.('jump');
         }
 
         // Aplicar gravidade
@@ -507,18 +519,17 @@ class PlayerCrist {
 
     takeDamage(damage) {
         if (this.invulnerable > 0 || this.hasActivePowerUp('invincible')) return false;
-        
-        this.life -= damage;
+        if (this.evolution?.tryEvade?.()) return false;
+        if (this.evolution?.tryShield?.()) return false;
+        const actualDamage = Math.max(1, Math.round(this.evolution?.calculateDamageReduction?.(damage) ?? damage));
+        this.life -= actualDamage;
         if (window.gamepadSystem?.rumble) window.gamepadSystem.rumble(this.controlPlayer || 1, 130, 0.7, 0.35);
         this.invulnerable = 40;
         this.combo = Math.floor(this.combo / 2);
         this.comboTimer = 0;
         if (this.life < 0) this.life = 0;
-        
-        if (this.life === 0) {
-            console.log(`💀 ${this.name} MORREU!`);
-        }
-        
+        if (this.life === 0 && this.evolution?.tryRevive?.()) return true;
+        if (this.life === 0) console.log(`💀 ${this.name} MORREU!`);
         return true;
     }
 

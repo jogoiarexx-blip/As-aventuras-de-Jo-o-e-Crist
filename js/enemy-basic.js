@@ -334,7 +334,7 @@ class BasicEnemy {
         // IA do inimigo
         this.aiTimer--;
         
-        if (distance < 70 && this.attackCooldown === 0) {
+        if (distance < 70 && this.attackCooldown === 0 && this.__attackAllowed !== false) {
             // Atacar se próximo
             this.attacking = true;
             this.attackTimer = 12;

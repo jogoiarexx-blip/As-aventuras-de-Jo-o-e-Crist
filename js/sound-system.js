@@ -7,11 +7,52 @@ class SoundSystem {
         this.musicVolume = 0.3; // Melhoria #52: Volume de música
         this.audioContext = null;
         this.initialized = false;
+
+        // v0.9.3: efeitos WAV 16-bit. Mantém fallback procedural caso um arquivo falhe.
+        this.soundManifest = {
+            punch:'assets/sounds/punch.wav', punch1:'assets/sounds/punch1.wav', kick:'assets/sounds/kick.wav', heavy:'assets/sounds/heavy.wav',
+            cane1:'assets/sounds/cane1.wav', cane2:'assets/sounds/cane2.wav', cane_ultimate:'assets/sounds/cane_ultimate.wav',
+            hit:'assets/sounds/hit.wav', enemyHit:'assets/sounds/enemyHit.wav', enemyDeath:'assets/sounds/enemyDeath.wav', ko:'assets/sounds/ko.wav',
+            dash:'assets/sounds/dash.wav', jump:'assets/sounds/jump.wav', combo:'assets/sounds/combo.wav', perfect:'assets/sounds/perfect.wav', perfectDodge:'assets/sounds/perfectDodge.wav',
+            powerup:'assets/sounds/powerup.wav', powerUp:'assets/sounds/powerUp.wav', levelComplete:'assets/sounds/levelComplete.wav', victory:'assets/sounds/victory.wav', gameOver:'assets/sounds/gameOver.wav',
+            menuMove:'assets/sounds/menuMove.wav', menuSelect:'assets/sounds/menuSelect.wav', menuBack:'assets/sounds/menuBack.wav', achievement:'assets/sounds/achievement.wav',
+            shoot:'assets/sounds/shoot.wav', fuse:'assets/sounds/fuse.wav', explosion:'assets/sounds/explosion.wav',
+            busEngine:'assets/sounds/busEngine.wav', busAccelerate:'assets/sounds/busAccelerate.wav', busBrake:'assets/sounds/busBrake.wav', busHorn:'assets/sounds/busHorn.wav',
+            busCollision:'assets/sounds/busCollision.wav', busRepair:'assets/sounds/busRepair.wav', busMoney:'assets/sounds/busMoney.wav', busStar:'assets/sounds/busStar.wav',
+            busTurbo:'assets/sounds/busTurbo.wav', busCheckpoint:'assets/sounds/busCheckpoint.wav', busDoorOpen:'assets/sounds/busDoorOpen.wav', busDoorClose:'assets/sounds/busDoorClose.wav',
+            busBroken:'assets/sounds/busBroken.wav', busArrival:'assets/sounds/busArrival.wav',
+            punch2:'assets/sounds/punch2.wav', punch3:'assets/sounds/punch3.wav', kick1:'assets/sounds/kick1.wav', kick2:'assets/sounds/kick2.wav',
+            hit1:'assets/sounds/hit1.wav', hit2:'assets/sounds/hit2.wav', hit3:'assets/sounds/hit3.wav',
+            enemyHit1:'assets/sounds/enemyHit1.wav', enemyHit2:'assets/sounds/enemyHit2.wav', enemyDeath1:'assets/sounds/enemyDeath1.wav', enemyDeath2:'assets/sounds/enemyDeath2.wav',
+            ko1:'assets/sounds/ko1.wav', ko2:'assets/sounds/ko2.wav', playerHurt1:'assets/sounds/playerHurt1.wav', playerHurt2:'assets/sounds/playerHurt2.wav',
+            jump1:'assets/sounds/jump1.wav', jump2:'assets/sounds/jump2.wav', dash1:'assets/sounds/dash1.wav', dash2:'assets/sounds/dash2.wav',
+            shoot1:'assets/sounds/shoot1.wav', shoot2:'assets/sounds/shoot2.wav', menuMove1:'assets/sounds/menuMove1.wav', menuMove2:'assets/sounds/menuMove2.wav',
+            crateHit:'assets/sounds/crateHit.wav', crateBreak:'assets/sounds/crateBreak.wav', barrelHit:'assets/sounds/barrelHit.wav', barrelBreak:'assets/sounds/barrelBreak.wav',
+            pickupHealth:'assets/sounds/pickupHealth.wav', pickupSpeed:'assets/sounds/pickupSpeed.wav', pickupStrength:'assets/sounds/pickupStrength.wav',
+            pickupInvincible:'assets/sounds/pickupInvincible.wav', pickupScore:'assets/sounds/pickupScore.wav',
+            dogPet:'assets/sounds/dogPet.wav', dogBark:'assets/sounds/dogBark.wav', levelUp:'assets/sounds/levelUp.wav', pause:'assets/sounds/pause.wav', unpause:'assets/sounds/unpause.wav',
+            busHorn1:'assets/sounds/busHorn1.wav', busHorn2:'assets/sounds/busHorn2.wav', busCollision1:'assets/sounds/busCollision1.wav', busCollision2:'assets/sounds/busCollision2.wav'
+        };
+        this.soundVariants = {
+            punch:['punch','punch2','punch3'], kick:['kick1','kick2'], hit:['hit1','hit2','hit3'],
+            enemyHit:['enemyHit1','enemyHit2'], enemyDeath:['enemyDeath1','enemyDeath2'], ko:['ko1','ko2'],
+            playerHurt:['playerHurt1','playerHurt2'], jump:['jump1','jump2'], dash:['dash1','dash2'], shoot:['shoot1','shoot2'],
+            menuMove:['menuMove1','menuMove2'], busHorn:['busHorn1','busHorn2'], busCollision:['busCollision1','busCollision2']
+        };
+        this.soundCooldownMs = { hit:28, enemyHit:35, punch:30, kick:45, playerHurt:80, menuMove:45, fuse:110, busCollision:120 };
+        this.soundPitchRange = { punch:.035, kick:.025, hit:.045, enemyHit:.035, playerHurt:.025, jump:.025, dash:.025, shoot:.018, menuMove:.015, busCollision:.02 };
+        this.soundVolumeScale = { hit:.68, enemyHit:.72, punch:.78, kick:.82, playerHurt:.82, ko:.88, shoot:.78, explosion:.80, busCollision:.82, dogBark:.72, menuMove:.72 };
+        this._lastPlayedAt = {};
+        this._lastVariantIndex = {};
+        this.soundPools = {};
+        this.loopingSounds = {};
+        this.preloadWavSounds();
         
         // Melhoria #53: Sistema de música de fundo
         this.musicPlaying = false;
         this.musicOscillators = [];
         this.musicGain = null;
+        this.musicSessionId = 0;
         
         // Não inicializar AudioContext aqui - aguardar interação do usuário
     }
@@ -22,24 +63,28 @@ class SoundSystem {
         
         const ctx = this.audioContext;
         const now = ctx.currentTime;
+        const session = ++this.musicSessionId;
         
         // Ganho principal da música
         this.musicGain = ctx.createGain();
         this.musicGain.gain.setValueAtTime(this.musicVolume, now);
         this.musicGain.connect(ctx.destination);
         
+        // Marcar antes de agendar os loops; a versão anterior marcava depois e
+        // o primeiro ciclo não era reprogramado.
+        this.musicPlaying = true;
+        this.musicTempo = tempo;
         // Batida base (kick)
-        const kickInterval = tempo === 'fast' ? 0.3 : 0.5;
-        this.playKick(now, kickInterval);
+        const kickInterval = tempo === 'fast' ? 0.3 : tempo === 'slow' ? 0.62 : 0.5;
+        this.playKick(now, kickInterval, session);
         
         // Linha de baixo
-        this.playBassline(now, tempo);
+        this.playBassline(now, tempo, session);
         
-        this.musicPlaying = true;
     }
     
-    playKick(startTime, interval) {
-        if (!this.musicGain) return;
+    playKick(startTime, interval, session=this.musicSessionId) {
+        if (!this.musicGain || session !== this.musicSessionId) return;
         
         const ctx = this.audioContext;
         const osc = ctx.createOscillator();
@@ -60,15 +105,15 @@ class SoundSystem {
         
         // Repetir kick
         if (this.musicPlaying) {
-            setTimeout(() => this.playKick(ctx.currentTime, interval), interval * 1000);
+            setTimeout(() => { if(this.musicPlaying && session===this.musicSessionId) this.playKick(ctx.currentTime, interval, session); }, interval * 1000);
         }
     }
     
-    playBassline(startTime, tempo) {
-        if (!this.musicGain) return;
+    playBassline(startTime, tempo, session=this.musicSessionId) {
+        if (!this.musicGain || session !== this.musicSessionId) return;
         
         const ctx = this.audioContext;
-        const notes = tempo === 'fast' ? [110, 130, 147, 165] : [82.4, 98, 110, 123.5]; // A, B, C#, D
+        const notes = tempo === 'fast' ? [110,130,147,165] : tempo === 'vegas' ? [98,123.5,146.8,196] : tempo === 'desert' ? [73.4,82.4,110,123.5] : [82.4,98,110,123.5]; // A, B, C#, D
         const noteLength = tempo === 'fast' ? 0.4 : 0.6;
         
         notes.forEach((freq, i) => {
@@ -97,12 +142,13 @@ class SoundSystem {
         
         // Loop da bassline
         if (this.musicPlaying) {
-            setTimeout(() => this.playBassline(ctx.currentTime, tempo), notes.length * noteLength * 1000);
+            setTimeout(() => { if(this.musicPlaying && session===this.musicSessionId) this.playBassline(ctx.currentTime, tempo, session); }, notes.length * noteLength * 1000);
         }
     }
     
     stopMusic() {
         this.musicPlaying = false;
+        this.musicSessionId++;
         if (this.musicGain) {
             this.musicGain.disconnect();
             this.musicGain = null;
@@ -127,9 +173,142 @@ class SoundSystem {
         }
     }
     
+    preloadWavSounds() {
+        Object.entries(this.soundManifest).forEach(([type, src]) => {
+            const pool = [];
+            const voices = type === 'busEngine' ? 1 : 4;
+            for (let i=0;i<voices;i++) {
+                const a = new Audio(src);
+                a.preload = 'auto';
+                pool.push(a);
+            }
+            this.soundPools[type] = { pool, cursor:0 };
+        });
+    }
+
+    resolveSoundKey(type) {
+        const variants = this.soundVariants[type];
+        if (!variants?.length) return type;
+        let idx = Math.floor(Math.random() * variants.length);
+        if (variants.length > 1 && idx === this._lastVariantIndex[type]) idx = (idx + 1) % variants.length;
+        this._lastVariantIndex[type] = idx;
+        return variants[idx];
+    }
+
+    playWav(type, volumeScale=1) {
+        if (!this.enabled || this._gamePaused) return false;
+        const now = performance.now();
+        const cd = this.soundCooldownMs[type] || 0;
+        if (cd && now - (this._lastPlayedAt[type] || -Infinity) < cd) return true;
+        this._lastPlayedAt[type] = now;
+
+        const key = this.resolveSoundKey(type);
+        const entry = this.soundPools[key] || this.soundPools[type];
+        if (!entry?.pool?.length) return false;
+        const audio = entry.pool[entry.cursor++ % entry.pool.length];
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.loop = false;
+            const baseScale = this.soundVolumeScale[type] ?? 1;
+            audio.volume = Math.max(0, Math.min(1, this.sfxVolume * volumeScale * baseScale));
+            const pitch = this.soundPitchRange[type] || 0;
+            audio.playbackRate = pitch ? 1 + (Math.random() * 2 - 1) * pitch : 1;
+            const promise = audio.play();
+            if (promise?.catch) promise.catch(()=>{});
+            return true;
+        } catch (_) { return false; }
+    }
+
+    startLoop(type, volumeScale=.65) {
+        if (!this.enabled || this.loopingSounds[type]) return;
+        const entry = this.soundPools[type];
+        if (!entry?.pool?.length) return;
+        const audio = entry.pool[0];
+        try {
+            audio.currentTime = 0; audio.loop = true; audio.playbackRate = 1;
+            audio.volume = Math.max(0, Math.min(1, this.sfxVolume * volumeScale));
+            this.loopingSounds[type] = audio;
+            const promise = audio.play();
+            if (promise?.catch) promise.catch(()=>{});
+        } catch (_) {}
+    }
+
+    stopLoop(type) {
+        const audio = this.loopingSounds[type];
+        if (!audio) return;
+        try { audio.pause(); audio.currentTime = 0; } catch (_) {}
+        delete this.loopingSounds[type];
+    }
+
+    stopAllLoops() { Object.keys(this.loopingSounds).forEach(k=>this.stopLoop(k)); }
+
+    pauseAll() {
+        if (this._gamePaused) return;
+        this._gamePaused = true;
+        this._pausedPoolAudio = [];
+        this._pausedLoops = [];
+        Object.entries(this.soundPools || {}).forEach(([type, entry]) => {
+            (entry?.pool || []).forEach((audio, index) => {
+                try {
+                    if (!audio.paused && !audio.ended) {
+                        this._pausedPoolAudio.push({type, index, time:audio.currentTime, loop:audio.loop});
+                        audio.pause();
+                    }
+                } catch (_) {}
+            });
+        });
+        Object.entries(this.loopingSounds || {}).forEach(([type, audio]) => {
+            try {
+                if (audio && !audio.paused) {
+                    this._pausedLoops.push({type, time:audio.currentTime});
+                    audio.pause();
+                }
+            } catch (_) {}
+        });
+        try {
+            if (this.audioContext?.state === 'running') {
+                this._resumeAudioContextAfterPause = true;
+                this.audioContext.suspend();
+            }
+        } catch (_) {}
+    }
+
+    resumeAll() {
+        if (!this._gamePaused) return;
+        this._gamePaused = false;
+        try {
+            if (this._resumeAudioContextAfterPause && this.audioContext?.state === 'suspended') this.audioContext.resume();
+        } catch (_) {}
+        this._resumeAudioContextAfterPause = false;
+        for (const item of (this._pausedPoolAudio || [])) {
+            const audio = this.soundPools?.[item.type]?.pool?.[item.index];
+            if (!audio) continue;
+            try {
+                audio.currentTime = item.time || 0;
+                audio.loop = !!item.loop;
+                const pr = audio.play(); if (pr?.catch) pr.catch(()=>{});
+            } catch (_) {}
+        }
+        // loops already exist in loopingSounds, only resume them from the same position.
+        for (const item of (this._pausedLoops || [])) {
+            const audio = this.loopingSounds?.[item.type];
+            if (!audio) continue;
+            try {
+                audio.currentTime = item.time || 0;
+                const pr = audio.play(); if (pr?.catch) pr.catch(()=>{});
+            } catch (_) {}
+        }
+        this._pausedPoolAudio = [];
+        this._pausedLoops = [];
+    }
+
     // Gerar sons proceduralmente usando Web Audio API
     playSound(type) {
         if (!this.enabled) return;
+
+        // Prioriza os WAVs 16-bit. O procedural fica como fallback para tipos antigos.
+        if (this.playWav(type)) return;
         
         // Inicializar AudioContext na primeira interação do usuário
         if (!this.initialized) {
@@ -452,5 +631,6 @@ class SoundSystem {
     
     toggle() {
         this.enabled = !this.enabled;
+        if (!this.enabled) this.stopAllLoops();
     }
 }

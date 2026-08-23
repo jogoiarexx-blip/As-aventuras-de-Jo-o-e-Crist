@@ -85,8 +85,8 @@ DICA: Foque nos Corredores primeiro - eles atacam rápido!`,
 🏜️ FASE 3: O DESERTO IMPLACÁVEL 🏜️
 ═══════════════════════════════════════════
 
-O ônibus quebra no meio do deserto escaldante.
-Mas o problema não é o calor... são os BANDIDOS!
+Depois da viagem pela Route 66, o ônibus é obrigado a parar diante de uma barreira no deserto.
+O problema não é o calor... são os BANDIDOS enviados para impedir a dupla!
 
 Uma gangue do deserto aparece nas dunas:
 "Tudo que vocês têm agora é NOSSO, velhinhos!"
@@ -136,7 +136,7 @@ INIMIGOS: 20 (TODOS OS TIPOS!)
 DICA: Mantenha-se em movimento! Não deixe cercarem você!`,
 
         `═══════════════════════════════════════════
-🎰 FASE 5: VEGAS - A BATALHA FINAL 🎰
+🎰 FASE 5: AS LUZES DE VEGAS 🎰
 ═══════════════════════════════════════════
 
 As luzes de neon brilham intensamente...
@@ -164,11 +164,11 @@ Eles sabem que essa é a luta de suas vidas.
 "Juntos?" - pergunta João
 "SEMPRE." - responde Crist
 
-💀 O CONFRONTO FINAL COMEÇA! 💀
+💀 A CONSPIRAÇÃO DE VEGAS COMEÇA A SER REVELADA! 💀
 
-OBJETIVO: DERROTE O REI DE VEGAS!
-INIMIGOS: 25 Elite Guards + REI DE VEGAS (BOSS FINAL)
-DICA: Use TUDO que aprendeu! Esta é a luta FINAL!
+OBJETIVO: Abra caminho por Vegas e descubra quem está por trás da armadilha!
+INIMIGOS: Turistas hostis, fãs de Elvis, seguranças e elites
+DICA: A viagem ainda não acabou — o cassino guarda respostas!
 
 ═══════════════════════════════════════════
 ⚡ A LENDA SERÁ DECIDIDA AGORA! ⚡
@@ -177,28 +177,19 @@ DICA: Use TUDO que aprendeu! Esta é a luta FINAL!
 
 // Capítulo 6: As Catacumbas
 `═══════════════════════════════════════════
-⚠️ CAPÍTULO 6: AS CATACUMBAS ⚠️
+🎰 CAPÍTULO 6: DENTRO DO CASSINO 🎰
 ═══════════════════════════════════════════
 
-O Rei de Vegas foi derrubado...
-Mas sob o cassino há algo mais sombrio.
+Dentro do cassino, Victor Blackjack finalmente revela que acompanhou a dupla desde a fazenda.
 
-Uma porta de ferro com um símbolo estranho.
-"Não abra isso." - sussurra um detetive misterioso.
+O torneio nunca foi apenas um torneio.
+Era um teste para descobrir se João e Crist ainda eram fortes o bastante para chegar até Vegas.
 
-João e Crist, claro, abrem.
+Depois da luta, uma passagem secreta surge atrás do salão principal.
+Documentos marcados com um símbolo negro apontam para uma organização ainda maior: A SOMBRA.
 
-Corredores de pedra. Runas brilhando.
-Guardas blindados protegendo tecnologia proibida.
-
-"Isso não é de Vegas..." - Crist franze a testa
-"Isso é muito mais antigo."
-
-No fundo das catacumbas: O ENGENHEIRO.
-Um gênio que conectou magia antiga com tecnologia.
-
-"Vocês dois... são os escolhidos das profecias?"
-"Só sabemos socar." - responde João simplesmente.
+"Victor não era o fim." - diz Crist.
+"Então vamos descobrir quem está acima dele." - responde João.
 
 ═══════════════════════════════════════════
 ⚡ ATENÇÃO: NÍVEL MÍNIMO 14 NECESSÁRIO! ⚡
@@ -249,8 +240,8 @@ Até hoje.
 
 A Sombra revelou a verdade final:
 
-"Vocês dois... não são humanos comuns.
-São peças de um jogo cósmico maior."
+"Blackjack nunca entendeu o jogo inteiro.
+Ele era apenas mais uma peça."
 
 Um portal dourado se abre.
 Além dele: um salão vasto como o universo.
@@ -259,9 +250,9 @@ No trono de ouro e obsidiana:
 O DEUS DAS APOSTAS.
 
 "Bem-vindos, peças." - a voz ressoa como trovão
-"Joguei com o destino de vocês desde o começo.
-A fazenda. A cidade. O deserto.
-Tudo foi meu jogo."
+"Calculei cada passo desde o começo.
+A fazenda. A cidade. O deserto. Vegas.
+Tudo fazia parte da minha aposta."
 
 João treme levemente. Crist não.
 
