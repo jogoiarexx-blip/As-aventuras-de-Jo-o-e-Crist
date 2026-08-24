@@ -86,15 +86,20 @@ let gamepadSystem = new GamepadSystem(sistemControles); window.gamepadSystem = g
 let soundSystem = new SoundSystem();
 let gameSettings = new SettingsSystem(); window.gameSettings = gameSettings; gameSettings.applyAudio(soundSystem);
 let optionsSelection = 0;
-const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','VIBRAÇÃO','DIFICULDADE','TELA CHEIA'];
+const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','QUALIDADE GRÁFICA','VIBRAÇÃO','DIFICULDADE','TELA CHEIA'];
 let selectedCharacters = [null, null]; // [Player1, Player2]
 let characterSelectCursor = 0; // Qual jogador está selecionando (0 ou 1)
 let characterSelectReady = false; // Evita seleção imediata ao entrar na tela
 let screenShake = 0; // Intensidade do screen shake
 let hitStopFrames = 0; // Freeze frames em hits fortes
+const pauseMenuBg = new Image();
+pauseMenuBg.src = 'assets/ui/pause-menu-vegas.webp';
+
 let pauseReturnState = GameState.PLAYING;
 let pauseStartedAt = 0;
 let pauseSnapshot = null;
+let pauseMenuSelection = 0;
+const pauseMenuItems = ['CONTINUAR','VOLUME GERAL','MÚSICA','EFEITOS','QUALIDADE GRÁFICA','VIBRAÇÃO','TELA CHEIA','VOLTAR AO MENU'];
 
 function capturePauseSnapshot() {
     try {
@@ -127,6 +132,7 @@ function enterTruePause(fromState=gameState) {
     if (gameState === GameState.PAUSED) return;
     pauseReturnState = fromState || GameState.PLAYING;
     pauseStartedAt = performance.now();
+    pauseMenuSelection = 0;
     capturePauseSnapshot();
     gameState = GameState.PAUSED;
     soundSystem?.pauseAll?.();
@@ -260,6 +266,26 @@ for (let i = 0; i < 50; i++) {
 // ✅ SPRINT 1 FIX: Funções de Cleanup (Memory Leak Fix)
 // ═══════════════════════════════════════════════════════════════
 
+function getEffectiveGraphicsQuality() {
+    const configured = gameSettings?.data?.graphicsQuality || 'auto';
+    if (configured !== 'auto') return configured;
+    const fps = Number.isFinite(currentFPS) ? currentFPS : 60;
+    if (fps < 42) return 'low';
+    if (fps < 54) return 'medium';
+    return 'high';
+}
+function getParticleLimit() {
+    return ({high:500,medium:320,low:180})[getEffectiveGraphicsQuality()] || 500;
+}
+function getParticleScale() {
+    return ({high:1,medium:.75,low:.5})[getEffectiveGraphicsQuality()] || 1;
+}
+function graphicsQualityDisplay() {
+    const configured = gameSettings?.data?.graphicsQuality || 'auto';
+    const base = gameSettings?.graphicsQualityLabel?.() || configured.toUpperCase();
+    return configured === 'auto' ? `${base} (${getEffectiveGraphicsQuality().toUpperCase()})` : base;
+}
+
 /**
  * Limpa partículas mortas e excesso de partículas
  */
@@ -267,13 +293,14 @@ function cleanupParticles() {
     // Remover partículas mortas sem criar um novo array; objetos simples são reciclados.
     const before = particles.length;
     let w=0;
-    for(let i=0;i<particles.length;i++){ const p=particles[i]; if(p.life>0) particles[w++]=p; else if(particlePool.length<MAX_PARTICLES) particlePool.push(p); }
+    const particleLimit=getParticleLimit();
+    for(let i=0;i<particles.length;i++){ const p=particles[i]; if(p.life>0) particles[w++]=p; else if(particlePool.length<particleLimit) particlePool.push(p); }
     particles.length=w;
     
     // Limitar tamanho máximo (prevenir memory leak)
-    if (particles.length > MAX_PARTICLES) {
-        const removed = particles.length - MAX_PARTICLES;
-        particles.splice(0, particles.length - MAX_PARTICLES);
+    if (particles.length > particleLimit) {
+        const removed = particles.length - particleLimit;
+        particles.splice(0, particles.length - particleLimit);
         if (debugMode) {
             console.warn(`⚠️ Limite de partículas atingido! Removendo ${removed} antigas`);
         }
@@ -446,6 +473,30 @@ document.addEventListener('keydown', e => {
         }
     }
     
+    // Menu de pausa completo
+    if (gameState === GameState.PAUSED) {
+        if (showModal) {
+            if (e.key==='Enter' || e.key==='y' || e.key==='Y') {
+                showModal=false; const cb=modalCallback; modalCallback=null; cb?.(); return;
+            }
+            if (e.key==='Escape' || e.key==='n' || e.key==='N') {
+                showModal=false; modalCallback=null; soundSystem.playSound('menuBack'); return;
+            }
+            return;
+        }
+        const up=e.key==='ArrowUp'||e.key==='w'||e.key==='W';
+        const down=e.key==='ArrowDown'||e.key==='s'||e.key==='S';
+        const left=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
+        const right=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
+        if (e.key==='Escape' || sistemControles.teclaParaAcao(normalizedKey,'pause')) { resumeTruePause(); return; }
+        if(up){pauseMenuSelection=(pauseMenuSelection+pauseMenuItems.length-1)%pauseMenuItems.length;soundSystem.playSound('menuMove');return;}
+        if(down){pauseMenuSelection=(pauseMenuSelection+1)%pauseMenuItems.length;soundSystem.playSound('menuMove');return;}
+        if(left){adjustPauseMenuSetting(-1,false);return;}
+        if(right){adjustPauseMenuSetting(1,false);return;}
+        if(e.key==='Enter'||e.key===' '){adjustPauseMenuSetting(1,true);return;}
+        return;
+    }
+
     // Seletor de fases (desbloqueado apenas após zerar o jogo)
     if (gameState === GameState.STAGE_SELECT) {
         if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
@@ -513,9 +564,10 @@ document.addEventListener('keydown', e => {
             if (optionsSelection===0) gameSettings.data.masterVolume=Math.max(0,Math.min(100,gameSettings.data.masterVolume+dir*5));
             else if (optionsSelection===1) gameSettings.data.musicVolume=Math.max(0,Math.min(100,gameSettings.data.musicVolume+dir*5));
             else if (optionsSelection===2) gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
-            else if (optionsSelection===3) { gameSettings.data.vibration=!gameSettings.data.vibration; if(gameSettings.data.vibration) gamepadSystem.rumble(1,160,.55,.35); }
-            else if (optionsSelection===4) gameSettings.cycleDifficulty(dir);
-            else if (optionsSelection===5 && e.key === 'Enter') toggleFullscreen();
+            else if (optionsSelection===3) gameSettings.cycleGraphicsQuality(dir);
+            else if (optionsSelection===4) { gameSettings.data.vibration=!gameSettings.data.vibration; if(gameSettings.data.vibration) gamepadSystem.rumble(1,160,.55,.35); }
+            else if (optionsSelection===5) gameSettings.cycleDifficulty(dir);
+            else if (optionsSelection===6 && e.key === 'Enter') toggleFullscreen();
             gameSettings.save(); gameSettings.applyAudio(soundSystem); soundSystem.playSound('menuSelect');
         }
         if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=5; soundSystem.playSound('menuBack'); }
@@ -1375,9 +1427,10 @@ function acquireParticle(data){const p=particlePool.pop()||{};Object.keys(p).for
 
 function createParticle(x, y, color, count, type = 'normal') {
     // Bug #5: Limitar número de partículas para evitar memory leak
-    if (particles.length >= MAX_PARTICLES) {
-        // Remover partículas mais antigas se atingir o limite
-        particles.splice(0, count);
+    const particleLimit=getParticleLimit();
+    count=Math.max(1,Math.round(count*getParticleScale()));
+    if (particles.length >= particleLimit) {
+        particles.splice(0, Math.min(count, particles.length));
     }
     
     for (let i = 0; i < count; i++) {
@@ -1399,7 +1452,7 @@ function createParticle(x, y, color, count, type = 'normal') {
 
 function createTextPopup(x, y, text, color, size = 24) {
     // Bug #5: Limitar número de partículas
-    if (particles.length >= MAX_PARTICLES) {
+    if (particles.length >= getParticleLimit()) {
         particles.splice(0, 1);
     }
     
@@ -1791,7 +1844,7 @@ function drawOptions() {
     ctx.fillStyle='rgba(8,8,12,.82)';ctx.strokeStyle='#8c5a2b';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(215,125,570,395,18);ctx.fill();ctx.stroke();
     const values=[
         `${gameSettings.data.masterVolume}%`, `${gameSettings.data.musicVolume}%`, `${gameSettings.data.sfxVolume}%`,
-        gameSettings.data.vibration?'LIGADA':'DESLIGADA', gameSettings.difficultyLabel(), document.fullscreenElement?'ATIVA':'ENTRAR'
+        graphicsQualityDisplay(), gameSettings.data.vibration?'LIGADA':'DESLIGADA', gameSettings.difficultyLabel(), document.fullscreenElement?'ATIVA':'ENTRAR'
     ];
     optionsItems.forEach((item,i)=>{
         const y=174+i*55, sel=i===optionsSelection;
@@ -1869,9 +1922,10 @@ function handleGamepadInput() {
             if(optionsSelection===0)gameSettings.data.masterVolume=Math.max(0,Math.min(100,gameSettings.data.masterVolume+dir*5));
             else if(optionsSelection===1)gameSettings.data.musicVolume=Math.max(0,Math.min(100,gameSettings.data.musicVolume+dir*5));
             else if(optionsSelection===2)gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
-            else if(optionsSelection===3){gameSettings.data.vibration=!gameSettings.data.vibration;if(gameSettings.data.vibration)gamepadSystem.rumble(1,160,.55,.35);}
-            else if(optionsSelection===4)gameSettings.cycleDifficulty(dir);
-            else if(optionsSelection===5&&accept)toggleFullscreen();
+            else if(optionsSelection===3)gameSettings.cycleGraphicsQuality(dir);
+            else if(optionsSelection===4){gameSettings.data.vibration=!gameSettings.data.vibration;if(gameSettings.data.vibration)gamepadSystem.rumble(1,160,.55,.35);}
+            else if(optionsSelection===5)gameSettings.cycleDifficulty(dir);
+            else if(optionsSelection===6&&accept)toggleFullscreen();
             gameSettings.save();gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
         if(back){gameState=GameState.MENU;menuSelection=5;soundSystem.playSound('menuBack');}
     }
@@ -1900,7 +1954,20 @@ function handleGamepadInput() {
     else if(gameState===GameState.VICTORY){ if(accept||back){ gameState=GameState.MENU;refreshMenuOptions?.();menuSelection=0;soundSystem.playSound('menuSelect'); } }
     else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;startLevelMusic();}else nextLevel();soundSystem.playSound('menuSelect');}
     else if([GameState.PLAYING,GameState.BUS_MINIGAME].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
-    else if(gameState===GameState.PAUSED&&([0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))||back)){resumeTruePause();}
+    else if(gameState===GameState.PAUSED){
+        if(showModal){
+            if(accept){showModal=false;const cb=modalCallback;modalCallback=null;cb?.();}
+            else if(back){showModal=false;modalCallback=null;soundSystem.playSound('menuBack');}
+            return;
+        }
+        const pausePressed=[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9));
+        if(pausePressed||back){resumeTruePause();}
+        else if(up){pauseMenuSelection=(pauseMenuSelection+pauseMenuItems.length-1)%pauseMenuItems.length;soundSystem.playSound('menuMove');}
+        else if(down){pauseMenuSelection=(pauseMenuSelection+1)%pauseMenuItems.length;soundSystem.playSound('menuMove');}
+        else if(left){adjustPauseMenuSetting(-1,false);}
+        else if(right){adjustPauseMenuSetting(1,false);}
+        else if(accept){adjustPauseMenuSetting(1,true);}
+    }
 }
 
 function drawStageSelect() {
@@ -2148,32 +2215,77 @@ function drawLevelComplete() {
     ctx.fillText('Pressione ENTER para continuar', 500, 590);
 }
 
+function adjustPauseMenuSetting(dir=1, activate=false) {
+    const item = pauseMenuItems[pauseMenuSelection];
+    if (item === 'CONTINUAR') { if (activate) resumeTruePause(); return; }
+    if (item === 'VOLUME GERAL') gameSettings.data.masterVolume=Math.max(0,Math.min(100,gameSettings.data.masterVolume+dir*5));
+    else if (item === 'MÚSICA') gameSettings.data.musicVolume=Math.max(0,Math.min(100,gameSettings.data.musicVolume+dir*5));
+    else if (item === 'EFEITOS') gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
+    else if (item === 'QUALIDADE GRÁFICA') gameSettings.cycleGraphicsQuality(dir);
+    else if (item === 'VIBRAÇÃO' && (activate || dir!==0)) { gameSettings.data.vibration=!gameSettings.data.vibration; if(gameSettings.data.vibration) gamepadSystem?.rumble?.(1,130,.45,.25); }
+    else if (item === 'TELA CHEIA' && activate) { toggleFullscreen(); }
+    else if (item === 'VOLTAR AO MENU' && activate) {
+        showModal=true;
+        modalMessage='Deseja voltar ao menu principal?\nSeu progresso desde o último checkpoint será perdido.';
+        modalCallback=()=>{
+            soundSystem?.stopAllLoops?.();
+            soundSystem?.resumeAll?.();
+            window.GameRuntime?.resumeTimers?.();
+            pauseStartedAt=0; pauseSnapshot=null;
+            gameState=GameState.MENU; menuSelection=0; clearKeys();
+        };
+        return;
+    }
+    gameSettings.save();
+    gameSettings.applyAudio(soundSystem);
+    soundSystem.playSound('menuSelect');
+}
+
+function pauseValueFor(item) {
+    if(item==='VOLUME GERAL') return `${gameSettings.data.masterVolume}%`;
+    if(item==='MÚSICA') return `${gameSettings.data.musicVolume}%`;
+    if(item==='EFEITOS') return `${gameSettings.data.sfxVolume}%`;
+    if(item==='QUALIDADE GRÁFICA') return graphicsQualityDisplay();
+    if(item==='VIBRAÇÃO') return gameSettings.data.vibration?'LIGADA':'DESLIGADA';
+    if(item==='TELA CHEIA') return document.fullscreenElement?'ATIVA':'ENTRAR';
+    return '';
+}
+
 function drawPaused() {
-    // Overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, 1000, 650);
-    
-    // Texto de pausa
-    ctx.save();
-    ctx.shadowBlur = 30;
-    ctx.shadowColor = '#00ffff';
-    ctx.fillStyle = '#00ffff';
-    ctx.font = 'bold 96px Bebas Neue';
-    ctx.textAlign = 'center';
-    ctx.fillText('PAUSADO', 500, 280);
-    ctx.restore();
-    
-    // Opções
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 28px Righteous';
-    ctx.textAlign = 'center';
-    ctx.fillText('ESC ou P - Continuar', 500, 360);
-    ctx.fillText('Q - Voltar ao Menu', 500, 400);
-    
-    // Estatísticas
-    ctx.fillStyle = '#888';
-    ctx.font = '18px Righteous';
-    ctx.fillText(`Score: ${score} | Fase: ${currentLevelIndex + 1}/${LEVELS.length}`, 500, 480);
+    if (pauseMenuBg.complete && pauseMenuBg.naturalWidth) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(pauseMenuBg, 0, 0, 1000, 650);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = 'rgba(4, 7, 13, 0.88)';
+        ctx.fillRect(0, 0, 1000, 650);
+    }
+
+    const x=274,y=154,w=452,rowH=40;
+    const panelH=pauseMenuItems.length*rowH+20;
+
+    pauseMenuItems.forEach((item,i)=>{
+        const ry=y+12+i*rowH, selected=i===pauseMenuSelection;
+        if(selected){
+            ctx.fillStyle='rgba(182,68,32,.88)';ctx.strokeStyle='#ffd267';ctx.lineWidth=2;
+            ctx.beginPath();ctx.roundRect(x+10,ry,w-20,rowH-6,8);ctx.fill();ctx.stroke();
+        }
+        ctx.font='bold 20px Bebas Neue';ctx.textAlign='left';ctx.fillStyle=selected?'#fff7db':'#f0e6d1';
+        ctx.fillText(item,x+26,ry+24);
+        const value=pauseValueFor(item);
+        if(value){ctx.textAlign='right';ctx.fillStyle=selected?'#ffd267':'#8fdcff';ctx.fillText(value,x+w-26,ry+24);}
+        if(i>=1&&i<=3){
+            const pct=[gameSettings.data.masterVolume,gameSettings.data.musicVolume,gameSettings.data.sfxVolume][i-1]/100;
+            ctx.fillStyle='rgba(21,38,66,.95)';ctx.fillRect(x+230,ry+28,136,4);
+            ctx.fillStyle=selected?'#ffd267':'#5ccdf5';ctx.fillRect(x+230,ry+28,136*pct,4);
+        }
+    });
+
+    ctx.fillStyle='#d7cbb8';ctx.font='12px Righteous';ctx.textAlign='center';
+    ctx.fillText('↑ ↓ escolher  •  ← → ajustar  •  ENTER / A confirmar  •  ESC / Start continuar',500,602);
+    ctx.fillStyle='#83daf5';ctx.font='11px Righteous';
+    ctx.fillText('Qualidade AUTO reduz partículas e efeitos automaticamente quando o FPS cai.',500,621);
 }
 
 // Bug #2: Modal customizado
@@ -2365,7 +2477,7 @@ function drawDebugPanel() {
         `FPS: ${currentFPS}`,
         `Jogadores: ${players.length}`,
         `Inimigos: ${enemies.length}`,
-        `Partículas: ${particles.length}/${MAX_PARTICLES}`,
+        `Partículas: ${particles.length}/${getParticleLimit()}`,
         `Power-ups: ${powerUps.length}`,
         `Câmera X: ${Math.floor(cameraX)}`,
         `Estado: ${gameState}`,
@@ -3391,8 +3503,9 @@ function gameLoop() {
                         ctx.stroke();
                     } else {
                         // Partículas normais e explosões
-                        ctx.shadowBlur = p.type === 'explosion' ? 15 : 5;
-                        ctx.shadowColor = p.color;
+                        const q=getEffectiveGraphicsQuality();
+                        ctx.shadowBlur = q==='low' ? 0 : (p.type === 'explosion' ? (q==='medium'?8:15) : (q==='medium'?2:5));
+                        if(ctx.shadowBlur>0) ctx.shadowColor = p.color;
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                         ctx.fill();
@@ -3402,11 +3515,11 @@ function gameLoop() {
                 }
                 return true;
             }
-            if(particlePool.length<MAX_PARTICLES)particlePool.push(p);
+            if(particlePool.length<getParticleLimit())particlePool.push(p);
             return false;
         });
         
-        if (window.GraphicsUpgrade) {
+        if (window.GraphicsUpgrade && getEffectiveGraphicsQuality() !== 'low') {
             window.GraphicsUpgrade.drawForeground(ctx, currentLevel, cameraX);
         }
         drawGameplayHitboxes(ctx);

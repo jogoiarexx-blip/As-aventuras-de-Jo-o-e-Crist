@@ -5,6 +5,7 @@ class SettingsSystem {
             musicVolume: 55,
             sfxVolume: 75,
             vibration: true,
+            graphicsQuality: 'auto',
             difficulty: 'normal'
         };
         this.data = this.load();
@@ -15,6 +16,17 @@ class SettingsSystem {
         } catch (_) { return { ...this.defaults }; }
     }
     save() { localStorage.setItem('joaoCristSettings', JSON.stringify(this.data)); }
+
+    cycleGraphicsQuality(dir=1) {
+        const order = ['auto','high','medium','low'];
+        let i = order.indexOf(this.data.graphicsQuality || 'auto');
+        if (i < 0) i = 0;
+        i = (i + dir + order.length) % order.length;
+        this.data.graphicsQuality = order[i]; this.save();
+    }
+    graphicsQualityLabel() {
+        return ({auto:'AUTO',high:'ALTA',medium:'MÉDIA',low:'BAIXA'})[this.data.graphicsQuality || 'auto'] || 'AUTO';
+    }
     cycleDifficulty(dir=1) {
         const order = ['facil','normal','dificil','insano'];
         let i = order.indexOf(this.data.difficulty);
