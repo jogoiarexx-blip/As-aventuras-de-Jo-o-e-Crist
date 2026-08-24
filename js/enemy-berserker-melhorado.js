@@ -394,6 +394,7 @@ class BerserkerEnemy extends Enemy {
         const comboDamage = Math.floor(this.damage * mult.damage * (1 + this.comboCounter * 0.2));
         
         setTimeout(() => {
+            if (window.gameState && window.gameState !== 'playing') return;
             if (this.life > 0 && this.distanceTo(player) < 90) {
                 player.takeDamage(comboDamage);
                 
@@ -598,6 +599,7 @@ class BerserkerEnemy extends Enemy {
         this.attackCooldown = 20; // Cooldown curto
         
         setTimeout(() => {
+            if (window.gameState && window.gameState !== 'playing') return;
             if (this.life > 0 && this.distanceTo(player) < 100) {
                 const counterDamage = Math.floor(this.damage * 2);
                 player.takeDamage(counterDamage);

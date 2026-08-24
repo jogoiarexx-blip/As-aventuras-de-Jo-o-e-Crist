@@ -5,7 +5,8 @@ class SettingsSystem {
             musicVolume: 55,
             sfxVolume: 75,
             vibration: true,
-            difficulty: 'normal'
+            difficulty: 'normal',
+            performanceMode: 'auto'
         };
         this.data = this.load();
     }

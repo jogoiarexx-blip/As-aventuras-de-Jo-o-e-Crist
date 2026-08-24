@@ -33,29 +33,28 @@ class WaveSystem {
     buildWaves() {
         const id = this.level.id;
         if (id === 6) {
+            // Cassino: mantém identidade visual de Vegas e introduz a elite aos poucos.
             return [
-                // Onda 1: Introdução a inimigos elite
-                { types: ['basic', 'basic', 'elite'], message: '⚡ ONDA 1 - PATRULHA ELITE!', color: '#00aaff' },
-                // Onda 2: Fantasmas aparecem
-                { types: ['ghost', 'ghost', 'elite', 'fast'], message: '👻 ONDA 2 - OS FANTASMAS!', color: '#9b59b6' },
-                // Onda 3: Mistura perigosa
-                { types: ['elite', 'elite', 'ghost', 'berserker'], message: '💥 ONDA 3 - ATAQUE TOTAL!', color: '#ff8800' },
-                // Onda 4: Pré-boss
-                { types: ['assassin', 'ghost', 'elite', 'sniper', 'healer'], message: '⚠️ ONDA FINAL!', color: '#ff0000' }
+                { types: ['seguranca', 'turista', 'elvis_fan'], message: '🎰 ONDA 1 - SEGURANÇA DO CASSINO!', color: '#00aaff' },
+                { types: ['seguranca', 'mulher_feia', 'travesti', 'elite'], message: '🎲 ONDA 2 - SALÃO VIP!', color: '#9b59b6' },
+                { types: ['elite', 'seguranca', 'elvis_fan', 'berserker'], message: '💥 ONDA 3 - REFORÇOS!', color: '#ff8800' },
+                { types: ['elite', 'assassin', 'seguranca', 'tank'], message: '⚠️ ONDA FINAL - ARENA VIP!', color: '#ff0000' }
             ];
         } else if (id === 7) {
+            // Clube dos Assassinos: sem Sniper/Healer/Exploder por enquanto.
             return [
                 { types: ['assassin', 'assassin', 'ghost'], message: '🌑 ONDA 1 - SOMBRAS!', color: '#333' },
                 { types: ['assassin', 'ghost', 'ghost', 'elite'], message: '🌑 ONDA 2 - INFILTRAÇÃO!', color: '#555' },
-                { types: ['assassin', 'assassin', 'elite', 'ghost', 'sniper'], message: '🌑 ONDA 3 - ELITE SOMBRIA!', color: '#9b59b6' },
-                { types: ['assassin', 'ghost', 'elite', 'berserker', 'healer', 'sniper'], message: '💀 ONDA FINAL - EXECUTORES!', color: '#ff0000' }
+                { types: ['assassin', 'assassin', 'elite', 'ghost', 'berserker'], message: '🌑 ONDA 3 - ELITE SOMBRIA!', color: '#9b59b6' },
+                { types: ['assassin', 'ghost', 'elite', 'berserker', 'cowboy'], message: '💀 ONDA FINAL - EXECUTORES!', color: '#ff0000' }
             ];
         } else if (id === 8) {
+            // Trono final: usa somente inimigos que já possuem visual consolidado.
             return [
                 { types: ['elite', 'elite', 'assassin', 'ghost', 'tank'], message: '⭐ ONDA 1 - GUARDAS REAIS!', color: '#ffd700' },
-                { types: ['elite', 'ghost', 'ghost', 'assassin', 'berserker', 'healer'], message: '⭐ ONDA 2 - LEGIÃO!', color: '#ff8800' },
-                { types: ['elite', 'elite', 'elite', 'assassin', 'assassin', 'sniper', 'exploder'], message: '⭐ ONDA 3 - ANIQUILAÇÃO!', color: '#ff4400' },
-                { types: ['elite', 'ghost', 'assassin', 'ghost', 'elite', 'berserker', 'sniper', 'cowboy'], message: '💀 ONDA FINAL - ARMAGEDDON!', color: '#ff0000' }
+                { types: ['elite', 'ghost', 'ghost', 'assassin', 'berserker'], message: '⭐ ONDA 2 - LEGIÃO!', color: '#ff8800' },
+                { types: ['elite', 'elite', 'elite', 'assassin', 'assassin', 'tank'], message: '⭐ ONDA 3 - ANIQUILAÇÃO!', color: '#ff4400' },
+                { types: ['elite', 'ghost', 'assassin', 'ghost', 'elite', 'berserker', 'cowboy'], message: '💀 ONDA FINAL - ARMAGEDDON!', color: '#ff0000' }
             ];
         }
         return [];
@@ -82,9 +81,23 @@ class WaveSystem {
             window.screenShake = 6;
         }
 
-        // Spawnar inimigos da onda com espaçamento
+        // Spawnar inimigos da onda perto da ação atual. A versão antiga sempre
+        // usava x=700..., então nas fases longas novas ondas podiam nascer quilômetros
+        // atrás do jogador e parecer que a fase havia travado.
+        const activePlayers = (window.players || []).filter(p => p && p.life > 0);
+        const leadX = activePlayers.length ? Math.max(...activePlayers.map(p => p.x + (p.w || 0))) : 300;
+        const worldWidth = Number.isFinite(this.level.width) ? this.level.width : 5000;
+        const maxSpawnX = Math.max(700, worldWidth - 180);
+        let anchor = Math.min(maxSpawnX - Math.max(0, wave.types.length - 1) * 115, leadX + 520);
+        if (anchor > maxSpawnX - 250) anchor = Math.max(700, leadX - 650);
+
         wave.types.forEach((type, i) => {
-            const x = 700 + i * 180 + Math.random() * 60;
+            let x = anchor + i * 115 + (Math.random() * 50 - 25);
+            x = Math.max(580, Math.min(maxSpawnX, x));
+            // Evita materializar um inimigo em cima de um jogador.
+            for (const p of activePlayers) {
+                if (Math.abs(x - p.x) < 170) x = Math.min(maxSpawnX, p.x + 210 + i * 24);
+            }
             let enemy;
 
             if (type === 'elite') enemy = new EliteEnemy(x, this.groundY);
@@ -96,13 +109,19 @@ class WaveSystem {
                 enemy = new Enemy(x, this.groundY, type);
             }
 
-            // Escalar pela dificuldade da fase
+            if (!enemy) return;
+            // Escala por fase + multiplayer. Dois jogadores recebem mais resistência inimiga,
+            // mas sem simplesmente dobrar HP/dano.
+            const playerCount = Math.max(1, (window.players || []).filter(p => p && p.life > 0).length || 1);
+            const mpLife = playerCount > 1 ? 1.30 : 1;
+            const mpDamage = playerCount > 1 ? 1.08 : 1;
             const dm = this.level.difficultyMultiplier || 1;
             if (enemy.maxLife) {
-                enemy.maxLife = Math.floor(enemy.maxLife * dm);
+                enemy.maxLife = Math.max(1, Math.floor(enemy.maxLife * dm * mpLife));
                 enemy.life = enemy.maxLife;
             }
-            if (enemy.damage) enemy.damage = Math.floor(enemy.damage * dm);
+            if (enemy.damage) enemy.damage = Math.max(1, Math.floor(enemy.damage * dm * mpDamage));
+            if (enemy.attackDamage) enemy.attackDamage = Math.max(1, Math.floor(enemy.attackDamage * dm * mpDamage));
 
             enemies.push(enemy);
         });
@@ -231,7 +250,10 @@ function drawLevelGate(ctx, levelIndex, players, onConfirm) {
     ctx.fillRect(350, 570, 300, 50);
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 24px Bebas Neue';
-    ctx.fillText('PRESSIONE ENTER PARA JOGAR NOVAMENTE', 500, 601);
+    ctx.fillText('ENTER / A: REJOGAR FASE ANTERIOR', 500, 595);
+    ctx.fillStyle = '#cfcfcf';
+    ctx.font = 'bold 14px Righteous';
+    ctx.fillText('ESC / B: VOLTAR AO MENU', 500, 618);
 
     ctx.restore();
 }

@@ -30,8 +30,32 @@
   });
   addEventListener('blur',()=>window.sistemControles.limparTouch());
   document.addEventListener('visibilitychange',()=>{if(document.hidden)window.sistemControles.limparTouch();});
+  const jumpBtn=layer.querySelector('[data-a="up"]');
+  const dashBtn=layer.querySelector('[data-a="dash"]');
+  const rangedBtn=layer.querySelector('[data-a="ranged"]');
+  const attackBtn=layer.querySelector('[data-a="attack"]');
+  let lastMode='';
   const sync=()=>{
-    try { layer.style.display = (gameState===GameState.PLAYING) ? 'block' : 'none'; } catch(_) {}
+    try {
+      const bus = gameState===GameState.BUS_MINIGAME;
+      const gameplay = gameState===GameState.PLAYING;
+      layer.style.display = (gameplay || bus) ? 'block' : 'none';
+      const mode=bus?'bus':'fight';
+      if(mode!==lastMode){
+        lastMode=mode;
+        if(bus){
+          if(jumpBtn) jumpBtn.textContent='↑';
+          if(dashBtn) dashBtn.textContent='↓';
+          if(rangedBtn) rangedBtn.style.display='none';
+          if(attackBtn) attackBtn.textContent='BUZINA';
+        }else{
+          if(jumpBtn) jumpBtn.textContent='PULO';
+          if(dashBtn) dashBtn.textContent='DASH';
+          if(rangedBtn){rangedBtn.style.display='';rangedBtn.textContent='TIRO';}
+          if(attackBtn) attackBtn.textContent='ATAQUE';
+        }
+      }
+    } catch(_) {}
     requestAnimationFrame(sync);
   };
   sync();

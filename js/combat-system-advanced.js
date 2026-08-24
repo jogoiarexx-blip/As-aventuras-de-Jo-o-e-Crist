@@ -151,6 +151,7 @@ class CombatSystem {
         // Processar hit após wind-up
         const windUpFrames = Math.floor(currentCombo.frames * 0.3);
         setTimeout(() => {
+            if (window.gameState && window.gameState !== 'playing') return;
             this.processHit(player, enemies, currentCombo, finalDamage, isCritical);
         }, windUpFrames * (1000/60));
         

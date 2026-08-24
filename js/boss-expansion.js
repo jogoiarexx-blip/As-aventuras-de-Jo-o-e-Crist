@@ -624,7 +624,8 @@ class GodBoss extends Enemy {
                         vy: 5,
                         damage: 25,
                         color: '#ffd700',
-                        life: 120, w: 12, h: 12
+                        spriteKind: 'orb_gold',
+                        life: 120, w: 18, h: 18
                     });
                 }
             }
@@ -649,7 +650,8 @@ class GodBoss extends Enemy {
                             vx: 0, vy: 6 + this.phase,
                             damage: 20 + this.phase * 5,
                             color: '#ffd700',
-                            life: 180, w: 16, h: 16
+                            spriteKind: 'orb_gold',
+                            life: 180, w: 22, h: 22
                         });
                     }
                     if (window.particles) {
@@ -691,10 +693,11 @@ class GodBoss extends Enemy {
                 // Modo fúria por 3 segundos
                 this.rageMode = true;
                 this.damage = this.phase === 3 ? 80 : this.phase === 2 ? 65 : 50;
-                setTimeout(() => {
+                (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('boss', 3000, () => {
+                    if (this.life <= 0) return;
                     this.rageMode = false;
                     this.damage = 50 + this.phase * 10;
-                }, 3000);
+                });
                 if (window.particles) {
                     window.particles.explosion(this.x + this.w / 2, this.y + this.h / 2, 50, { color: '#ff0000', speed: 8 });
                     window.particles.createText(this.x + this.w / 2, this.y - 40, '💢 FÚRIA DIVINA!', '#ff0000', { size: 24 });

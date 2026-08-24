@@ -310,17 +310,16 @@ class BasicEnemy {
             return;
         }
 
-        // Encontrar jogador mais próximo
-        let nearestPlayer = players[0];
-        let minDist = Math.abs(players[0].x - this.x);
-        
-        players.forEach(player => {
-            if (player.life > 0) {
-                const dist = Math.abs(player.x - this.x);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestPlayer = player;
-                }
+        // Encontrar jogador VIVO mais próximo. Evita atacar P1 morto no multiplayer.
+        const alivePlayers = Array.isArray(players) ? players.filter(player => player && player.life > 0) : [];
+        if (!alivePlayers.length) return;
+        let nearestPlayer = alivePlayers[0];
+        let minDist = Math.abs(nearestPlayer.x - this.x);
+        alivePlayers.forEach(player => {
+            const dist = Math.abs(player.x - this.x);
+            if (dist < minDist) {
+                minDist = dist;
+                nearestPlayer = player;
             }
         });
 

@@ -14,6 +14,20 @@ class Level {
         this.backgroundImage = config.backgroundImage || null;
         this._backgroundImg = null;
         this._backgroundFailed = false;
+
+        // Flags de gameplay recebidas pela configuração. Antes estes campos eram
+        // ignorados pelo construtor, fazendo bosses/ondas/dificuldade das fases
+        // avançadas ficarem undefined mesmo estando declarados em LEVELS.
+        this.hasBoss = !!config.hasBoss;
+        this.hasFinalBoss = !!config.hasFinalBoss;
+        this.hasTechBoss = !!config.hasTechBoss;
+        this.hasShadowBoss = !!config.hasShadowBoss;
+        this.hasGodBoss = !!config.hasGodBoss;
+        this.useWaves = !!config.useWaves;
+        this.levelRequirement = Number.isFinite(config.levelRequirement) ? config.levelRequirement : 0;
+        this.difficultyMultiplier = Number.isFinite(config.difficultyMultiplier) ? config.difficultyMultiplier : 1;
+        this.customDrawBackground = typeof config.drawBackground === 'function' ? config.drawBackground : null;
+
         // v0.9.3 stability: carregamento preguiçoso. Evita decodificar todos os
         // backgrounds grandes logo ao abrir o index.html.
         this.description = config.description;
@@ -70,6 +84,13 @@ class Level {
             // o recorte cair exatamente no viewport 0..canvasW.
             ctx.drawImage(this._backgroundImg, sx, 0, sw, imgH, safeCameraX, 0, canvasW, canvasH);
             ctx.restore();
+            return;
+        }
+
+        // Cenários customizados (Fases 7/8). A configuração já possuía
+        // drawBackground, mas o construtor antigo nunca a conectava à fase.
+        if (this.customDrawBackground) {
+            this.customDrawBackground.call(this, ctx, cameraX);
             return;
         }
 
@@ -1177,7 +1198,7 @@ const LEVELS = [
     new Level({
         id: 5,
         name: 'VEGAS!',
-        description: 'A batalha final nas luzes de Vegas! Derrote o REI DE VEGAS!',
+        description: 'As luzes de Vegas escondem uma armadilha. Derrote o REI DE VEGAS e descubra quem está por trás de tudo!',
         backgroundImage: 'assets/backgrounds/fase5-vegas.webp',
         bgColor1: '#0a0a1a',
         bgColor2: '#1a0a2e',
@@ -1204,6 +1225,8 @@ const LEVELS = [
         enemyTypes: ['turista', 'seguranca', 'elvis_fan', 'mulher_feia', 'travesti'],
         enemyCount: 28,
         hasBoss: true,
+        hasTechBoss: true,
+        useWaves: true,
         nextLevel: 7,
         difficultyMultiplier: 2.25
     }),
@@ -1224,23 +1247,27 @@ const LEVELS = [
         levelRequirement: 18,
         difficultyMultiplier: 3.0,
         drawBackground(ctx, cameraX) {
+            const viewX = Math.max(0, Number(cameraX) || 0);
+            const viewW = 1000;
             const grad = ctx.createLinearGradient(0, 0, 0, 650);
             grad.addColorStop(0, '#0d0000');
             grad.addColorStop(1, '#1a0005');
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 5000, 650);
-            // Luzes vermelhas
-            for (let i = 200; i < 5000; i += 400) {
-                const pulse = Math.sin(Date.now() * 0.004 + i * 0.01) * 0.4 + 0.6;
+            ctx.fillRect(viewX, 0, viewW, 650);
+
+            const firstLight = Math.floor((viewX - 220) / 400) * 400 + 200;
+            for (let i = firstLight; i < viewX + viewW + 220; i += 400) {
+                const pulse = Math.sin(performance.now() * 0.004 + i * 0.01) * 0.4 + 0.6;
                 const spotGrad = ctx.createRadialGradient(i, 0, 0, i, 0, 200);
                 spotGrad.addColorStop(0, `rgba(180, 0, 0, ${0.25 * pulse})`);
                 spotGrad.addColorStop(1, 'transparent');
                 ctx.fillStyle = spotGrad;
                 ctx.fillRect(i - 200, 0, 400, 400);
             }
-            // Luminárias vermelhas
-            for (let i = 300; i < 5000; i += 300) {
-                const on = Math.floor(Date.now() * 0.003 + i * 0.01) % 3 !== 2;
+
+            const firstLamp = Math.floor((viewX - 100) / 300) * 300 + 300;
+            for (let i = firstLamp; i < viewX + viewW + 100; i += 300) {
+                const on = Math.floor(performance.now() * 0.003 + i * 0.01) % 3 !== 2;
                 if (on) {
                     ctx.fillStyle = '#cc0000';
                     ctx.shadowBlur = 20;
@@ -1251,14 +1278,15 @@ const LEVELS = [
                     ctx.shadowBlur = 0;
                 }
             }
-            // Chão reflexivo vermelho
+
             const floorGrad = ctx.createLinearGradient(0, 510, 0, 650);
             floorGrad.addColorStop(0, '#2a0000');
             floorGrad.addColorStop(1, '#1a0000');
             ctx.fillStyle = floorGrad;
-            ctx.fillRect(0, 510, 5000, 140);
-            for (let i = 0; i < 5000; i += 80) {
-                const a = Math.sin(Date.now() * 0.005 + i * 0.05) * 0.08 + 0.05;
+            ctx.fillRect(viewX, 510, viewW, 140);
+            const firstTile = Math.floor(viewX / 80) * 80;
+            for (let i = firstTile; i < viewX + viewW + 80; i += 80) {
+                const a = Math.sin(performance.now() * 0.005 + i * 0.05) * 0.08 + 0.05;
                 ctx.fillStyle = `rgba(200, 0, 0, ${a})`;
                 ctx.fillRect(i, 510, 40, 140);
             }
@@ -1281,44 +1309,44 @@ const LEVELS = [
         levelRequirement: 22,
         difficultyMultiplier: 4.0,
         drawBackground(ctx, cameraX) {
+            const viewX = Math.max(0, Number(cameraX) || 0);
+            const viewW = 1000;
             const grad = ctx.createLinearGradient(0, 0, 0, 650);
             grad.addColorStop(0, '#000005');
             grad.addColorStop(0.5, '#05000a');
             grad.addColorStop(1, '#0a0500');
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 5000, 650);
-            // Estrelas douradas
+            ctx.fillRect(viewX, 0, viewW, 650);
+
+            // Estrelas determinísticas apenas no trecho visível.
             for (let i = 0; i < 300; i++) {
                 const sx = (i * 137.5) % 5000;
+                if (sx < viewX - 8 || sx > viewX + viewW + 8) continue;
                 const sy = (i * 89.3) % 450;
-                const b = Math.sin(Date.now() * 0.002 + i) * 0.5 + 0.5;
+                const b = Math.sin(performance.now() * 0.002 + i) * 0.5 + 0.5;
                 ctx.fillStyle = `rgba(255, 215, 0, ${b * 0.6})`;
-                ctx.shadowBlur = b * 8;
-                ctx.shadowColor = '#ffd700';
                 ctx.beginPath();
-                ctx.arc(sx, sy, b * 1.5, 0, Math.PI * 2);
+                ctx.arc(sx, sy, Math.max(0.5, b * 1.5), 0, Math.PI * 2);
                 ctx.fill();
             }
-            ctx.shadowBlur = 0;
-            // Pilares de mármore
-            for (let i = 200; i < 5000; i += 600) {
+
+            const firstPillar = Math.floor((viewX - 200) / 600) * 600 + 200;
+            for (let i = firstPillar; i < viewX + viewW + 100; i += 600) {
                 ctx.fillStyle = '#1a1500';
                 ctx.fillRect(i, 200, 40, 310);
-                ctx.fillStyle = '#ffd700';
-                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = 'rgba(255,215,0,.30)';
                 ctx.fillRect(i - 10, 195, 60, 10);
                 ctx.fillRect(i - 10, 505, 60, 10);
-                ctx.globalAlpha = 1;
             }
-            // Chão
+
             const floorGrad = ctx.createLinearGradient(0, 510, 0, 650);
             floorGrad.addColorStop(0, '#1a1500');
             floorGrad.addColorStop(1, '#0a0a00');
             ctx.fillStyle = floorGrad;
-            ctx.fillRect(0, 510, 5000, 140);
-            // Reflexos dourados
-            for (let i = 0; i < 5000; i += 100) {
-                const a = Math.sin(Date.now() * 0.003 + i * 0.02) * 0.06 + 0.04;
+            ctx.fillRect(viewX, 510, viewW, 140);
+            const firstTile = Math.floor(viewX / 100) * 100;
+            for (let i = firstTile; i < viewX + viewW + 100; i += 100) {
+                const a = Math.sin(performance.now() * 0.003 + i * 0.02) * 0.06 + 0.04;
                 ctx.fillStyle = `rgba(255, 215, 0, ${a})`;
                 ctx.fillRect(i, 510, 50, 140);
             }

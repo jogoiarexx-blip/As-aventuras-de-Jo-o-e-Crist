@@ -8,6 +8,7 @@ class SaveSystem {
             gamesPlayed: 0,
             favoriteCharacter: null,
             gameCompleted: false,
+            campaignCheckpoint: null,
             lastSessionStartedAt: null,
             busMinigameUnlocked: false,
             busBestTime: null,
@@ -63,6 +64,52 @@ class SaveSystem {
         }
     }
     
+
+    saveCampaignCheckpoint(checkpoint = {}) {
+        // Checkpoint guarda apenas o início de uma fase. Evolução individual continua
+        // sendo persistida pelo sistema já existente de playerProgress.
+        if (this.data.gameCompleted) return false;
+        const levelIndex = Math.max(0, Math.min(7, Number(checkpoint.levelIndex) || 0));
+        const chars = Array.isArray(checkpoint.selectedCharacters)
+            ? checkpoint.selectedCharacters.filter(Boolean).slice(0, 2)
+            : [];
+        if (!chars.length) return false;
+        this.data.campaignCheckpoint = {
+            version: 1,
+            levelIndex,
+            playerCount: Math.max(1, Math.min(2, Number(checkpoint.playerCount) || chars.length || 1)),
+            selectedCharacters: chars,
+            score: Math.max(0, Number(checkpoint.score) || 0),
+            savedAt: Date.now()
+        };
+        this.saveSave();
+        return true;
+    }
+
+    loadCampaignCheckpoint() {
+        const cp = this.data.campaignCheckpoint;
+        if (!cp || this.data.gameCompleted) return null;
+        const levelIndex = Number(cp.levelIndex);
+        if (!Number.isFinite(levelIndex) || levelIndex < 0 || levelIndex > 7) return null;
+        const chars = Array.isArray(cp.selectedCharacters) ? cp.selectedCharacters.filter(Boolean).slice(0,2) : [];
+        if (!chars.length) return null;
+        return {
+            version: 1,
+            levelIndex,
+            playerCount: Math.max(1, Math.min(2, Number(cp.playerCount) || chars.length || 1)),
+            selectedCharacters: chars,
+            score: Math.max(0, Number(cp.score) || 0),
+            savedAt: Number(cp.savedAt) || null
+        };
+    }
+
+    clearCampaignCheckpoint() {
+        if (this.data.campaignCheckpoint !== null) {
+            this.data.campaignCheckpoint = null;
+            this.saveSave();
+        }
+    }
+
 
     recordBusResult(result = {}) {
         const time = Number(result.time);
@@ -143,8 +190,10 @@ class SaveSystem {
                 if (!Array.isArray(this.data.busTrophies)) this.data.busTrophies = [];
                 // Migração de saves antigos: quem já alcançou/zerou a última fase também recebe o seletor.
                 if (typeof this.data.gameCompleted !== 'boolean') {
-                    this.data.gameCompleted = Number(this.data.highestLevel || 0) >= 6;
+                    this.data.gameCompleted = Number(this.data.highestLevel || 0) >= 8;
                 }
+                if (!this.data.campaignCheckpoint || typeof this.data.campaignCheckpoint !== 'object') this.data.campaignCheckpoint = null;
+                if (this.data.gameCompleted) this.data.campaignCheckpoint = null;
             }
         } catch (e) {
             console.warn('Não foi possível carregar progresso');
@@ -160,8 +209,8 @@ class SaveSystem {
                 gamesPlayed: 0,
                 favoriteCharacter: null,
                 gameCompleted: false,
+                campaignCheckpoint: null,
                 lastSessionStartedAt: null,
-            lastSessionStartedAt: null,
                 busMinigameUnlocked: false,
                 busBestTime: null,
                 busBestResistance: 0,

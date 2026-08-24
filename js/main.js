@@ -35,7 +35,7 @@ let enemies = [];
 let cameraX = 0;
 let score = 0;
 let particles = [];
-const MAX_PARTICLES = 500; // Bug #5: Limite máximo de partículas
+let MAX_PARTICLES = 500; // Bug #5: Limite máximo de partículas
 let currentLevel = null;
 let currentLevelIndex = 0;
 let levelIntroTimer = 0;
@@ -56,15 +56,20 @@ let levelLoadToken = 0; // invalida callbacks de fases antigas          // WaveS
 let levelGateActive = false;    // Tela de gate de nível ativa
 let menuSelection = 0;
 let menuOptions = [];
+let menuButtonRects = [];
+let menuPointerActive = false;
 let stageSelectIndex = 0;
 let pendingStartLevel = 0;
 let stageSelectPlayers = 1;
+let pendingResumeCheckpoint = null;
 function getStageSelectCount(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0); }
 function stageSelectIsBusBonus(){ return saveSystem?.load?.().busMinigameUnlocked && stageSelectIndex === LEVELS.length; }
 
 function refreshMenuOptions() {
     const completed = !!saveSystem?.load?.().gameCompleted;
     menuOptions = ['1 JOGADOR', '2 JOGADORES', 'COMO JOGAR: JOÃO & CRIST', 'CONFIGURAR CONTROLES', 'TROFÉUS', 'OPÇÕES'];
+    const checkpoint = saveSystem?.loadCampaignCheckpoint?.();
+    if (checkpoint && !completed) menuOptions.push('CONTINUAR CAMPANHA');
     if (completed) menuOptions.push('SELECIONAR FASE');
     if (saveSystem?.load?.().busMinigameUnlocked) menuOptions.push('BÔNUS — ESTRADA PARA VEGAS');
     if (menuSelection >= menuOptions.length) menuSelection = menuOptions.length - 1;
@@ -80,8 +85,9 @@ const controlsConfigLabels = { left:'Mover esquerda', right:'Mover direita', up:
 let gamepadSystem = new GamepadSystem(sistemControles); window.gamepadSystem = gamepadSystem;
 let soundSystem = new SoundSystem();
 let gameSettings = new SettingsSystem(); window.gameSettings = gameSettings; gameSettings.applyAudio(soundSystem);
+let performanceSystem = new PerformanceSystem(gameSettings); window.performanceSystem = performanceSystem;
 let optionsSelection = 0;
-const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','VIBRAÇÃO','DIFICULDADE','TELA CHEIA'];
+const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','VIBRAÇÃO','DIFICULDADE','QUALIDADE GRÁFICA','TELA CHEIA'];
 let selectedCharacters = [null, null]; // [Player1, Player2]
 let characterSelectCursor = 0; // Qual jogador está selecionando (0 ou 1)
 let characterSelectReady = false; // Evita seleção imediata ao entrar na tela
@@ -125,6 +131,7 @@ function enterTruePause(fromState=gameState) {
     capturePauseSnapshot();
     gameState = GameState.PAUSED;
     soundSystem?.pauseAll?.();
+    window.GameRuntime?.pauseTimers?.();
     clearKeys();
     if (window.GameDebugConsole) window.GameDebugConsole.log('[PAUSE] Simulação congelada');
 }
@@ -151,6 +158,7 @@ function resumeTruePause() {
     gameState = pauseReturnState || GameState.PLAYING;
     pauseStartedAt = 0;
     soundSystem?.resumeAll?.();
+    window.GameRuntime?.resumeTimers?.();
     clearKeys();
     try { __fixedAccum = 0; __fixedLast = performance.now(); } catch (_) {}
     if (window.GameDebugConsole) window.GameDebugConsole.log('[PAUSE] Simulação retomada');
@@ -312,9 +320,50 @@ function cleanupPowerUps() {
     }
 }
 
+function replayPreviousLevelFromGate() {
+    if (!levelGateActive) return false;
+    const replayIndex = Math.max(0, currentLevelIndex - 1);
+    levelGateActive = false;
+    gameOverScreen?.deactivate?.();
+    clearKeys?.();
+    soundSystem?.stopMusic?.();
+    loadLevel(replayIndex);
+    if (gameState !== GameState.GAME_OVER) {
+        gameState = GameState.LEVEL_INTRO;
+        levelIntroTimer = 180;
+    }
+    soundSystem?.playSound?.('menuSelect');
+    return true;
+}
+
+function returnToMenuFromGameOver() {
+    levelGateActive = false;
+    gameOverScreen?.deactivate?.();
+    soundSystem?.stopMusic?.();
+    window.GameRuntime?.cancelTimersFor?.('level');
+    window.GameRuntime?.cancelTimersFor?.('boss');
+    clearKeys?.();
+    gameState = GameState.MENU;
+    refreshMenuOptions?.();
+    menuSelection = 0;
+    soundSystem?.playSound?.('menuBack');
+}
+
 // Event listeners
 document.addEventListener('keydown', e => {
     const normalizedKey = sistemControles.normalizarTecla(e.key);
+    if (window.__gameLoopFatalPaused) {
+        if (e.key === 'r' || e.key === 'R') {
+            window.__gameLoopFatalPaused = false; window.__gameDebugFatal = null; __fixedAccum = 0; __fixedLast = performance.now();
+            try { loadLevel(currentLevelIndex); gameState = GameState.LEVEL_INTRO; } catch (_) { location.reload(); }
+            return;
+        }
+        if (e.key === 'Escape') {
+            window.__gameLoopFatalPaused = false; window.__gameDebugFatal = null; __fixedAccum = 0; __fixedLast = performance.now();
+            soundSystem?.stopAllLoops?.(); gameState = GameState.MENU; menuSelection = 0; refreshMenuOptions(); clearKeys();
+            return;
+        }
+    }
     if (gameState === GameState.CONTROLS_CONFIG && controlsConfigCapture && controlsConfigDevice === 'keyboard') {
         e.preventDefault();
         if (e.key === 'Escape') {
@@ -467,7 +516,8 @@ document.addEventListener('keydown', e => {
             else if (optionsSelection===2) gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
             else if (optionsSelection===3) { gameSettings.data.vibration=!gameSettings.data.vibration; if(gameSettings.data.vibration) gamepadSystem.rumble(1,160,.55,.35); }
             else if (optionsSelection===4) gameSettings.cycleDifficulty(dir);
-            else if (optionsSelection===5 && e.key === 'Enter') toggleFullscreen();
+            else if (optionsSelection===5) performanceSystem.cycleMode(dir);
+            else if (optionsSelection===6 && e.key === 'Enter') toggleFullscreen();
             gameSettings.save(); gameSettings.applyAudio(soundSystem); soundSystem.playSound('menuSelect');
         }
         if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=5; soundSystem.playSound('menuBack'); }
@@ -555,22 +605,27 @@ document.addEventListener('keydown', e => {
         soundSystem.playSound('menuSelect');
     }
     
-    // Reiniciar
-    if (gameState === GameState.GAME_OVER || gameState === GameState.VICTORY) {
-        if (e.key === 'r' || e.key === 'R' || e.key === 'Enter') {
-            // Usar o novo sistema se disponível
-            if (gameState === GameState.GAME_OVER && gameOverScreen) {
-                if (gameOverScreen.handleInput(e.key)) {
-                    gameState = GameState.MENU;
-                    menuSelection = 0;
-                }
-            } else {
-                // Fallback ou Victory screen
-                gameState = GameState.MENU;
-                menuSelection = 0;
-                soundSystem.playSound('menuSelect');
+    // Game Over / gate / vitória
+    if (gameState === GameState.GAME_OVER) {
+        if (levelGateActive) {
+            if (e.key === 'r' || e.key === 'R' || e.key === 'Enter') {
+                replayPreviousLevelFromGate();
+                return;
             }
+            if (e.key === 'Escape') {
+                returnToMenuFromGameOver();
+                return;
+            }
+        } else if (e.key === 'r' || e.key === 'R' || e.key === 'Enter' || e.key === 'Escape') {
+            returnToMenuFromGameOver();
+            return;
         }
+    } else if (gameState === GameState.VICTORY && (e.key === 'r' || e.key === 'R' || e.key === 'Enter' || e.key === 'Escape')) {
+        gameState = GameState.MENU;
+        refreshMenuOptions?.();
+        menuSelection = 0;
+        soundSystem.playSound('menuSelect');
+        return;
     }
     
     // Pause real: congela simulação, animações e áudio.
@@ -624,6 +679,43 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('keyup', e => {
     keys[sistemControles.normalizarTecla(e.key)] = false;
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (gameState !== GameState.MENU) return;
+    const pos = getCanvasPointerPosition(e);
+    const hit = hitTestMenuOption(pos.x, pos.y);
+    if (hit >= 0) {
+        canvas.style.cursor = 'pointer';
+        if (menuSelection !== hit) {
+            menuSelection = hit;
+            soundSystem.playSound('menuMove');
+        }
+        menuPointerActive = true;
+    } else {
+        canvas.style.cursor = 'default';
+        menuPointerActive = false;
+    }
+});
+
+canvas.addEventListener('mouseleave', () => {
+    canvas.style.cursor = 'default';
+    menuPointerActive = false;
+});
+
+canvas.addEventListener('click', e => {
+    if (gameState === GameState.LOADING && loadingProgress >= 1) {
+        gameState = GameState.MENU;
+        soundSystem.playSound('menuSelect');
+        return;
+    }
+    if (gameState !== GameState.MENU) return;
+    const pos = getCanvasPointerPosition(e);
+    const hit = hitTestMenuOption(pos.x, pos.y);
+    if (hit >= 0) {
+        menuSelection = hit;
+        activateMenuSelection();
+    }
 });
 
 // Função auxiliar para limpar todas as teclas (previne conflitos entre estados)
@@ -685,7 +777,8 @@ function startGameWithCharacters() {
     players.length = 0;
     enemies.length = 0; // Limpar array
     cameraX = 0;
-    score = 0;
+    const resumeCheckpoint = pendingResumeCheckpoint;
+    score = resumeCheckpoint ? Math.max(0, Number(resumeCheckpoint.score) || 0) : 0;
     particles.length = 0; // Limpar array
     powerUps.length = 0;
     destructibles.length = 0;
@@ -743,6 +836,7 @@ function startGameWithCharacters() {
     // Carregar a fase escolhida (0 em campanha normal).
     loadLevel(startLevelIndex);
     pendingStartLevel = 0;
+    pendingResumeCheckpoint = null;
 
     // Abertura cinematográfica da campanha. No seletor de fases mantemos o fluxo direto.
     if (startLevelIndex === 0) {
@@ -759,6 +853,9 @@ function loadLevel(index) {
         return;
     }
     
+    // Cancela callbacks de gameplay pertencentes à fase anterior antes de trocar de cena.
+    window.GameRuntime?.cancelTimersFor?.('level');
+    window.GameRuntime?.cancelTimersFor?.('boss');
     currentLevelIndex = index;
     currentLevel = LEVELS[index];
     window.assetManager?.preloadLevel?.(currentLevel);
@@ -802,12 +899,12 @@ function loadLevel(index) {
     if (currentLevel.useWaves && typeof WaveSystem !== 'undefined') {
         waveSystem = new WaveSystem({ ...currentLevel, difficultyMultiplier:(currentLevel.difficultyMultiplier||1)*gameSettings.difficultyMultiplier() }, currentLevel.getGround());
         // Iniciar primeira onda automaticamente após 2s
-        setTimeout(() => {
+        (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level', 2000, () => {
             if (thisLevelToken !== levelLoadToken) return;
             if (waveSystem && gameState === GameState.PLAYING) {
                 waveSystem.startNextWave(enemies);
             }
-        }, 2000);
+        });
     }
     
     // Atualizar posição do chão para os jogadores
@@ -841,6 +938,16 @@ function loadLevel(index) {
     
     // Spawn de power-ups (2-4 por fase)
     spawnPowerUps(2 + Math.floor(Math.random() * 3));
+
+    // Checkpoint de campanha: sempre no início de uma fase já validada pelo gate.
+    // Não salva posição/meio de combate para evitar estados impossíveis ao recarregar.
+    saveSystem?.saveCampaignCheckpoint?.({
+        levelIndex: index,
+        playerCount,
+        selectedCharacters: selectedCharacters.slice(0, playerCount),
+        score
+    });
+    refreshMenuOptions?.();
 }
 
 function createEnemySafe(type, x, y) {
@@ -865,11 +972,15 @@ function createEnemySafe(type, x, y) {
     }
 
     const difficultyMult = (currentLevel.difficultyMultiplier || 1.0) * gameSettings.difficultyMultiplier();
+    const activePlayerCount = Math.max(1, players.filter(p => p && p.life > 0).length || playerCount || 1);
+    const mpLife = activePlayerCount > 1 ? 1.30 : 1;
+    const mpDamage = activePlayerCount > 1 ? 1.08 : 1;
     if (enemy.maxLife) {
-        enemy.maxLife = Math.floor(enemy.maxLife * difficultyMult);
+        enemy.maxLife = Math.max(1, Math.floor(enemy.maxLife * difficultyMult * mpLife));
         enemy.life = enemy.maxLife;
     }
-    if (enemy.damage) enemy.damage = Math.floor(enemy.damage * difficultyMult);
+    if (enemy.damage) enemy.damage = Math.max(1, Math.floor(enemy.damage * difficultyMult * mpDamage));
+    if (enemy.attackDamage) enemy.attackDamage = Math.max(1, Math.floor(enemy.attackDamage * difficultyMult * mpDamage));
     if (enemy.score) enemy.score = Math.floor(enemy.score * difficultyMult);
     return enemy;
 }
@@ -1056,8 +1167,12 @@ function spawnBoss() {
     
     if (boss) {
         const userDiff=gameSettings.difficultyMultiplier();
-        if (boss.maxLife) { boss.maxLife=Math.floor(boss.maxLife*userDiff); boss.life=boss.maxLife; }
-        if (boss.damage) boss.damage=Math.floor(boss.damage*userDiff);
+        const bossPlayers = Math.max(1, alivePlayers.length || playerCount || 1);
+        const bossMpLife = bossPlayers > 1 ? 1.35 : 1;
+        const bossMpDamage = bossPlayers > 1 ? 1.10 : 1;
+        if (boss.maxLife) { boss.maxLife=Math.floor(boss.maxLife*userDiff*bossMpLife); boss.life=boss.maxLife; }
+        if (boss.damage) boss.damage=Math.floor(boss.damage*userDiff*bossMpDamage);
+        if (boss.attackDamage) boss.attackDamage=Math.floor(boss.attackDamage*userDiff*bossMpDamage);
         enemies.push(boss);
         
         const bossVisualY = boss.y + boss.h / 2;
@@ -1124,8 +1239,9 @@ function startLevelMusic() {
     window.soundSystem.initAudioContext?.();
     window.soundSystem.stopMusic?.();
     const id=currentLevel?.id||1;
-    const tempo=id>=5?'vegas':id===3?'desert':id===4?'fast':'normal';
-    setTimeout(()=>window.soundSystem?.startMusic?.(tempo),40);
+    const tempo=id===8?'fast':id===7?'slow':id>=5?'vegas':id===3?'desert':id===4?'fast':'normal';
+    const start=()=>window.soundSystem?.startMusic?.(tempo);
+    if(window.GameRuntime?.schedule) window.GameRuntime.schedule('level',40,start); else setTimeout(start,40);
 }
 
 function recordLevelCompletion(index=currentLevelIndex) {
@@ -1150,7 +1266,7 @@ function commitVictoryOnce(){
     victoryCommitted=true;
     recordLevelCompletion(currentLevelIndex);
     const elapsed=Math.max(0,(Date.now()-gameStartTime)/1000);
-    if(saveSystem){saveSystem.addPlaytime?.(Math.max(0,elapsed-sessionPlaytimeSeconds));sessionPlaytimeSeconds=elapsed;saveSystem.markGameCompleted?.();saveSystem.save({score,level:LEVELS.length,playerCharacter:selectedCharacters[0],victory:true});}
+    if(saveSystem){saveSystem.addPlaytime?.(Math.max(0,elapsed-sessionPlaytimeSeconds));sessionPlaytimeSeconds=elapsed;saveSystem.markGameCompleted?.();saveSystem.clearCampaignCheckpoint?.();saveSystem.save({score,level:LEVELS.length,playerCharacter:selectedCharacters[0],victory:true});}
     refreshMenuOptions?.();
     soundSystem?.stopMusic?.();
     soundSystem?.playSound?.('victory');
@@ -1185,12 +1301,14 @@ function finishGameWithStory() {
     if (window.storyCutscenes && !window.storyCutscenes.hasSeen?.('ending')) {
         startStoryScene('ending', () => {
             if (saveSystem?.markGameCompleted) saveSystem.markGameCompleted();
+            saveSystem?.clearCampaignCheckpoint?.();
             refreshMenuOptions();
             gameState = GameState.VICTORY;
         });
         return;
     }
     if (saveSystem?.markGameCompleted) saveSystem.markGameCompleted();
+    saveSystem?.clearCampaignCheckpoint?.();
     refreshMenuOptions();
     gameState = GameState.VICTORY;
 }
@@ -1318,6 +1436,9 @@ if (!window.particles.createText) {
 // Imagem oficial da tela de carregamento
 const loadingScreenImage = new Image();
 loadingScreenImage.src = 'assets/ui/loading-screen.webp';
+const mainMenuBackgroundImage = new Image();
+mainMenuBackgroundImage.src = 'assets/ui/menu-principal-vegas.webp';
+
 
 function drawLoading() {
     ctx.save();
@@ -1395,90 +1516,155 @@ function drawLoading() {
     }
 }
 
-function drawMenu() {
-    refreshMenuOptions();
-    // Fundo inspirado na estrada para Vegas: céu do deserto, asfalto e neon retrô.
-    const sky = ctx.createLinearGradient(0, 0, 0, 650);
-    sky.addColorStop(0, '#0c1026');
-    sky.addColorStop(0.58, '#321247');
-    sky.addColorStop(0.76, '#d25a38');
-    sky.addColorStop(1, '#1b1114');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, 1000, 650);
-
-    // Lua e estrelas pixeladas.
-    ctx.fillStyle = 'rgba(255,235,170,.9)';
-    ctx.beginPath(); ctx.arc(850, 92, 43, 0, Math.PI * 2); ctx.fill();
-    bgParticles.slice(0, 28).forEach(p => {
-        p.x = (p.x + p.speedX + 1000) % 1000;
-        p.y = (p.y + p.speedY + 650) % 650;
-        ctx.fillStyle = `hsla(${p.hue},100%,80%,.7)`;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y * .55), Math.max(1, Math.round(p.size)), Math.max(1, Math.round(p.size)));
-    });
-
-    // Silhuetas do deserto.
-    ctx.fillStyle = '#130d18';
-    ctx.beginPath(); ctx.moveTo(0,365); ctx.lineTo(110,315); ctx.lineTo(225,360); ctx.lineTo(360,300); ctx.lineTo(505,365); ctx.lineTo(650,310); ctx.lineTo(790,350); ctx.lineTo(910,295); ctx.lineTo(1000,345); ctx.lineTo(1000,650); ctx.lineTo(0,650); ctx.closePath(); ctx.fill();
-
-    // Estrada em perspectiva.
-    ctx.fillStyle = '#15171c';
-    ctx.beginPath(); ctx.moveTo(400,650); ctx.lineTo(463,375); ctx.lineTo(537,375); ctx.lineTo(610,650); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#f4d35e'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(488,650); ctx.lineTo(497,375); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(512,650); ctx.lineTo(503,375); ctx.stroke();
-
-    // Placa principal no estilo do universo do jogo.
-    ctx.save();
-    ctx.translate(500, 108);
-    ctx.fillStyle = '#36120f'; ctx.strokeStyle = '#f4b13a'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.roundRect(-270,-69,540,138,22); ctx.fill(); ctx.stroke();
-    for (let x=-250; x<=250; x+=25) { ctx.fillStyle='#ffd56a'; ctx.beginPath(); ctx.arc(x,-56,3,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x,56,3,0,Math.PI*2); ctx.fill(); }
-    ctx.shadowBlur = 16; ctx.shadowColor = '#ff6b32';
-    ctx.fillStyle = '#fff3d0'; ctx.font = 'bold 60px Bebas Neue'; ctx.textAlign='center';
-    ctx.fillText('JOÃO & CRIST',0,2);
-    ctx.shadowColor='#ffd700'; ctx.fillStyle='#ffd54a'; ctx.font='bold 29px Righteous';
-    ctx.fillText('RUMO A VEGAS',0,43);
-    ctx.restore();
-
-    // Sprites reais dos protagonistas nas laterais.
-    const menuIdleFrame = Math.floor(performance.now()/170)%4;
-    const menuBob = Math.sin(performance.now()/260)*3;
-    drawMenuSprite(JOAO_SPRITE_SHEET, menuIdleFrame, 115, 308+menuBob, 128, 128, 0);
-    drawMenuSprite(CRIST_SPRITE_SHEET, menuIdleFrame, 755, 308-menuBob, 128, 128, 0);
-
-    // Painel de menu de madeira/metal.
-    ctx.fillStyle='rgba(12,12,16,.88)'; ctx.strokeStyle='#8c5a2b'; ctx.lineWidth=4;
-    const menuPanelH = menuOptions.length > 6 ? 365 : 345;
-    ctx.beginPath(); ctx.roundRect(275,225,450,menuPanelH,18); ctx.fill(); ctx.stroke();
-
-    const savedData = saveSystem.load();
-    if (savedData.highScore > 0) {
-        ctx.fillStyle='#f5c04a'; ctx.font='16px Righteous'; ctx.textAlign='center';
-        ctx.fillText(`RECORDE ${savedData.highScore}  •  FASE ${savedData.highestLevel}`,500,264);
+function drawMenuBackgroundCover(img) {
+    const cw = ctx.canvas.width;
+    const ch = ctx.canvas.height;
+    if (img && img.complete && img.naturalWidth) {
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const scale = Math.max(cw / iw, ch / ih);
+        const sw = cw / scale;
+        const sh = ch / scale;
+        const sx = (iw - sw) / 2;
+        const sy = (ih - sh) / 2;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+        return true;
     }
-
-    menuOptions.forEach((option,i)=>{
-        const spacing = menuOptions.length > 6 ? 40 : 43;
-        const y=296+i*spacing;
-        const selected=i===menuSelection;
-        if(selected){
-            ctx.save(); ctx.shadowBlur=14; ctx.shadowColor='#ff7b39';
-            ctx.fillStyle='#a83225'; ctx.strokeStyle='#ffd06a'; ctx.lineWidth=3;
-            ctx.beginPath(); ctx.roundRect(323,y-29,354,37,8); ctx.fill(); ctx.stroke();
-            ctx.fillStyle='#fff7db'; ctx.font='bold 25px Bebas Neue'; ctx.textAlign='center';
-            ctx.fillText('▶  '+option+'  ◀',500,y-3); ctx.restore();
-        } else {
-            ctx.fillStyle='#ddd3c2'; ctx.font='bold 23px Bebas Neue'; ctx.textAlign='center'; ctx.fillText(option,500,y-3);
-        }
-    });
-
-    const pads=gamepadSystem.connected.length;
-    ctx.fillStyle=pads?'#73f59a':'#a9a9a9'; ctx.font='14px Righteous'; ctx.textAlign='center';
-    ctx.fillText(pads ? `🎮 ${pads} GAMEPAD${pads>1?'S':''} CONECTADO${pads>1?'S':''}` : '🎮 Gamepad compatível • conecte e pressione um botão',500,603);
-    ctx.fillStyle='#d8c9ad'; ctx.font='13px Righteous';
-    ctx.fillText('↑↓ / W S / Analógico para navegar  •  ENTER / A para selecionar  •  ESC / B para voltar',500,630);
+    return false;
 }
 
+function drawMenu() {
+    refreshMenuOptions();
+    menuButtonRects = [];
+
+    const drewBg = drawMenuBackgroundCover(mainMenuBackgroundImage);
+    if (!drewBg) {
+        const sky = ctx.createLinearGradient(0, 0, 0, 650);
+        sky.addColorStop(0, '#0c1026');
+        sky.addColorStop(0.58, '#321247');
+        sky.addColorStop(0.76, '#d25a38');
+        sky.addColorStop(1, '#1b1114');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, 1000, 650);
+    }
+
+    const savedData = saveSystem.load();
+    const highestPhase = Math.max(1, savedData.highestLevel || 1);
+    const recordText = `RECORDE ${savedData.highScore || 0}  •  FASE ${highestPhase}`;
+
+    // Linha de status abaixo do letreiro principal.
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 10, 16, 0.96)';
+    ctx.strokeStyle = '#8c5a2b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(330, 165, 340, 36, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#f0b44c';
+    ctx.font = 'bold 16px Righteous';
+    ctx.textAlign = 'center';
+    ctx.fillText(recordText, 500, 188);
+    ctx.restore();
+
+    // Painel central redesenhado para refletir opções desbloqueadas e seleção atual.
+    const panelX = 318;
+    const panelY = 204;
+    const panelW = 364;
+    const compactMenu = menuOptions.length >= 8;
+    const topPad = compactMenu ? 12 : 18;
+    const bottomPad = compactMenu ? 12 : 18;
+    const optionH = compactMenu ? 28 : 34;
+    const spacing = compactMenu ? 5 : 8;
+    const panelH = Math.max(356, topPad + bottomPad + menuOptions.length * optionH + Math.max(0, menuOptions.length - 1) * spacing);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 10, 16, 0.96)';
+    ctx.strokeStyle = '#b07b3a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    menuOptions.forEach((option, i) => {
+        const y = panelY + topPad + i * (optionH + spacing);
+        const isSelected = i === menuSelection;
+        const buttonRect = { x: panelX + 24, y, w: panelW - 48, h: optionH };
+        menuButtonRects.push(buttonRect);
+
+        if (isSelected) {
+            const grad = ctx.createLinearGradient(buttonRect.x, y, buttonRect.x, y + optionH);
+            grad.addColorStop(0, '#c94d20');
+            grad.addColorStop(1, '#982819');
+            ctx.fillStyle = grad;
+            ctx.strokeStyle = '#ffcf5d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, 8);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#f9d152';
+            ctx.font = 'bold 18px Bebas Neue';
+            ctx.textAlign = 'center';
+            ctx.fillText('◀', buttonRect.x + 18, buttonRect.y + (compactMenu ? 20 : 23));
+            ctx.fillText('▶', buttonRect.x + buttonRect.w - 18, buttonRect.y + (compactMenu ? 20 : 23));
+            ctx.fillStyle = '#fff9df';
+            ctx.font = compactMenu ? 'bold 20px Bebas Neue' : 'bold 24px Bebas Neue';
+            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + (compactMenu ? 20 : 23));
+        } else {
+            ctx.fillStyle = '#e9dcc6';
+            ctx.font = compactMenu ? 'bold 18px Bebas Neue' : 'bold 21px Bebas Neue';
+            ctx.textAlign = 'center';
+            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + (compactMenu ? 20 : 23));
+        }
+    });
+    ctx.restore();
+
+    // Faixa inferior com ajuda dinâmica.
+    const pads = gamepadSystem.connected.length;
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 10, 16, 0.96)';
+    ctx.strokeStyle = '#8c5a2b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(188, 580, 623, 54, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 14px Righteous';
+    ctx.fillStyle = '#f0e6d2';
+    ctx.fillText(pads ? `Gamepad compatível  •  ${pads} controle${pads > 1 ? 's' : ''} conectado${pads > 1 ? 's' : ''}` : 'Gamepad compatível  •  Conecte e pressione um botão', 500, 606);
+    ctx.font = 'bold 12px Righteous';
+    ctx.fillStyle = '#8ff56f';
+    ctx.fillText('ENTER / A para selecionar', 608, 626);
+    ctx.fillStyle = '#f0e6d2';
+    ctx.fillText('↑ ↓ / W S / Analógico para navegar', 343, 626);
+    ctx.fillStyle = '#ff6d5f';
+    ctx.fillText('ESC / B para voltar', 731, 626);
+    ctx.restore();
+}
+
+
+
+function getCanvasPointerPosition(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+    };
+}
+
+function hitTestMenuOption(px, py) {
+    for (let i = 0; i < menuButtonRects.length; i++) {
+        const r = menuButtonRects[i];
+        if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return i;
+    }
+    return -1;
+}
 
 function prettyKey(k) {
     if (k === ' ') return 'ESPAÇO';
@@ -1584,10 +1770,10 @@ function drawOptions() {
     ctx.fillStyle='rgba(8,8,12,.82)';ctx.strokeStyle='#8c5a2b';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(215,125,570,395,18);ctx.fill();ctx.stroke();
     const values=[
         `${gameSettings.data.masterVolume}%`, `${gameSettings.data.musicVolume}%`, `${gameSettings.data.sfxVolume}%`,
-        gameSettings.data.vibration?'LIGADA':'DESLIGADA', gameSettings.difficultyLabel(), document.fullscreenElement?'ATIVA':'ENTRAR'
+        gameSettings.data.vibration?'LIGADA':'DESLIGADA', gameSettings.difficultyLabel(), performanceSystem.modeLabel(), document.fullscreenElement?'ATIVA':'ENTRAR'
     ];
     optionsItems.forEach((item,i)=>{
-        const y=174+i*55, sel=i===optionsSelection;
+        const y=164+i*50, sel=i===optionsSelection;
         if(sel){ctx.fillStyle='rgba(168,50,37,.7)';ctx.strokeStyle='#ffd06a';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(255,y-30,490,42,9);ctx.fill();ctx.stroke();}
         ctx.fillStyle=sel?'#fff6dc':'#dfd5c6';ctx.font='bold 20px Bebas Neue';ctx.textAlign='left';ctx.fillText(item,280,y-3);
         ctx.fillStyle=sel?'#ffd06a':'#8de3ff';ctx.textAlign='right';ctx.fillText(values[i],720,y-3);
@@ -1596,9 +1782,9 @@ function drawOptions() {
             ctx.fillStyle='#302b2a';ctx.fillRect(505,y+6,w,5);ctx.fillStyle=sel?'#ffd06a':'#8de3ff';ctx.fillRect(505,y+6,w*pct,5);
         }
     });
-    ctx.fillStyle='#e5d7c1';ctx.font='14px Righteous';ctx.textAlign='center';ctx.fillText('↑ ↓ escolher  •  ← → ajustar  •  ENTER/A ativar  •  ESC/B voltar',500,565);
-    ctx.fillStyle='#9de2ff';ctx.fillText('Dificuldade altera vida e dano dos inimigos. Vibração depende do suporte do controle/navegador.',500,596);
-    ctx.fillStyle='#b9aa94';ctx.font='12px Righteous';ctx.fillText('Configurações ficam salvas neste navegador.',500,623);
+    ctx.fillStyle='#e5d7c1';ctx.font='14px Righteous';ctx.textAlign='center';ctx.fillText('↑ ↓ escolher  •  ← → ajustar  •  ENTER/A ativar  •  ESC/B voltar',500,548);
+    ctx.fillStyle='#9de2ff';ctx.fillText('AUTO reduz efeitos apenas quando necessário para manter o jogo fluido.',500,578);
+    ctx.fillStyle='#b9aa94';ctx.font='12px Righteous';ctx.fillText('Dificuldade e qualidade ficam salvas neste navegador.',500,610);
 }
 
 function activateMenuSelection() {
@@ -1611,6 +1797,19 @@ function activateMenuSelection() {
     else if(option==='CONFIGURAR CONTROLES'){clearKeys();gameState=GameState.CONTROLS_CONFIG;controlsConfigPlayer=1;controlsConfigSelection=0;controlsConfigCapture=false;controlsConfigDevice='keyboard';controlsConfigMessage='';soundSystem.playSound('menuSelect');}
     else if(option==='TROFÉUS'){gameState=GameState.TROPHIES;if(window.trophySystem)window.trophySystem.scrollOffset=0;soundSystem.playSound('menuSelect');}
     else if(option==='OPÇÕES'){gameState=GameState.OPTIONS;optionsSelection=0;gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
+    else if(option==='CONTINUAR CAMPANHA'){
+        const cp=saveSystem.loadCampaignCheckpoint?.();
+        if(cp){
+            pendingResumeCheckpoint=cp;
+            pendingStartLevel=cp.levelIndex;
+            playerCount=cp.playerCount;
+            selectedCharacters=[cp.selectedCharacters[0]||'João', cp.playerCount===2?(cp.selectedCharacters[1]||'Crist'):null];
+            characterSelectCursor=0;
+            characterSelectReady=true;
+            soundSystem.playSound('menuSelect');
+            startGameWithCharacters();
+        } else { refreshMenuOptions(); menuSelection=0; soundSystem.playSound('menuBack'); }
+    }
     else if(option==='SELECIONAR FASE' && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
     else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}
 }
@@ -1651,7 +1850,8 @@ function handleGamepadInput() {
             else if(optionsSelection===2)gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
             else if(optionsSelection===3){gameSettings.data.vibration=!gameSettings.data.vibration;if(gameSettings.data.vibration)gamepadSystem.rumble(1,160,.55,.35);}
             else if(optionsSelection===4)gameSettings.cycleDifficulty(dir);
-            else if(optionsSelection===5&&accept)toggleFullscreen();
+            else if(optionsSelection===5)performanceSystem.cycleMode(dir);
+            else if(optionsSelection===6&&accept)toggleFullscreen();
             gameSettings.save();gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
         if(back){gameState=GameState.MENU;menuSelection=5;soundSystem.playSound('menuBack');}
     }
@@ -1673,6 +1873,11 @@ function handleGamepadInput() {
             if(back){gameState=GameState.MENU;menuSelection=3;soundSystem.playSound('menuBack');}
         }
     }
+    else if(gameState===GameState.GAME_OVER){
+        if(levelGateActive){ if(accept) replayPreviousLevelFromGate(); else if(back) returnToMenuFromGameOver(); }
+        else if(accept||back) returnToMenuFromGameOver();
+    }
+    else if(gameState===GameState.VICTORY){ if(accept||back){ gameState=GameState.MENU;refreshMenuOptions?.();menuSelection=0;soundSystem.playSound('menuSelect'); } }
     else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;startLevelMusic();}else nextLevel();soundSystem.playSound('menuSelect');}
     else if([GameState.PLAYING,GameState.BUS_MINIGAME].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
     else if(gameState===GameState.PAUSED&&([0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))||back)){resumeTruePause();}
@@ -2141,6 +2346,8 @@ function drawDebugPanel() {
         `Jogadores: ${players.length}`,
         `Inimigos: ${enemies.length}`,
         `Partículas: ${particles.length}/${MAX_PARTICLES}`,
+        `Qualidade: ${performanceSystem?.modeLabel?.() || 'N/A'}`,
+        `Frame: ${performanceSystem?.frameEMA?.toFixed?.(1) || '?'} ms`,
         `Power-ups: ${powerUps.length}`,
         `Câmera X: ${Math.floor(cameraX)}`,
         `Estado: ${gameState}`,
@@ -2469,18 +2676,47 @@ function drawHUD() {
 }
 
 let __fixedLast=performance.now(), __fixedAccum=0;
+function drawFatalGameOverlay(fatal) {
+    try {
+        ctx.save();
+        ctx.fillStyle='rgba(5,7,12,.92)';ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.strokeStyle='#ff5a55';ctx.lineWidth=4;ctx.strokeRect(110,145,780,330);
+        ctx.fillStyle='#ff6b63';ctx.font='bold 38px Bebas Neue';ctx.textAlign='center';ctx.fillText('ERRO NO JOGO',500,205);
+        ctx.fillStyle='#fff0df';ctx.font='bold 17px Righteous';ctx.fillText('O save foi preservado.',500,247);
+        ctx.font='14px monospace';ctx.fillStyle='#ddd';
+        const state=fatal?.details?.state||'desconhecido', level=fatal?.details?.level||'?';
+        ctx.fillText(`Estado: ${state}  •  Fase: ${level}`,500,286);
+        ctx.fillStyle='#ffd36c';ctx.font='bold 16px Righteous';ctx.fillText('PRESSIONE R PARA RECARREGAR A FASE  •  ESC PARA VOLTAR AO MENU',500,420);
+        ctx.restore();
+    } catch (_) {}
+}
 function safeGameLoopFrame(timestamp=performance.now()) {
     const step=window.GameRuntime?.fixedStepMs || (1000/60);
+    const frameStart=performance.now();
     let dt=Math.min(100,Math.max(0,timestamp-__fixedLast));__fixedLast=timestamp;__fixedAccum+=dt;
-    let steps=Math.min(3,Math.floor(__fixedAccum/step));
-    if(steps===0){requestAnimationFrame(safeGameLoopFrame);return;}
+    if(window.__gameLoopFatalPaused){drawFatalGameOverlay(window.__gameDebugFatal);requestAnimationFrame(safeGameLoopFrame);return;}
+    const pendingSteps=Math.min(3,Math.floor(__fixedAccum/step));
+    if(pendingSteps===0){requestAnimationFrame(safeGameLoopFrame);return;}
+    // Um único update+render por RAF. Evita redesenhar a cena 2-3 vezes no mesmo frame em quedas de FPS.
+    // O excesso acumulado é descartado de forma controlada para priorizar resposta e evitar espirais de lag.
+    __fixedAccum=Math.max(0,__fixedAccum-step);
+    if(pendingSteps>1){__fixedAccum=Math.min(__fixedAccum,step);if(window.GameRuntime?.stats)window.GameRuntime.stats.slowFrames++;}
     try {
-        while(steps-->0){gameLoop();__fixedAccum-=step;}
+        gameLoop();
     } catch (fatalError) {
         const details={state:(typeof gameState!=='undefined'?gameState:'desconhecido'),level:(typeof currentLevelIndex!=='undefined'?currentLevelIndex+1:'?'),enemies:(typeof enemies!=='undefined'&&enemies?enemies.length:'?'),players:(typeof players!=='undefined'&&players?players.length:'?'),cameraX:(typeof cameraX!=='undefined'?Math.round(cameraX):'?')};
         const stack=fatalError&&(fatalError.stack||fatalError.message)?(fatalError.stack||fatalError.message):String(fatalError);
-        window.GameDebugConsole?.error?.('ERRO FATAL NO GAME LOOP | contexto='+JSON.stringify(details)+'\n'+stack);console.error('[game-loop-fatal]',details,fatalError);window.__gameDebugFatal={details,stack,time:Date.now()};return;
+        window.GameDebugConsole?.error?.('ERRO FATAL NO GAME LOOP | contexto='+JSON.stringify(details)+'\n'+stack);
+        console.error('[game-loop-fatal]',details,fatalError);
+        window.__gameDebugFatal={details,stack,time:Date.now()};
+        window.__gameLoopFatalPaused=true;
+        if(window.GameRuntime?.stats)window.GameRuntime.stats.fatalErrors++;
+        drawFatalGameOverlay(window.__gameDebugFatal);
     }
+    const frameMs=performance.now()-frameStart;
+    performanceSystem?.onFrame?.(Math.max(frameMs,dt),currentFPS);
+    MAX_PARTICLES = performanceSystem?.particleLimit?.() || 500;
+    if(window.GameRuntime?.stats){window.GameRuntime.stats.lastFrameMs=frameMs;window.GameRuntime.stats.maxFrameMs=Math.max(window.GameRuntime.stats.maxFrameMs,frameMs);}
     requestAnimationFrame(safeGameLoopFrame);
 }
 
@@ -2870,19 +3106,28 @@ function gameLoop() {
                 
                 // Desenhar projétil ativo
                 ctx.save();
-                ctx.fillStyle = proj.color;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = proj.color;
-                ctx.beginPath();
-                ctx.arc(proj.x, proj.y, proj.w/2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Trilha
-                ctx.globalAlpha = 0.5;
-                ctx.fillStyle = proj.color;
-                ctx.beginPath();
-                ctx.arc(proj.x - proj.vx/2, proj.y - proj.vy/2, proj.w/3, 0, Math.PI * 2);
-                ctx.fill();
+                const effectSprite = proj.spriteKind && window.__extraSpriteEffect ? window.__extraSpriteEffect(proj.spriteKind) : null;
+                if (effectSprite && effectSprite.complete && effectSprite.naturalWidth) {
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.globalAlpha = 0.55;
+                    ctx.drawImage(effectSprite, proj.x - proj.w, proj.y - proj.h, proj.w * 2, proj.h * 2);
+                    ctx.globalAlpha = 1;
+                    ctx.drawImage(effectSprite, proj.x - proj.w/2, proj.y - proj.h/2, proj.w, proj.h);
+                } else {
+                    ctx.fillStyle = proj.color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = proj.color;
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, proj.w/2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Trilha
+                    ctx.globalAlpha = 0.5;
+                    ctx.fillStyle = proj.color;
+                    ctx.beginPath();
+                    ctx.arc(proj.x - proj.vx/2, proj.y - proj.vy/2, proj.w/3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 ctx.restore();
                 
                 activeProjectiles.push(proj);
@@ -2905,8 +3150,9 @@ function gameLoop() {
         window.attackDirector?.assign?.(enemies, players);
         // Atualizar e desenhar inimigos
         enemies.forEach((enemy, index) => {
+            const shouldUpdateEnemy = !performanceSystem || performanceSystem.shouldUpdateEnemy(enemy, cameraX, canvas.width);
             try {
-                enemy.update(players, enemies);
+                if (shouldUpdateEnemy) enemy.update(players, enemies);
             } catch (enemyUpdateError) {
                 console.error('[enemy-update] Inimigo removido para evitar travamento:', enemy?.type || enemy?.name, enemyUpdateError);
                 enemy.life = 0;
@@ -2916,7 +3162,7 @@ function gameLoop() {
                 // PERFORMANCE: atualiza todos, mas só desenha quem está próximo do viewport.
                 // Isso evita dezenas de drawImage/gradientes para inimigos a milhares de px da câmera.
                 const enemyW = enemy.w || 60;
-                const visible = enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180;
+                const visible = performanceSystem ? performanceSystem.isVisible(enemy.x, enemyW, cameraX, canvas.width) : (enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180);
                 if (visible) {
                     if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
                     enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
@@ -3104,11 +3350,13 @@ function gameLoop() {
             p.life--;
             
             if (p.life > 0) {
+                const particleVisible = p.type === 'text' || (p.x >= cameraX - 80 && p.x <= cameraX + canvas.width + 80 && p.y >= -80 && p.y <= canvas.height + 80);
+                if (!particleVisible) return true;
                 if (p.type === 'text') {
                     // Renderizar texto popup
                     ctx.save();
                     ctx.globalAlpha = p.life / 60;
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = performanceSystem?.particleShadowsEnabled?.() ? 10 : 0;
                     ctx.shadowColor = p.color;
                     ctx.fillStyle = p.color;
                     ctx.font = `bold ${p.size}px Bebas Neue`;
@@ -3130,7 +3378,7 @@ function gameLoop() {
                         ctx.stroke();
                     } else {
                         // Partículas normais e explosões
-                        ctx.shadowBlur = p.type === 'explosion' ? 15 : 5;
+                        ctx.shadowBlur = performanceSystem?.particleShadowsEnabled?.() ? (p.type === 'explosion' ? 15 : 5) : 0;
                         ctx.shadowColor = p.color;
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -3262,27 +3510,28 @@ function gameLoop() {
                         
                         recordLevelCompletion(currentLevelIndex);
                         
-                        // Pequeno delay antes de completar a fase
-                        setTimeout(() => {
+                        // Pequeno delay antes de completar a fase, protegido contra troca de fase/menu.
+                        const bossFinishToken = levelLoadToken;
+                        const bossFinishLevel = currentLevelIndex;
+                        const finishBossLevel = () => {
+                            if (bossFinishToken !== levelLoadToken || bossFinishLevel !== currentLevelIndex) return;
+                            if (![GameState.PLAYING, GameState.LEVEL_COMPLETE].includes(gameState)) return;
                             if (currentLevel.nextLevel) {
                                 gameState = GameState.LEVEL_COMPLETE;
                                 levelCompleteTimer = 0;
                                 soundSystem.playSound('levelComplete');
-                                
                                 players.forEach(player => {
-                                    if (player.evolution) {
-                                        saveSystem.savePlayerProgress(player.name, player.evolution.save());
-                                    }
+                                    if (player.evolution) saveSystem.savePlayerProgress(player.name, player.evolution.save());
                                 });
                             } else {
                                 finishGameWithStory();
                                 players.forEach(player => {
-                                    if (player.evolution) {
-                                        saveSystem.savePlayerProgress(player.name, player.evolution.save());
-                                    }
+                                    if (player.evolution) saveSystem.savePlayerProgress(player.name, player.evolution.save());
                                 });
                             }
-                        }, 2000);
+                        };
+                        if (window.GameRuntime?.schedule) window.GameRuntime.schedule('boss', 2000, finishBossLevel);
+                        else setTimeout(finishBossLevel, 2000);
                     }
                 }
             } else {
@@ -3336,8 +3585,11 @@ function gameLoop() {
         if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
         if (busResult === 'ARRIVAL') {
             loadLevel(2);
-            gameState = GameState.BUS_ARRIVAL;
-            window.busSequence?.startArrival(players);
+            // Se o gate de nível for acionado, não sobrescreve GAME_OVER com a cutscene.
+            if (!levelGateActive && gameState !== GameState.GAME_OVER) {
+                gameState = GameState.BUS_ARRIVAL;
+                window.busSequence?.startArrival(players);
+            }
         } else if (busResult === 'BONUS_DONE') {
             gameState = GameState.MENU; refreshMenuOptions(); menuSelection = Math.max(0, menuOptions.indexOf('BÔNUS — ESTRADA PARA VEGAS'));
         }

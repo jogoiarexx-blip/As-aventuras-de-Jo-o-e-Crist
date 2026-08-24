@@ -126,6 +126,7 @@
     <script src='js/enemy-sprite-renderer.js'></script> <!-- renderer 16-bit unificado -->
     <script src='js/enemy-factory.js'></script>
     <script src='js/wave-system.js'></script>  <!-- ✅ EXPANSÃO: Sistema de ondas + Gate de nível -->
+    <script src='js/performance-system.js'></script> <!-- qualidade adaptativa AUTO/ALTA/MÉDIA/BAIXA -->
     <script src='js/runtime-stability.js'></script>
     <script src='js/level.js'></script>
     <script src='js/bus-sequence.js'></script> <!-- v0.9.3: sequência Fase 2 -> ônibus -> Fase 3 -->
@@ -138,8 +139,13 @@
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- MAIN (deve ser último) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
+    <script src='js/game-hardening.js'></script> <!-- estabilidade conservadora: timers/erros/cenas -->
     <script src='js/main.js'></script>
+    <script src='js/game-global-bridge.js'></script> <!-- compatibilidade segura para módulos legados -->
+    <script src='js/missing-sprites-pack.js'></script> <!-- sprites extras: elite/ghost/assassin/bosses/drone -->
     <script src='js/hud-v093.js'></script>
+    <script src='js/dev-test-tools.js'></script> <!-- F9: modo de teste, desligado por padrão -->
+    <script src='js/regression-guards.js'></script> <!-- proteção contra regressões estruturais -->
     <script src='js/touch-controls.js'></script>
     
     <script>

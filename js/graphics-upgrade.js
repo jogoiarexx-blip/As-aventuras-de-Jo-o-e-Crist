@@ -18,6 +18,7 @@
 
     function drawBackdropAtmosphere(ctx, level, cameraX) {
         if (!ctx || !level) return;
+        if (window.performanceSystem && !window.performanceSystem.atmosphereEnabled()) return;
         const id = levelId(level);
         const t = performance.now() * 0.001;
         const left = cameraX;
@@ -41,7 +42,8 @@
 
         // Partículas ambientais discretas. São calculadas, não armazenadas,
         // então não aumentam o array global de partículas nem geram memory leak.
-        const count = id === 5 ? 16 : 11;
+        const perfTier = window.performanceSystem?.effectiveTier?.() || 'high';
+        const count = perfTier === 'high' ? (id === 5 ? 16 : 11) : (id === 5 ? 8 : 6);
         for (let i = 0; i < count; i++) {
             const seedX = hash(i, id * 13);
             const seedY = hash(i, id * 29);
@@ -88,6 +90,7 @@
 
     function drawEnemyPre(ctx, enemy) {
         if (!ctx || !enemy || enemy.life <= 0) return;
+        if (window.performanceSystem && !window.performanceSystem.shadowsEnabled()) return;
         const w = enemy.w || 42;
         const h = enemy.h || 62;
         const x = enemy.x || 0;
@@ -148,6 +151,7 @@
 
     function drawForeground(ctx, level, cameraX) {
         if (!ctx || !level) return;
+        if (window.performanceSystem && !window.performanceSystem.foregroundEnabled()) return;
         const id = levelId(level);
         const left = cameraX;
         ctx.save();
@@ -189,6 +193,7 @@
 
     function drawScreenFinish(ctx, level) {
         if (!ctx || !level) return;
+        if (window.performanceSystem?.effectiveTier?.() === 'low') return;
         const id = levelId(level);
         ctx.save();
         // Vignette extremamente leve, melhora foco sem "escurecer o jogo".

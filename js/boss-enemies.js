@@ -413,18 +413,20 @@ class FinalBoss extends BossEnemy {
         const dir = this.facingRight ? 1 : -1;
 
         for (let i = 0; i < 4; i++) {
-            setTimeout(() => {
-                if (!window.particles) return;
+            (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('boss', i * 120, () => {
+                if (window.gameState && window.gameState !== 'playing') return;
+                if (this.life <= 0 || !window.particles) return;
                 window.particles.jet(
                     this.x + (dir > 0 ? this.w : 0), laserY,
                     dir > 0 ? 0 : Math.PI, 18,
                     { color: '#ff0000', speed: 12, type: 'spark' }
                 );
-            }, i * 120);
+            });
         }
 
-        setTimeout(() => {
-            if (!window.particles) return;
+        (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('boss', 480, () => {
+            if (window.gameState && window.gameState !== 'playing') return;
+            if (this.life <= 0 || !window.particles) return;
             for (let i = -1; i <= 1; i++) {
                 window.particles.jet(
                     this.x + (dir > 0 ? this.w : 0), laserY + i * 10,
@@ -441,19 +443,22 @@ class FinalBoss extends BossEnemy {
                 });
             }
             if (window.screenShake !== undefined) window.screenShake = 8;
-        }, 580);
+        });
     }
 
     meteorShower() {
         const baseX = (window.cameraX || 0) + 80;
 
         for (let i = 0; i < 6; i++) {
-            setTimeout(() => {
+            (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('boss', i * 320, () => {
+                if (window.gameState && window.gameState !== 'playing') return;
+                if (this.life <= 0) return;
                 const mx = baseX + Math.random() * 840;
                 if (window.particles) {
                     window.particles.createText(mx, 70, '☄️', '#ff8800', { size: 26, maxLife: 85 });
-                    setTimeout(() => {
-                        if (!window.particles) return;
+                    (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('boss', 880, () => {
+                        if (window.gameState && window.gameState !== 'playing') return;
+                        if (this.life <= 0 || !window.particles) return;
                         window.particles.explosion(mx, 490, 28, { color: '#ff8800', speed: 10 });
                         window.particles.explosion(mx, 490, 14, { color: '#ffff00', speed: 6 });
                         if (window.players) {
@@ -462,9 +467,9 @@ class FinalBoss extends BossEnemy {
                             });
                         }
                         if (window.screenShake !== undefined) window.screenShake = 6;
-                    }, 880);
+                    });
                 }
-            }, i * 320);
+            });
         }
     }
 

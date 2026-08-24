@@ -9,13 +9,23 @@
     travesti: { cls:'TravestiEnemy', name:'Diva de Vegas', life:90, speed:2.75, damage:15, score:250, w:50, h:78, visualH:104, glow:'#ff3fbe' }
   };
   const STATES=['idle','walk1','walk2','attack','hurt','dead'];
+  // Os IDs internos usam underscore, mas algumas pastas de assets usam hífen.
+  // Centralizar esse mapeamento evita 404s sem renomear arquivos já usados em outras versões.
+  const ASSET_FOLDER={
+    turista:'turista',
+    seguranca:'seguranca',
+    elvis_fan:'elvis-fan',
+    mulher_feia:'mulher-feia',
+    travesti:'travesti'
+  };
   const images={};
   for(const type of Object.keys(CONFIG)){
     images[type]={};
+    const folder=ASSET_FOLDER[type]||type;
     for(const state of STATES){
       const img=new Image();
-      img.onerror=()=>console.warn('[sprite-vegas] Falha ao carregar:',type,state);
-      img.src=`assets/enemies/vegas-frames/${type}/${state}.webp`;
+      img.onerror=()=>console.warn('[sprite-vegas] Falha ao carregar:',type,state,`(${folder}/${state}.webp)`);
+      img.src=`assets/enemies/vegas-frames/${folder}/${state}.webp`;
       images[type][state]=img;
     }
   }
