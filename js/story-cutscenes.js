@@ -37,6 +37,18 @@ const SCENES = {
       ['CRIST','Agora ficou interessante.']
     ]
   },
+
+  colonelIntro: {
+    bg:2, title:'O CORONEL', actors:'colonelDesert',
+    lines:[
+      ['NARRADOR','Com o último capanga derrotado, passos pesados ecoam pela areia.'],
+      ['CRIST','Tem alguma coisa vindo naquela direção.'],
+      ['O CORONEL','Então vocês são os idiotas que derrubaram meu bloqueio no deserto.'],
+      ['JOÃO','Se você é o chefe deles, chegou atrasado pra festa.'],
+      ['O CORONEL','Eu sou O Coronel. E ninguém cruza meu território a caminho de Vegas.'],
+      ['CRIST','Ótimo. Então vamos resolver isso agora.']
+    ]
+  },
   desertClue: {
     bg:2, title:'UMA PISTA', actors:'phone',
     lines:[
@@ -113,6 +125,22 @@ const SCENES = {
   }
 };
 
+
+const __sceneImageCache = {};
+function getSceneImage(src){
+  if(!__sceneImageCache[src]){ const i = new Image(); i.src = src; __sceneImageCache[src] = i; }
+  return __sceneImageCache[src];
+}
+function drawSceneSprite(ctx, src, x, y, w, h, flip=false){
+  const img = getSceneImage(src);
+  if(!img.complete || !img.naturalWidth) return;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  if(flip){ ctx.translate(x + w/2, 0); ctx.scale(-1,1); ctx.translate(-(x + w/2),0); }
+  ctx.drawImage(img, x, y, w, h);
+  ctx.restore();
+}
+
 class StoryCutsceneManager {
   constructor(){ this.active=null; this.index=0; this.startedAt=0; this.lineStartedAt=0; this.onComplete=null; this.seen=new Set(); this.flash=0; }
   hasSeen(id){ return this.seen.has(id); }
@@ -147,6 +175,14 @@ class StoryCutsceneManager {
     } else if(kind==='desert'||kind==='phone'){
       this.drawActor(ctx,p1,335,445,true); if(p2)this.drawActor(ctx,p2,425,445,true);
       if(kind==='phone'){ctx.save();ctx.fillStyle='#111';ctx.fillRect(535,482,18,28);ctx.fillStyle='#61e5ff';ctx.fillRect(538,486,12,15);ctx.restore();}
+    } else if(kind==='colonelDesert'){
+      this.drawActor(ctx,p1,260,445,true); if(p2)this.drawActor(ctx,p2,350,445,true);
+      const elapsed = performance.now() - this.startedAt;
+      const walking = elapsed < 2200;
+      const phase = Math.min(1, elapsed / 2200);
+      const cx = 1030 - (phase * 290);
+      const sprite = walking ? ((Math.floor(performance.now()/180)%2)===0 ? 'colonel_walk1.webp' : 'colonel_walk2.webp') : 'colonel_idle.webp';
+      drawSceneSprite(ctx, 'assets/sprite-pack/' + sprite, cx, 270, 220, 228, false);
     } else if(kind==='vegas'||kind==='screen'||kind==='door'||kind==='shadow'||kind==='god'){
       this.drawActor(ctx,p1,300,445,true); if(p2)this.drawActor(ctx,p2,390,445,true);
       ctx.save();

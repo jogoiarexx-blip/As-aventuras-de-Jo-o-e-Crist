@@ -15,7 +15,7 @@
     ghost:    { frames:{ idle:['ghost_idle.webp'], walk:['ghost_walk1.webp','ghost_walk2.webp'], attack:['ghost_attack.webp'], hurt:['ghost_hurt.webp'], dead:['ghost_dead.webp'] }, w:76, h:90, shadow:0, glow:'#a84cff', alpha:true, floaty:true, deathFrames:30 },
     assassin: { frames:{ idle:['assassin_idle.webp'], walk:['assassin_walk1.webp','assassin_walk2.webp'], attack:['assassin_attack.webp'], hurt:['assassin_hurt.webp'], dead:['assassin_dead.webp'] }, w:68, h:92, shadow:15, glow:'#ff0066', deathFrames:30 },
     drone:    { frames:{ idle:['drone_idle.webp'], walk:['drone_walk1.webp','drone_walk2.webp'], attack:['drone_attack.webp'], hurt:['drone_hurt.webp'], dead:['drone_dead.webp'] }, w:52, h:52, shadow:14, glow:'#00d7ff', deathFrames:30 },
-    colonel:  { frames:{ idle:['colonel_idle.webp'], walk:['colonel_walk1.webp','colonel_walk2.webp'], attack:['colonel_attack.webp'], hurt:['colonel_hurt.webp'], dead:['colonel_dead.webp'] }, w:132, h:132, shadow:28, glow:'#7d3c98', boss:true, deathFrames:30, barColor:'#e74c3c' },
+    colonel:  { frames:{ idle:['colonel_idle.webp'], walk:['colonel_walk1.webp','colonel_walk2.webp'], attack:['colonel_attack1.webp','colonel_attack2.webp','colonel_attack3.webp','colonel_attack4.webp'], hurt:['colonel_hurt.webp'], dead:['colonel_dead.webp'] }, w:176, h:182, shadow:32, glow:'#7d3c98', boss:true, deathFrames:30, barColor:'#e74c3c' },
     vegas:    { frames:{ idle:['vegas_idle.webp'], walk:['vegas_walk1.webp','vegas_walk2.webp'], attack:['vegas_attack.webp'], hurt:['vegas_hurt.webp'], dead:['vegas_dead.webp'] }, w:132, h:132, shadow:28, glow:'#ffd700', boss:true, deathFrames:30, barColor:'#ff00aa' },
     engineer: { frames:{ idle:['engineer_idle.webp'], walk:['engineer_walk1.webp','engineer_walk2.webp'], attack:['engineer_attack.webp'], hurt:['engineer_hurt.webp'], dead:['engineer_dead.webp'] }, w:118, h:126, shadow:24, glow:'#00d7ff', boss:true, deathFrames:40, barColor:'#00d7ff' },
     shadow:   { frames:{ idle:['shadow_idle.webp'], walk:['shadow_walk1.webp','shadow_walk2.webp'], attack:['shadow_attack.webp'], hurt:['shadow_hurt.webp'], dead:['shadow_dead.webp'] }, w:108, h:124, shadow:18, glow:'#a84cff', boss:true, deathFrames:40, alpha:true, barColor:'#a84cff' },
@@ -81,7 +81,9 @@
     if (entity.life <= 0 && (entity.deathAnim || 0) >= (cfg.deathFrames || 30)) return;
     const state = stateFor(entity);
     const list = cfg.frames[state] || cfg.frames.idle;
-    const frame = list[(state === 'walk') ? (Math.floor(performance.now()/160) % list.length) : 0];
+    const animSpeed = state === 'walk' ? 160 : state === 'attack' ? 110 : state === 'hurt' ? 150 : state === 'dead' ? 9999 : 220;
+    const frameIndex = list.length > 1 ? (Math.floor(performance.now()/animSpeed) % list.length) : 0;
+    const frame = list[frameIndex];
     const sprite = img(frame);
     const centerX = entity.x + entity.w/2;
     const ground = Number.isFinite(entity.groundY) ? entity.groundY : (entity.y + entity.h);

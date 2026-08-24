@@ -35,7 +35,7 @@ let enemies = [];
 let cameraX = 0;
 let score = 0;
 let particles = [];
-let MAX_PARTICLES = 500; // Bug #5: Limite máximo de partículas
+const MAX_PARTICLES = 500; // Bug #5: Limite máximo de partículas
 let currentLevel = null;
 let currentLevelIndex = 0;
 let levelIntroTimer = 0;
@@ -85,9 +85,8 @@ const controlsConfigLabels = { left:'Mover esquerda', right:'Mover direita', up:
 let gamepadSystem = new GamepadSystem(sistemControles); window.gamepadSystem = gamepadSystem;
 let soundSystem = new SoundSystem();
 let gameSettings = new SettingsSystem(); window.gameSettings = gameSettings; gameSettings.applyAudio(soundSystem);
-let performanceSystem = new PerformanceSystem(gameSettings); window.performanceSystem = performanceSystem;
 let optionsSelection = 0;
-const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','VIBRAÇÃO','DIFICULDADE','QUALIDADE GRÁFICA','TELA CHEIA'];
+const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','VIBRAÇÃO','DIFICULDADE','TELA CHEIA'];
 let selectedCharacters = [null, null]; // [Player1, Player2]
 let characterSelectCursor = 0; // Qual jogador está selecionando (0 ou 1)
 let characterSelectReady = false; // Evita seleção imediata ao entrar na tela
@@ -516,8 +515,7 @@ document.addEventListener('keydown', e => {
             else if (optionsSelection===2) gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
             else if (optionsSelection===3) { gameSettings.data.vibration=!gameSettings.data.vibration; if(gameSettings.data.vibration) gamepadSystem.rumble(1,160,.55,.35); }
             else if (optionsSelection===4) gameSettings.cycleDifficulty(dir);
-            else if (optionsSelection===5) performanceSystem.cycleMode(dir);
-            else if (optionsSelection===6 && e.key === 'Enter') toggleFullscreen();
+            else if (optionsSelection===5 && e.key === 'Enter') toggleFullscreen();
             gameSettings.save(); gameSettings.applyAudio(soundSystem); soundSystem.playSound('menuSelect');
         }
         if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=5; soundSystem.playSound('menuBack'); }
@@ -893,6 +891,7 @@ function loadLevel(index) {
     bossPhase = false;
     bossDefeated = false;
     bossWarningTimer = 0;
+    phase3ColonelIntroPlayed = false;
     
     // Inicializar sistema de ondas para fases de expansão
     waveSystem = null;
@@ -1295,6 +1294,28 @@ function startStoryScene(sceneId, onComplete) {
     }
     onComplete?.();
     return false;
+}
+
+
+function startPhase3ColonelIntro(onDone) {
+    if (phase3ColonelIntroPlayed) { onDone?.(); return; }
+    phase3ColonelIntroPlayed = true;
+    players.forEach((player, i) => {
+        player.attacking = false;
+        player.attackTimer = 0;
+        player.dashing = false;
+        player.dashTimer = 0;
+        player.isMoving = false;
+        player.x = 220 + (i * 88);
+        player.y = currentLevel.getGround() - player.h;
+    });
+    cameraX = Math.max(0, players[0]?.x - 140 || 0);
+    startStoryScene('colonelIntro', () => {
+        gameState = GameState.PLAYING;
+        startLevelMusic();
+        spawnBoss();
+        onDone?.();
+    });
 }
 
 function finishGameWithStory() {
@@ -1770,10 +1791,10 @@ function drawOptions() {
     ctx.fillStyle='rgba(8,8,12,.82)';ctx.strokeStyle='#8c5a2b';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(215,125,570,395,18);ctx.fill();ctx.stroke();
     const values=[
         `${gameSettings.data.masterVolume}%`, `${gameSettings.data.musicVolume}%`, `${gameSettings.data.sfxVolume}%`,
-        gameSettings.data.vibration?'LIGADA':'DESLIGADA', gameSettings.difficultyLabel(), performanceSystem.modeLabel(), document.fullscreenElement?'ATIVA':'ENTRAR'
+        gameSettings.data.vibration?'LIGADA':'DESLIGADA', gameSettings.difficultyLabel(), document.fullscreenElement?'ATIVA':'ENTRAR'
     ];
     optionsItems.forEach((item,i)=>{
-        const y=164+i*50, sel=i===optionsSelection;
+        const y=174+i*55, sel=i===optionsSelection;
         if(sel){ctx.fillStyle='rgba(168,50,37,.7)';ctx.strokeStyle='#ffd06a';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(255,y-30,490,42,9);ctx.fill();ctx.stroke();}
         ctx.fillStyle=sel?'#fff6dc':'#dfd5c6';ctx.font='bold 20px Bebas Neue';ctx.textAlign='left';ctx.fillText(item,280,y-3);
         ctx.fillStyle=sel?'#ffd06a':'#8de3ff';ctx.textAlign='right';ctx.fillText(values[i],720,y-3);
@@ -1782,9 +1803,9 @@ function drawOptions() {
             ctx.fillStyle='#302b2a';ctx.fillRect(505,y+6,w,5);ctx.fillStyle=sel?'#ffd06a':'#8de3ff';ctx.fillRect(505,y+6,w*pct,5);
         }
     });
-    ctx.fillStyle='#e5d7c1';ctx.font='14px Righteous';ctx.textAlign='center';ctx.fillText('↑ ↓ escolher  •  ← → ajustar  •  ENTER/A ativar  •  ESC/B voltar',500,548);
-    ctx.fillStyle='#9de2ff';ctx.fillText('AUTO reduz efeitos apenas quando necessário para manter o jogo fluido.',500,578);
-    ctx.fillStyle='#b9aa94';ctx.font='12px Righteous';ctx.fillText('Dificuldade e qualidade ficam salvas neste navegador.',500,610);
+    ctx.fillStyle='#e5d7c1';ctx.font='14px Righteous';ctx.textAlign='center';ctx.fillText('↑ ↓ escolher  •  ← → ajustar  •  ENTER/A ativar  •  ESC/B voltar',500,565);
+    ctx.fillStyle='#9de2ff';ctx.fillText('Dificuldade altera vida e dano dos inimigos. Vibração depende do suporte do controle/navegador.',500,596);
+    ctx.fillStyle='#b9aa94';ctx.font='12px Righteous';ctx.fillText('Configurações ficam salvas neste navegador.',500,623);
 }
 
 function activateMenuSelection() {
@@ -1850,8 +1871,7 @@ function handleGamepadInput() {
             else if(optionsSelection===2)gameSettings.data.sfxVolume=Math.max(0,Math.min(100,gameSettings.data.sfxVolume+dir*5));
             else if(optionsSelection===3){gameSettings.data.vibration=!gameSettings.data.vibration;if(gameSettings.data.vibration)gamepadSystem.rumble(1,160,.55,.35);}
             else if(optionsSelection===4)gameSettings.cycleDifficulty(dir);
-            else if(optionsSelection===5)performanceSystem.cycleMode(dir);
-            else if(optionsSelection===6&&accept)toggleFullscreen();
+            else if(optionsSelection===5&&accept)toggleFullscreen();
             gameSettings.save();gameSettings.applyAudio(soundSystem);soundSystem.playSound('menuSelect');}
         if(back){gameState=GameState.MENU;menuSelection=5;soundSystem.playSound('menuBack');}
     }
@@ -2346,8 +2366,6 @@ function drawDebugPanel() {
         `Jogadores: ${players.length}`,
         `Inimigos: ${enemies.length}`,
         `Partículas: ${particles.length}/${MAX_PARTICLES}`,
-        `Qualidade: ${performanceSystem?.modeLabel?.() || 'N/A'}`,
-        `Frame: ${performanceSystem?.frameEMA?.toFixed?.(1) || '?'} ms`,
         `Power-ups: ${powerUps.length}`,
         `Câmera X: ${Math.floor(cameraX)}`,
         `Estado: ${gameState}`,
@@ -2714,8 +2732,6 @@ function safeGameLoopFrame(timestamp=performance.now()) {
         drawFatalGameOverlay(window.__gameDebugFatal);
     }
     const frameMs=performance.now()-frameStart;
-    performanceSystem?.onFrame?.(Math.max(frameMs,dt),currentFPS);
-    MAX_PARTICLES = performanceSystem?.particleLimit?.() || 500;
     if(window.GameRuntime?.stats){window.GameRuntime.stats.lastFrameMs=frameMs;window.GameRuntime.stats.maxFrameMs=Math.max(window.GameRuntime.stats.maxFrameMs,frameMs);}
     requestAnimationFrame(safeGameLoopFrame);
 }
@@ -3150,9 +3166,8 @@ function gameLoop() {
         window.attackDirector?.assign?.(enemies, players);
         // Atualizar e desenhar inimigos
         enemies.forEach((enemy, index) => {
-            const shouldUpdateEnemy = !performanceSystem || performanceSystem.shouldUpdateEnemy(enemy, cameraX, canvas.width);
             try {
-                if (shouldUpdateEnemy) enemy.update(players, enemies);
+                enemy.update(players, enemies);
             } catch (enemyUpdateError) {
                 console.error('[enemy-update] Inimigo removido para evitar travamento:', enemy?.type || enemy?.name, enemyUpdateError);
                 enemy.life = 0;
@@ -3162,7 +3177,7 @@ function gameLoop() {
                 // PERFORMANCE: atualiza todos, mas só desenha quem está próximo do viewport.
                 // Isso evita dezenas de drawImage/gradientes para inimigos a milhares de px da câmera.
                 const enemyW = enemy.w || 60;
-                const visible = performanceSystem ? performanceSystem.isVisible(enemy.x, enemyW, cameraX, canvas.width) : (enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180);
+                const visible = enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180;
                 if (visible) {
                     if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
                     enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
@@ -3350,13 +3365,11 @@ function gameLoop() {
             p.life--;
             
             if (p.life > 0) {
-                const particleVisible = p.type === 'text' || (p.x >= cameraX - 80 && p.x <= cameraX + canvas.width + 80 && p.y >= -80 && p.y <= canvas.height + 80);
-                if (!particleVisible) return true;
                 if (p.type === 'text') {
                     // Renderizar texto popup
                     ctx.save();
                     ctx.globalAlpha = p.life / 60;
-                    ctx.shadowBlur = performanceSystem?.particleShadowsEnabled?.() ? 10 : 0;
+                    ctx.shadowBlur = 10;
                     ctx.shadowColor = p.color;
                     ctx.fillStyle = p.color;
                     ctx.font = `bold ${p.size}px Bebas Neue`;
@@ -3378,7 +3391,7 @@ function gameLoop() {
                         ctx.stroke();
                     } else {
                         // Partículas normais e explosões
-                        ctx.shadowBlur = performanceSystem?.particleShadowsEnabled?.() ? (p.type === 'explosion' ? 15 : 5) : 0;
+                        ctx.shadowBlur = p.type === 'explosion' ? 15 : 5;
                         ctx.shadowColor = p.color;
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -3492,7 +3505,12 @@ function gameLoop() {
                         if (bossWarningTimer % 30 === 0) screenShake = 3;
                         
                         if (bossWarningTimer >= BOSS_WARNING_DURATION) {
-                            spawnBoss();
+                            const isColonelLevel = (currentLevel?.id === 3 || currentLevelIndex === 2) && currentLevel?.hasBoss;
+                            if (isColonelLevel && !phase3ColonelIntroPlayed) {
+                                startPhase3ColonelIntro();
+                            } else {
+                                spawnBoss();
+                            }
                         }
                     }
                 } else if (bossSpawned && allBossesDead) {
