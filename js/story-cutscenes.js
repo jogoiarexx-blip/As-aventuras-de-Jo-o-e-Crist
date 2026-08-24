@@ -41,12 +41,15 @@ const SCENES = {
   colonelIntro: {
     bg:2, title:'O CORONEL', actors:'colonelDesert',
     lines:[
-      ['NARRADOR','Com o último capanga derrotado, passos pesados ecoam pela areia.'],
-      ['CRIST','Tem alguma coisa vindo naquela direção.'],
-      ['O CORONEL','Então vocês são os idiotas que derrubaram meu bloqueio no deserto.'],
-      ['JOÃO','Se você é o chefe deles, chegou atrasado pra festa.'],
-      ['O CORONEL','Eu sou O Coronel. E ninguém cruza meu território a caminho de Vegas.'],
-      ['CRIST','Ótimo. Então vamos resolver isso agora.']
+      ['NARRADOR','Com o último capanga derrotado, passos pesados ecoam pela areia do deserto.'],
+      ['CRIST','Escutou isso? Tem alguém vindo. E não parece nada amigável.'],
+      ['O CORONEL','Então foram vocês que varreram meus homens da estrada.'],
+      ['JOÃO','Se eles eram seus, já deu pra ver que você treina muito mal a tropa.'],
+      ['O CORONEL','Eu sou O Coronel. Cada quilômetro até Vegas responde à minha ordem.'],
+      ['CRIST','Bonita apresentação. Vai continuar falando ou finalmente vai lutar?'],
+      ['O CORONEL','Ajoelhem-se agora... e talvez eu deixe um de vocês sair daqui respirando.'],
+      ['JOÃO','A gente não se ajoelha pra tirano. Muito menos no meio do deserto.'],
+      ['CRIST','Pode vir, Coronel. Sua barreira termina aqui.']
     ]
   },
   desertClue: {
@@ -176,13 +179,13 @@ class StoryCutsceneManager {
       this.drawActor(ctx,p1,335,445,true); if(p2)this.drawActor(ctx,p2,425,445,true);
       if(kind==='phone'){ctx.save();ctx.fillStyle='#111';ctx.fillRect(535,482,18,28);ctx.fillStyle='#61e5ff';ctx.fillRect(538,486,12,15);ctx.restore();}
     } else if(kind==='colonelDesert'){
-      this.drawActor(ctx,p1,260,445,true); if(p2)this.drawActor(ctx,p2,350,445,true);
+      this.drawActor(ctx,p1,245,445,true); if(p2)this.drawActor(ctx,p2,335,445,true);
       const elapsed = performance.now() - this.startedAt;
-      const walking = elapsed < 2200;
-      const phase = Math.min(1, elapsed / 2200);
-      const cx = 1030 - (phase * 290);
+      const walking = elapsed < 2600;
+      const phase = Math.min(1, elapsed / 2600);
+      const cx = 1060 - (phase * 350);
       const sprite = walking ? ((Math.floor(performance.now()/180)%2)===0 ? 'colonel_walk1.webp' : 'colonel_walk2.webp') : 'colonel_idle.webp';
-      drawSceneSprite(ctx, 'assets/sprite-pack/' + sprite, cx, 270, 220, 228, false);
+      drawSceneSprite(ctx, 'assets/sprite-pack/' + sprite, cx, 282, 196, 204, true);
     } else if(kind==='vegas'||kind==='screen'||kind==='door'||kind==='shadow'||kind==='god'){
       this.drawActor(ctx,p1,300,445,true); if(p2)this.drawActor(ctx,p2,390,445,true);
       ctx.save();

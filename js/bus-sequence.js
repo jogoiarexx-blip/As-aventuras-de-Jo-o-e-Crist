@@ -85,8 +85,12 @@
             if (this.phase2Waiting || this.boarding || this.run) return;
             this.phase2Waiting = true;
             this.boardingPoint = Math.max(650, (level?.width || 5000) - 390);
-            this.busWorldX = Math.max(700, (level?.width || 5000) - 320);
-            this.log('[BUS] Ônibus disponível para embarque no final da Fase 2');
+            this.busWorldX = Math.max(700, (level?.width || 5000) - 320); // posição final de parada
+            this.busApproachX = (level?.width || 5000) + 320; // começa fora da tela pela direita
+            this.phase2BusArrived = false;
+            this.phase2BusStopTimer = 0;
+            window.soundSystem?.startLoop?.('busEngine', .42);
+            this.log('[BUS] Ônibus chegando ao final da Fase 2');
             players.forEach(p => { if (p) p._busReady = false; });
         }
 
@@ -94,9 +98,25 @@
             if (!this.phase2Waiting) return false;
             const alive = (players || []).filter(p => p && p.life > 0);
             if (!alive.length) return false;
+
+            // Primeiro, o ônibus entra em cena e estaciona.
+            if (!this.phase2BusArrived) {
+                const targetDrawX = this.busWorldX - BUS_PHASE_W;
+                this.busApproachX += (targetDrawX - this.busApproachX) * 0.12;
+                if (Math.abs(this.busApproachX - targetDrawX) < 3) {
+                    this.busApproachX = targetDrawX;
+                    this.phase2BusArrived = true;
+                    this.phase2BusStopTimer = performance.now();
+                    window.soundSystem?.playSound?.('busBrake');
+                    this.log('[BUS] Ônibus estacionou para embarque');
+                }
+                return false;
+            }
+
             alive.forEach(p => { p._busReady = (p.x + (p.w || 0) * .5) >= this.boardingPoint; });
             if (alive.every(p => p._busReady)) {
                 this.phase2Waiting = false;
+                window.soundSystem?.stopLoop?.('busEngine');
                 this.startBoarding(alive);
                 return true;
             }
@@ -114,14 +134,20 @@
 
         drawPhase2Bus(ctx) {
             if (!this.phase2Waiting) return;
-            const img = this.sprites.idle;
-            this.drawBusFacingRight(ctx, img, this.busWorldX - BUS_PHASE_W, BUS_PHASE_Y, BUS_PHASE_W, BUS_PHASE_H);
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(this.busWorldX - 285, 400, 260, 38);
-            ctx.strokeStyle = '#ffd66b'; ctx.strokeRect(this.busWorldX - 285, 400, 260, 38);
-            ctx.fillStyle = '#fff5d6'; ctx.font = 'bold 17px Righteous'; ctx.textAlign='center';
-            ctx.fillText('VÁ ATÉ O ÔNIBUS', this.busWorldX - 170, 418);
-            ctx.restore();
+            const moving = !this.phase2BusArrived;
+            const img = moving ? this.sprites.arriving : this.sprites.idle;
+            const drawX = moving ? this.busApproachX : (this.busWorldX - BUS_PHASE_W);
+            this.drawBusFacingRight(ctx, img, drawX, BUS_PHASE_Y, BUS_PHASE_W, BUS_PHASE_H);
+            if (moving) {
+                this.drawDust(ctx, drawX + 42, 544, 2);
+            } else {
+                ctx.save();
+                ctx.fillStyle = 'rgba(0,0,0,.72)'; ctx.fillRect(this.busWorldX - 285, 400, 260, 38);
+                ctx.strokeStyle = '#ffd66b'; ctx.strokeRect(this.busWorldX - 285, 400, 260, 38);
+                ctx.fillStyle = '#fff5d6'; ctx.font = 'bold 17px Righteous'; ctx.textAlign='center';
+                ctx.fillText('VÁ ATÉ O ÔNIBUS', this.busWorldX - 170, 418);
+                ctx.restore();
+            }
         }
 
         startBoarding(players) {
