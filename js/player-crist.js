@@ -1,14 +1,28 @@
-const CRIST_SPRITE_SHEET = new Image();
-CRIST_SPRITE_SHEET.src = 'assets/crist-16bit.webp';
-const CRIST_16_FRAMES = {"idle":[[29,10,80,107],[155,10,78,107],[280,10,76,107],[408,10,76,107]],"walk":[[24,132,91,111],[150,130,88,112],[273,130,90,112],[408,135,90,107],[540,135,87,108],[670,135,83,108]],"run":[[16,260,102,105],[144,260,107,105],[270,260,110,103],[402,258,116,196],[540,259,118,103]],"jump":[[23,387,82,93],[156,384,79,95],[276,376,80,104],[546,377,80,102]],"attack":[[629,502,186,218],[796,501,157,220],[919,500,153,220],[1063,624,76,96],[1072,501,86,96]],"hurt":[[26,840,85,99],[32,732,82,97],[170,846,82,93]],"dead":[[19,1072,102,77],[156,959,111,94],[171,1074,100,75]],"dash":[[19,1173,129,104],[157,1173,144,104],[314,1173,152,104],[492,1170,162,107],[671,1173,168,103],[854,1174,136,102]]};
+const CRIST_FRAME_FILES = {
+  idle: ['assets/crist/idle1.webp', 'assets/crist/idle2.webp', 'assets/crist/idle3.webp', 'assets/crist/idle4.webp'],
+  walk: ['assets/crist/walk1.webp', 'assets/crist/walk2.webp', 'assets/crist/walk3.webp', 'assets/crist/walk4.webp', 'assets/crist/walk5.webp', 'assets/crist/walk6.webp'],
+  run: ['assets/crist/run1.webp', 'assets/crist/run2.webp', 'assets/crist/run3.webp', 'assets/crist/run4.webp', 'assets/crist/run5.webp', 'assets/crist/run6.webp'],
+  jump: ['assets/crist/jump1.webp', 'assets/crist/jump2.webp', 'assets/crist/jump3.webp', 'assets/crist/jump4.webp'],
+  attack: ['assets/crist/attack1.webp', 'assets/crist/attack2.webp', 'assets/crist/attack3.webp', 'assets/crist/attack4.webp', 'assets/crist/attack5.webp', 'assets/crist/attack6.webp'],
+  hurt: ['assets/crist/hurt1.webp', 'assets/crist/hurt2.webp', 'assets/crist/hurt3.webp'],
+  dead: ['assets/crist/dead1.webp', 'assets/crist/dead2.webp', 'assets/crist/dead3.webp', 'assets/crist/dead4.webp', 'assets/crist/dead5.webp'],
+  dash: ['assets/crist/dash1.webp', 'assets/crist/dash2.webp', 'assets/crist/dash3.webp']
+};
+
+const CRIST_FRAMES = Object.fromEntries(
+  Object.entries(CRIST_FRAME_FILES).map(([state, list]) => [
+    state,
+    list.map(src => { const img = new Image(); img.src = src; return img; })
+  ])
+);
 
 // Classe específica para o personagem CRIST
 class PlayerCrist {
     constructor(x, y, controlPlayer = 1) {
         this.name = 'Crist';
         this.x = x;
-        this.w = 50;
-        this.h = 70;
+        this.w = 48;
+        this.h = 72;
         
         // ✅ PADRONIZADO: Mesmo sistema de chão dos inimigos
         this.groundY = y;        // y é a posição do chão
@@ -22,13 +36,16 @@ class PlayerCrist {
         this.attackCooldown = 0;
         this.facingRight = true;
         
-        // PATCH: Hitbox ajustada para corpo real
+        // PATCH 2: hitbox e base refinadas para o novo sprite do Crist.
+        // Corpo mais estreito, com pés melhor alinhados ao chão para reduzir
+        // sensação de flutuar e evitar colisões injustas nas laterais.
         this.hitbox = {
-            offsetX: 5,
-            offsetY: 25,
-            width: 40,
-            height: 45  // 65% da altura
+            offsetX: 8,
+            offsetY: 18,
+            width: 32,
+            height: 50
         };
+        this.spriteBaseOffset = 3;
         
         // Controles do SLOT do jogador (independe do personagem escolhido)
         this.controlPlayer = controlPlayer;
@@ -162,17 +179,61 @@ class PlayerCrist {
     }
 
     drawCristSprite(ctx) {
-        const sheet=CRIST_SPRITE_SHEET;
-        if(!sheet.complete||!sheet.naturalWidth){this.drawCrist(ctx);return;}
-        let state='idle';
-        if(this.dashing)state='dash'; else if(this.attacking)state='attack'; else if(this.isJumping)state='jump'; else if(this.invulnerable>15)state='hurt'; else if(this.isMoving)state=this.isRunning?'run':'walk';
-        const frames=CRIST_16_FRAMES[state]||CRIST_16_FRAMES.idle; let frame=0;
-        if(state==='attack')frame=Math.min(frames.length-1,Math.floor((15-Math.max(0,this.attackTimer))/3));
-        else if(state==='jump')frame=Math.min(frames.length-1,Math.max(0,Math.floor((this.vy+12)/6)));
-        else if(state==='dash')frame=Math.floor((this.dashDuration-Math.max(0,this.dashTimer))/2)%frames.length;
-        else frame=Math.floor(performance.now()/(state==='run'?85:state==='walk'?125:190))%frames.length;
-        const [sx,sy,sw,sh]=frames[frame];const ratio=sw/sh;let h=98,w=Math.max(70,h*ratio);if(ratio>1.45){w=Math.min(145,h*ratio);h=Math.min(98,w/ratio);}const cx=this.x+this.w/2,bottom=this.y+this.h+5,dx=cx-w/2,dy=bottom-h;
-        ctx.save();ctx.imageSmoothingEnabled=false;if(this.invulnerable>0&&Math.floor(this.invulnerable/5)%2===0)ctx.globalAlpha=.55;if(!this.facingRight){ctx.translate(dx+w,0);ctx.scale(-1,1);ctx.drawImage(sheet,sx,sy,sw,sh,0,dy,w,h);}else ctx.drawImage(sheet,sx,sy,sw,sh,dx,dy,w,h);ctx.restore();
+        let state = 'idle';
+        if (this.life <= 0) state = 'dead';
+        else if (this.dashing) state = 'dash';
+        else if (this.attacking) state = 'attack';
+        else if (this.isJumping) state = 'jump';
+        else if (this.invulnerable > 15) state = 'hurt';
+        else if (this.isMoving) state = this.isRunning ? 'run' : 'walk';
+
+        const frames = CRIST_FRAMES[state] || CRIST_FRAMES.idle;
+        if (!frames || !frames.length || !frames[0].complete) { this.drawCrist(ctx); return; }
+
+        let frame = 0;
+        if (state === 'attack') {
+            const progress = 1 - (Math.max(0, this.attackTimer) / 15);
+            frame = Math.min(frames.length - 1, Math.floor(progress * frames.length));
+        } else if (state === 'jump') {
+            if (this.vy < -6) frame = 0;
+            else if (this.vy < -1) frame = 1;
+            else if (this.vy < 6) frame = 2;
+            else frame = 3;
+        } else if (state === 'dash') {
+            frame = Math.floor((this.dashDuration - Math.max(0, this.dashTimer)) / 2) % frames.length;
+        } else if (state === 'hurt') {
+            frame = Math.floor(performance.now() / 95) % frames.length;
+        } else if (state === 'dead') {
+            frame = Math.min(frames.length - 1, 2 + (Math.floor(performance.now()/220)%Math.max(1, frames.length-2)));
+        } else {
+            const speed = state === 'run' ? 72 : state === 'walk' ? 95 : 180;
+            frame = Math.floor(performance.now() / speed) % frames.length;
+        }
+
+        const img = frames[frame];
+        if (!img || !img.complete || !img.naturalWidth) { this.drawCrist(ctx); return; }
+
+        const ratio = img.naturalWidth / img.naturalHeight;
+        let h = state === 'jump' ? 106 : 96;
+        let w = Math.max(66, h * ratio);
+        if (ratio > 1.4) { w = Math.min(165, h * ratio); h = Math.min(108, w / ratio); }
+
+        const cx = this.x + this.w / 2;
+        const bottom = this.y + this.h + this.spriteBaseOffset;
+        const dx = cx - w / 2;
+        const dy = bottom - h;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        if (this.invulnerable > 0 && Math.floor(this.invulnerable / 5) % 2 === 0) ctx.globalAlpha = 0.55;
+        if (!this.facingRight) {
+            ctx.translate(dx + w, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(img, 0, dy, w, h);
+        } else {
+            ctx.drawImage(img, dx, dy, w, h);
+        }
+        ctx.restore();
     }
 
     drawCrist(ctx) {
@@ -507,11 +568,11 @@ class PlayerCrist {
     getHitbox() {
         // Dano só nos frames ativos do golpe: evita acertar antes/depois do bastão encostar.
         if (!this.attacking || this.attackTimer > 10 || this.attackTimer < 6) return null;
-        const hitboxW = 68;
-        const hitboxH = 38;
+        const hitboxW = 62;
+        const hitboxH = 40;
         return {
-            x: this.facingRight ? this.x + this.w - 6 : this.x - hitboxW + 6,
-            y: this.y + 18,
+            x: this.facingRight ? this.x + this.w - 2 : this.x - hitboxW + 2,
+            y: this.y + 20,
             w: hitboxW,
             h: hitboxH
         };
@@ -536,6 +597,15 @@ class PlayerCrist {
     heal(amount) {
         this.life += amount;
         if (this.life > this.maxLife) this.life = this.maxLife;
+    }
+
+    getBodyBounds() {
+        return {
+            x: this.x + this.hitbox.offsetX,
+            y: this.y + this.hitbox.offsetY,
+            w: this.hitbox.width,
+            h: this.hitbox.height
+        };
     }
 
     addCombo() {

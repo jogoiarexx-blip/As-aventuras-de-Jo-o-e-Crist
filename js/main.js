@@ -169,6 +169,9 @@ function resumeTruePause() {
     if (window.GameDebugConsole) window.GameDebugConsole.log('[PAUSE] Simulação retomada');
 }
 
+window.enterTruePause = enterTruePause;
+window.resumeTruePause = resumeTruePause;
+
 // Bug #2: Modal customizado para substituir confirm()
 let showModal = false;
 let modalMessage = '';
