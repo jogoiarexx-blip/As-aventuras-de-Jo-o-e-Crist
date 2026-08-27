@@ -1,4 +1,4 @@
-// v0.9.3 - controles touch robustos para Android/iOS/WebView
+// v0.9.4 - controles touch robustos para Android/iOS/WebView
 (() => {
   'use strict';
 
@@ -107,7 +107,7 @@
     const pausePress = e => {
       e.preventDefault();
       try {
-        if (window.gameState === 'playing' || window.gameState === 'bus_minigame') {
+        if (window.gameState === 'playing' || window.gameState === 'bus_minigame' || window.gameState === 'fishing_bonus') {
           if (typeof window.enterTruePause === 'function') window.enterTruePause(window.gameState);
           else window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
         }
@@ -127,7 +127,8 @@
         const state = window.gameState;
         const bus = state === 'bus_minigame';
         const gameplay = state === 'playing';
-        const visible = gameplay || bus;
+        const fishing = state === 'fishing_bonus';
+        const visible = gameplay || bus || fishing;
         layer.style.display = visible ? 'block' : 'none';
         if (!visible) releaseAll();
 

@@ -1,4 +1,4 @@
-/* João & Crist v0.9.3 - camada conservadora de estabilidade.
+/* João & Crist v0.9.4 - camada conservadora de estabilidade.
    Não substitui sistemas existentes: adiciona guardas, diagnóstico e utilidades. */
 (() => {
   if (window.GameHardening) return;

@@ -23,6 +23,7 @@ const GameState = {
     STAGE_SELECT: 'stage_select',
     BUS_BOARDING: 'bus_boarding',
     BUS_MINIGAME: 'bus_minigame',
+    FISHING_BONUS: 'fishing_bonus',
     BUS_ARRIVAL: 'bus_arrival',
     CUTSCENE: 'cutscene'
 };
@@ -62,8 +63,11 @@ let stageSelectIndex = 0;
 let pendingStartLevel = 0;
 let stageSelectPlayers = 1;
 let pendingResumeCheckpoint = null;
-function getStageSelectCount(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0); }
-function stageSelectIsBusBonus(){ return saveSystem?.load?.().busMinigameUnlocked && stageSelectIndex === LEVELS.length; }
+function getStageSelectCount(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0) + 1; }
+function stageSelectBusIndex(){ return saveSystem?.load?.().busMinigameUnlocked ? LEVELS.length : -1; }
+function stageSelectChicoIndex(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0); }
+function stageSelectIsBusBonus(){ return stageSelectIndex === stageSelectBusIndex(); }
+function stageSelectIsChicoBonus(){ return stageSelectIndex === stageSelectChicoIndex(); }
 
 function refreshMenuOptions() {
     const completed = !!saveSystem?.load?.().gameCompleted;
@@ -515,6 +519,7 @@ document.addEventListener('keydown', e => {
         }
         if (e.key === 'Enter') {
             if (stageSelectIsBusBonus()) { window.busSequence?.startMinigame(true); gameState=GameState.BUS_MINIGAME; soundSystem.playSound('menuSelect'); }
+            else if (stageSelectIsChicoBonus()) { soundSystem?.stopMusic?.(); window.fishingBonus?.start?.(stageSelectPlayers); gameState=GameState.FISHING_BONUS; soundSystem.playSound('menuSelect'); }
             else { pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect'); }
         }
         if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=6; soundSystem.playSound('menuBack'); }
@@ -682,7 +687,7 @@ document.addEventListener('keydown', e => {
     }
     
     // Pause real: congela simulação, animações e áudio.
-    const canPauseNow = [GameState.PLAYING, GameState.BUS_MINIGAME].includes(gameState);
+    const canPauseNow = [GameState.PLAYING, GameState.BUS_MINIGAME, GameState.FISHING_BONUS].includes(gameState);
     if (canPauseNow && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
         enterTruePause(gameState);
     } else if (gameState === GameState.PAUSED && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
@@ -1515,6 +1520,8 @@ const loadingScreenImage = new Image();
 loadingScreenImage.src = 'assets/ui/loading-screen.webp';
 const mainMenuBackgroundImage = new Image();
 mainMenuBackgroundImage.src = 'assets/ui/menu-principal-vegas.webp';
+const chicoFumacaSelectImage = new Image();
+chicoFumacaSelectImage.src = 'assets/npc/chico-fumaca-idle.webp';
 
 
 function drawLoading() {
@@ -1913,7 +1920,7 @@ function handleGamepadInput() {
         if(up||left){stageSelectIndex=(stageSelectIndex+getStageSelectCount()-1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(down||right){stageSelectIndex=(stageSelectIndex+1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
-        if(accept){if(stageSelectIsBusBonus()){soundSystem?.stopMusic?.();window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
+        if(accept){if(stageSelectIsBusBonus()){soundSystem?.stopMusic?.();window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}else if(stageSelectIsChicoBonus()){soundSystem?.stopMusic?.();window.fishingBonus?.start?.(stageSelectPlayers);gameState=GameState.FISHING_BONUS;soundSystem.playSound('menuSelect');}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
@@ -1956,7 +1963,7 @@ function handleGamepadInput() {
     }
     else if(gameState===GameState.VICTORY){ if(accept||back){ gameState=GameState.MENU;refreshMenuOptions?.();menuSelection=0;soundSystem.playSound('menuSelect'); } }
     else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;startLevelMusic();}else nextLevel();soundSystem.playSound('menuSelect');}
-    else if([GameState.PLAYING,GameState.BUS_MINIGAME].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
+    else if([GameState.PLAYING,GameState.BUS_MINIGAME,GameState.FISHING_BONUS].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
     else if(gameState===GameState.PAUSED){
         if(showModal){
             if(accept){showModal=false;const cb=modalCallback;modalCallback=null;cb?.();}
@@ -1975,14 +1982,43 @@ function handleGamepadInput() {
 
 function drawStageSelect() {
     const g=ctx.createLinearGradient(0,0,0,650); g.addColorStop(0,'#090d20'); g.addColorStop(.55,'#30133b'); g.addColorStop(1,'#6b2d1b'); ctx.fillStyle=g;ctx.fillRect(0,0,1000,650);
-    ctx.fillStyle='#fff1c8';ctx.font='bold 48px Bebas Neue';ctx.textAlign='center';ctx.fillText('SELECIONAR FASE',500,58);
-    ctx.fillStyle='#f5c04a';ctx.font='14px Righteous';ctx.fillText(saveSystem.load().busMinigameUnlocked?'FASES + CONTEÚDO BÔNUS DESBLOQUEADO':'DESBLOQUEADO POR ZERAR O JOGO',500,84);
-    const entries=LEVELS.map((level,i)=>({title:`${i+1}. ${level.name}`,desc:level.description||'Rumo a Vegas',bonus:false}));
-    if(saveSystem.load().busMinigameUnlocked)entries.push({title:'BÔNUS — ESTRADA PARA VEGAS',desc:'Rejogue o minigame do ônibus sem repetir a Fase 2',bonus:true});
-    const cardY=105, cardH=45, gap=7;
-    entries.forEach((entry,i)=>{const y=cardY+i*(cardH+gap),sel=i===stageSelectIndex;ctx.fillStyle=sel?(entry.bonus?'rgba(45,115,108,.94)':'rgba(168,50,37,.92)'):'rgba(10,10,14,.82)';ctx.strokeStyle=sel?'#ffd06a':'#65513f';ctx.lineWidth=sel?3:1;ctx.beginPath();ctx.roundRect(175,y,650,cardH,9);ctx.fill();ctx.stroke();ctx.textAlign='left';ctx.fillStyle=sel?'#fff7db':'#ddd3c2';ctx.font='bold 19px Bebas Neue';ctx.fillText(entry.title,198,y+20);ctx.fillStyle=sel?'#ffd06a':'#9eb2c7';ctx.font='11px Righteous';ctx.fillText(entry.desc.slice(0,74),198,y+37);ctx.textAlign='right';ctx.fillStyle=sel?'#fff':'#8d8273';ctx.font='bold 15px Bebas Neue';ctx.fillText(sel?'▶ JOGAR':'',795,y+27);});
-    ctx.textAlign='center';ctx.fillStyle='#8de3ff';ctx.font='14px Righteous';ctx.fillText(`MODO: ${stageSelectPlayers} JOGADOR${stageSelectPlayers>1?'ES':''}  •  TAB / X troca jogadores`,500,595);
-    ctx.fillStyle='#ded1bd';ctx.font='13px Righteous';ctx.fillText('↑↓ / ←→ escolher  •  ENTER / A confirmar  •  ESC / B voltar',500,622);
+    ctx.fillStyle='#fff1c8';ctx.font='bold 46px Bebas Neue';ctx.textAlign='center';ctx.fillText('SELECIONAR FASE / BÔNUS',500,52);
+    ctx.fillStyle='#f5c04a';ctx.font='13px Righteous';ctx.fillText('Campanha concluída • conteúdos extras e desafios',500,76);
+
+    const entries=LEVELS.map((level,i)=>({title:`${i+1}. ${level.name}`,desc:level.description||'Rumo a Vegas',bonus:false,playable:true}));
+    if(saveSystem.load().busMinigameUnlocked)entries.push({title:'BÔNUS — ESTRADA PARA VEGAS',desc:'Rejogue o minigame do ônibus sem repetir a Fase 2',bonus:true,playable:true});
+    entries.push({title:'BÔNUS — PESCARIA DO CHICO FUMAÇA',desc:'Pesque no açude do Chico Fumaça e enfrente o monstro que morder o anzol.',bonus:true,chico:true,playable:true});
+
+    const cardY=92, cardH=38, gap=5;
+    const listX=112, listW=620;
+    entries.forEach((entry,i)=>{
+        const y=cardY+i*(cardH+gap),sel=i===stageSelectIndex;
+        ctx.fillStyle=sel?(entry.chico?'rgba(117,78,25,.95)':entry.bonus?'rgba(45,115,108,.94)':'rgba(168,50,37,.92)'):'rgba(10,10,14,.82)';
+        ctx.strokeStyle=sel?'#ffd06a':'#65513f';ctx.lineWidth=sel?3:1;
+        ctx.beginPath();ctx.roundRect(listX,y,listW,cardH,8);ctx.fill();ctx.stroke();
+        ctx.textAlign='left';ctx.fillStyle=sel?'#fff7db':'#ddd3c2';ctx.font='bold 17px Bebas Neue';ctx.fillText(entry.title,listX+18,y+17);
+        ctx.fillStyle=sel?'#ffd06a':'#9eb2c7';ctx.font='10px Righteous';ctx.fillText(entry.desc.slice(0,72),listX+18,y+32);
+        ctx.textAlign='right';ctx.fillStyle=entry.playable?(sel?'#fff':'#8d8273'):'#f5c04a';ctx.font='bold 14px Bebas Neue';ctx.fillText(sel?(entry.playable?'▶ JOGAR':'EM BREVE'):'',listX+listW-16,y+24);
+    });
+
+    // Preview do novo bônus do Chico Fumaça, apenas no seletor por enquanto.
+    if(stageSelectIsChicoBonus()){
+        const px=758,py=150,pw=205,ph=310;
+        ctx.fillStyle='rgba(12,16,20,.90)';ctx.strokeStyle='#d99a37';ctx.lineWidth=3;
+        ctx.beginPath();ctx.roundRect(px,py,pw,ph,16);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#ffd06a';ctx.font='bold 22px Bebas Neue';ctx.textAlign='center';ctx.fillText('CHICO FUMAÇA',px+pw/2,py+34);
+        if(chicoFumacaSelectImage.complete&&chicoFumacaSelectImage.naturalWidth){
+            const s=Math.min(165/chicoFumacaSelectImage.naturalWidth,190/chicoFumacaSelectImage.naturalHeight);
+            const iw=chicoFumacaSelectImage.naturalWidth*s,ih=chicoFumacaSelectImage.naturalHeight*s;
+            ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(chicoFumacaSelectImage,px+pw/2-iw/2,py+52,iw,ih);ctx.restore();
+        }
+        ctx.fillStyle='#fff1c8';ctx.font='12px Righteous';ctx.fillText('FAZENDA DO CHICO FUMAÇA',px+pw/2,py+257);
+        ctx.fillStyle='#8de3ff';ctx.font='11px Righteous';ctx.fillText('Pescaria + Boss Tubarão',px+pw/2,py+279);
+        ctx.fillStyle='#79ef9a';ctx.font='bold 17px Bebas Neue';ctx.fillText('PRONTO PARA JOGAR',px+pw/2,py+304);
+    }
+
+    ctx.textAlign='center';ctx.fillStyle='#8de3ff';ctx.font='13px Righteous';ctx.fillText(`MODO: ${stageSelectPlayers} JOGADOR${stageSelectPlayers>1?'ES':''}  •  TAB / X troca jogadores`,500,595);
+    ctx.fillStyle='#ded1bd';ctx.font='12px Righteous';ctx.fillText('↑↓ / ←→ escolher  •  ENTER / A confirmar  •  ESC / B voltar',500,620);
 }
 
 function drawAchievements() {
@@ -3707,6 +3743,15 @@ function gameLoop() {
                     }
                 }
             }
+        }
+    }
+    else if (gameState === GameState.FISHING_BONUS) {
+        const fishingResult = window.fishingBonus?.updateDraw?.(ctx, keys, gamepadSystem, sistemControles);
+        if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
+        if (fishingResult === 'DONE') {
+            gameState = GameState.STAGE_SELECT;
+            stageSelectIndex = stageSelectChicoIndex();
+            soundSystem?.playSound?.('menuSelect');
         }
     }
     else if (gameState === GameState.BUS_BOARDING) {

@@ -28,7 +28,7 @@ class Level {
         this.difficultyMultiplier = Number.isFinite(config.difficultyMultiplier) ? config.difficultyMultiplier : 1;
         this.customDrawBackground = typeof config.drawBackground === 'function' ? config.drawBackground : null;
 
-        // v0.9.3 stability: carregamento preguiçoso. Evita decodificar todos os
+        // v0.9.4 stability: carregamento preguiçoso. Evita decodificar todos os
         // backgrounds grandes logo ao abrir o index.html.
         this.description = config.description;
         this.width = Number.isFinite(config.width) ? config.width : 5000;

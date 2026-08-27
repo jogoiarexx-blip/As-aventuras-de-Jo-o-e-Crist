@@ -8,7 +8,7 @@ class SoundSystem {
         this.audioContext = null;
         this.initialized = false;
 
-        // v0.9.3: efeitos WAV 16-bit. Mantém fallback procedural caso um arquivo falhe.
+        // v0.9.4: efeitos WAV 16-bit. Mantém fallback procedural caso um arquivo falhe.
         this.soundManifest = {
             punch:'assets/sounds/punch.wav', punch1:'assets/sounds/punch1.wav', kick:'assets/sounds/kick.wav', heavy:'assets/sounds/heavy.wav',
             cane1:'assets/sounds/cane1.wav', cane2:'assets/sounds/cane2.wav', cane_ultimate:'assets/sounds/cane_ultimate.wav',

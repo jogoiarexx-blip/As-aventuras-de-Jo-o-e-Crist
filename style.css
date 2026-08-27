@@ -76,7 +76,7 @@ canvas {
         inset 0 0 30px rgba(0, 0, 0, 0.5);
 }
 
-/* v0.9.3 - camada mobile */
+/* v0.9.4 - camada mobile */
 #touch-controls{position:absolute;inset:0;z-index:900;pointer-events:none;display:none;user-select:none;-webkit-user-select:none;touch-action:none}
 #touch-controls .touch-left,#touch-controls .touch-right{position:absolute;bottom:18px;display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
 #touch-controls .touch-left{left:18px}

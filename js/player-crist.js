@@ -1,3 +1,5 @@
+const CRIST_SPRITE_SHEET = new Image();
+CRIST_SPRITE_SHEET.src = 'assets/crist-16bit-spaced.webp'; // preview compatível para menus
 const CRIST_FRAME_FILES = {
   idle: ['assets/crist/idle1.webp', 'assets/crist/idle2.webp', 'assets/crist/idle3.webp', 'assets/crist/idle4.webp'],
   walk: ['assets/crist/walk1.webp', 'assets/crist/walk2.webp', 'assets/crist/walk3.webp', 'assets/crist/walk4.webp', 'assets/crist/walk5.webp', 'assets/crist/walk6.webp'],

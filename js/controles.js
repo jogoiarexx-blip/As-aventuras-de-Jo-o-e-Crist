@@ -28,7 +28,7 @@ class Controles {
             const v = saved[acao];
             if (typeof v === 'string' && v.length > 0) base[acao] = this.normalizarTecla(v);
         }
-        // Migração v0.9.3: algumas versões antigas gravaram teclas de ação
+        // Migração v0.9.4: algumas versões antigas gravaram teclas de ação
         // (principalmente ENTER/S) nos campos de movimento. Isso fazia ENTER
         // mover para trás e S mover para frente após carregar um save antigo.
         // Corrigimos somente esquerda/direita, preservando as demais teclas

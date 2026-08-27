@@ -1,4 +1,4 @@
-// v0.9.3 - HUD 16-bit com moldura visual e dados 100% dinâmicos.
+// v0.9.4 - HUD 16-bit com moldura visual e dados 100% dinâmicos.
 (() => {
   const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
   const load=(src)=>{const i=new Image();i.src=src;return i;};

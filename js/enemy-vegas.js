@@ -1,4 +1,4 @@
-/* João e Crist v0.9.3 — renderer corrigido dos inimigos exclusivos de Vegas / Fases 5 e 6 */
+/* João e Crist v0.9.4 — renderer corrigido dos inimigos exclusivos de Vegas / Fases 5 e 6 */
 (() => {
   const fallbackEnemyDraw = (typeof Enemy !== 'undefined' && Enemy.prototype.draw) ? Enemy.prototype.draw : null;
   const CONFIG = {

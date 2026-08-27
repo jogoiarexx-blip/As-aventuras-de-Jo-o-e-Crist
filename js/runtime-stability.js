@@ -1,4 +1,4 @@
-// João & Crist v0.9.3 - infraestrutura incremental de estabilidade
+// João & Crist v0.9.4 - infraestrutura incremental de estabilidade
 (() => {
   class AssetManager {
     constructor(){ this.images=new Map(); }

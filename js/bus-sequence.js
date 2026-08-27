@@ -1,5 +1,5 @@
 // Assets extras do ônibus adicionados: carros coloridos, motos, cones e buracos.
-/* João & Crist v0.9.3 - sequência modular do ônibus / minigame Estrada para Vegas */
+/* João & Crist v0.9.4 - sequência modular do ônibus / minigame Estrada para Vegas */
 (function () {
     'use strict';
 

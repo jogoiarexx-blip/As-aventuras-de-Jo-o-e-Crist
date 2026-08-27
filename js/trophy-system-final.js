@@ -410,7 +410,7 @@ class TrophySystem {
         this.unlockedTrophies.add(trophy.id);
         
         this.addNotification(trophy);
-        // v0.9.3: conquista discreta — sem partículas/efeitos no gameplay
+        // v0.9.4: conquista discreta — sem partículas/efeitos no gameplay
         this.giveReward(trophy.reward);
         
         if (window.soundSystem) {
