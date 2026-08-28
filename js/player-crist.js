@@ -436,7 +436,7 @@ class PlayerCrist {
         if (sistemControles.acaoAtiva(this.controlPlayer, 'dash', keys) && !this.dashing && this.dashCooldown === 0 && !this.attacking) {
             this.dashing = true;
             this.dashTimer = this.dashDuration;
-            this.dashCooldown = 60;
+            this.dashCooldown = this.evolution?.getDashCooldown?.(60) ?? 60;
             this.invulnerable = this.dashDuration;
         }
         
@@ -499,7 +499,7 @@ class PlayerCrist {
         const groundedNow = this.y + this.h >= this.groundY - 1;
         if (groundedNow) this.coyoteFrames = 6; else if (this.coyoteFrames > 0) this.coyoteFrames--;
         if (this.jumpBufferFrames > 0 && this.coyoteFrames > 0 && !this.dashing) {
-            this.jumpPower = -18 * (this._superJumpMultiplier || 1);
+            this.jumpPower = -18;
             this.isJumping = true;
             this.jumpBufferFrames = 0;
             this.coyoteFrames = 0;
@@ -525,7 +525,7 @@ class PlayerCrist {
         if (sistemControles.acaoAtiva(this.controlPlayer, 'attack', keys) && !this.attacking && this.attackCooldown === 0 && !this.dashing) {
             this.attacking = true;
             this.attackTimer = 15;
-            this.attackCooldown = 20;
+            this.attackCooldown = this.evolution?.getAttackCooldown?.(20) ?? 20;
         }
 
         if (this.attacking) {

@@ -777,6 +777,50 @@ function rects(a, b) {
            a.y + a.h > b.y;
 }
 
+function applySkillKnockback(enemy, player, amount) {
+    if (!enemy || !player || !amount || enemy.isBoss) return;
+    const dir = (enemy.x + (enemy.w || 0)/2) >= (player.x + (player.w || 0)/2) ? 1 : -1;
+    enemy.x += dir * amount;
+    enemy.hitFlash = Math.max(enemy.hitFlash || 0, 10);
+}
+
+function applySonicKnockdown(enemy, player) {
+    if (!player?.evolution?.shouldSonicKnockdown?.(enemy)) return false;
+    const dir = (enemy.x + (enemy.w || 0)/2) >= (player.x + (player.w || 0)/2) ? 1 : -1;
+    enemy.x += dir * 52;
+    enemy.attacking = false;
+    if (typeof enemy.attackCooldown === 'number') enemy.attackCooldown = Math.max(enemy.attackCooldown, 50);
+    enemy._sonicKnockdownUntil = performance.now() + 650;
+    enemy.hitFlash = Math.max(enemy.hitFlash || 0, 18);
+    createTextPopup?.(enemy.x + (enemy.w || 50)/2, enemy.y - 18, 'DERRUBADO!', '#6ee7ff');
+    return true;
+}
+
+function triggerComboExplosion(player, primaryDamage) {
+    if (!player?.evolution?.shouldTriggerComboExplosion?.(player.combo || 0)) return;
+    const cx = player.x + player.w/2, cy = player.y + player.h/2;
+    const radius = 190;
+    const waveDamage = Math.max(10, Math.round(primaryDamage * 0.35));
+    enemies.forEach(target => {
+        if (!target || target.life <= 0) return;
+        const tx = target.x + (target.w || 50)/2, ty = target.y + (target.h || 60)/2;
+        const dist = Math.hypot(tx-cx, ty-cy);
+        if (dist > radius) return;
+        if (typeof target.takeDamage === 'function') target.takeDamage(waveDamage);
+        else { target.life = Math.max(0, target.life - waveDamage); target.hitFlash = 12; }
+        if (target.life <= 0) {
+            target.dead = true;
+            awardEnemyXP(target, player, { melee:true, combo:player.combo || 0 });
+            if (player._vampirism && !target.isBoss) player.heal?.(Math.ceil(player.maxLife * 0.05));
+        }
+        applySkillKnockback(target, player, target.isBoss ? 0 : 28);
+    });
+    createParticle?.(cx, cy, '#68ddff', 14, 'spark');
+    createTextPopup?.(cx, player.y - 36, 'ONDA DE CHOQUE!', '#68ddff');
+    screenShake = Math.max(screenShake || 0, 5);
+    soundSystem?.playSound?.('combo');
+}
+
 function startGame(numPlayers) {
     gameState = GameState.LEVEL_INTRO;
     playerCount = numPlayers;
@@ -1820,8 +1864,9 @@ function drawMenuFrameImage(img, x, y, w, h, flip=false) {
 }
 
 function getCharacterPreviewAnim(name, selected){
+    const n=String(name||'').toLowerCase();
     const t=performance.now();
-    if(name==='João'){
+    if(n==='joão'||n==='joao'){
         const cycle=selected?5600:3600;
         const p=t%cycle;
         if(selected){
@@ -1837,7 +1882,7 @@ function getCharacterPreviewAnim(name, selected){
         if(p<2100) return {state:'attack', frameMs:125, drift:6, bob:0, scale:1.01, fx:'impact'};
         return {state:'idle', frameMs:185, drift:0, bob:Math.sin(p/170)*1.5, scale:1};
     }
-    if(name==='Crist'){
+    if(n==='crist'){
         const cycle=selected?5600:3700;
         const p=t%cycle;
         if(selected){
@@ -1852,7 +1897,7 @@ function getCharacterPreviewAnim(name, selected){
         if(p<2200) return {state:'dash', frameMs:110, drift:10, bob:-1, scale:1.02, fx:'dash'};
         return {state:'idle', frameMs:180, drift:0, bob:Math.sin(p/170)*1.5, scale:1};
     }
-    if(name==='Chico Fumaça'){
+    if(n==='chico fumaça'||n==='chico fumaca'){
         const p=t%2800;
         return {state:'idle', frameMs:220, drift:Math.sin(p/350)*2.2, bob:Math.sin(p/180)*2.8, scale:1.02+Math.sin(p/240)*0.015, fx:(p>1800&&p<2400)?'shine':'idle'};
     }
@@ -1860,6 +1905,7 @@ function getCharacterPreviewAnim(name, selected){
 }
 
 function drawCharacterPreview(name, cx, cardY, selected){
+    const n=String(name||'').toLowerCase();
     const anim=getCharacterPreviewAnim(name, selected);
     const previewTop=cardY+20;
     const previewH=172;
@@ -1902,7 +1948,7 @@ function drawCharacterPreview(name, cx, cardY, selected){
         ctx.restore();
     };
 
-    if(name==='João'){
+    if(n==='joão'||n==='joao'){
         const fallback = (JOAO_16_FRAMES?.idle||[])[0];
         const frames=JOAO_16_FRAMES?.[anim.state]||JOAO_16_FRAMES?.idle||[];
         const idx=Math.floor(performance.now()/anim.frameMs)%Math.max(1,frames.length);
@@ -1925,7 +1971,7 @@ function drawCharacterPreview(name, cx, cardY, selected){
         return;
     }
 
-    if(name==='Crist'){
+    if(n==='crist'){
         const fallback = (CRIST_FRAMES?.idle||[])[0];
         const frames=CRIST_FRAMES?.[anim.state]||CRIST_FRAMES?.idle||[];
         const idx=Math.floor(performance.now()/anim.frameMs)%Math.max(1,frames.length);
@@ -1946,13 +1992,18 @@ function drawCharacterPreview(name, cx, cardY, selected){
         return;
     }
 
-    if(name==='Chico Fumaça' && chicoFumacaSelectImage.complete && chicoFumacaSelectImage.naturalWidth){
-        const drawH=132*scale, drawW=Math.min(130, chicoFumacaSelectImage.naturalWidth*(drawH/chicoFumacaSelectImage.naturalHeight));
-        const x=Math.round(baseX+(frameBox.w-drawW)/2);
-        const y=Math.round(baseY+frameBox.h-drawH-2);
-        drawMenuFrameImage(chicoFumacaSelectImage, x, y, drawW, drawH, false);
-        ctx.save(); ctx.globalAlpha=.12; ctx.fillStyle='#ffd06a'; ctx.fillRect(x+18, y+18, drawW-36, 8); ctx.restore();
-        drawSparkles('#f0bd55', cx, previewTop+80);
+    if(n==='chico fumaça'||n==='chico fumaca'){
+        const frames=(CHICO_FRAMES?.idle||[]);
+        const idx=Math.floor(performance.now()/190)%Math.max(1,frames.length);
+        const img=frames[idx]||frames[0]||chicoFumacaSelectImage;
+        if(img?.complete&&img.naturalWidth){
+            const drawH=132*scale, drawW=Math.min(138, img.naturalWidth*(drawH/img.naturalHeight));
+            const x=Math.round(baseX+(frameBox.w-drawW)/2);
+            const y=Math.round(baseY+frameBox.h-drawH-2);
+            drawMenuFrameImage(img, x, y, drawW, drawH, false);
+            ctx.save(); ctx.globalAlpha=.12; ctx.fillStyle='#ffd06a'; ctx.fillRect(x+18, y+18, Math.max(10,drawW-36), 8); ctx.restore();
+            drawSparkles('#f0bd55', cx, previewTop+80);
+        }
     }
     ctx.restore();
 }
@@ -3544,7 +3595,9 @@ function gameLoop() {
         // Atualizar e desenhar inimigos
         enemies.forEach((enemy, index) => {
             try {
-                enemy.update(players, enemies);
+                if (!enemy._sonicKnockdownUntil || performance.now() >= enemy._sonicKnockdownUntil) {
+                    enemy.update(players, enemies);
+                }
             } catch (enemyUpdateError) {
                 console.error('[enemy-update] Inimigo removido para evitar travamento:', enemy?.type || enemy?.name, enemyUpdateError);
                 enemy.life = 0;
@@ -3578,6 +3631,32 @@ function gameLoop() {
             // Verificar colisão dos ataques dos jogadores
             players.forEach(player => {
                 if (player.life <= 0) return;
+
+                // Dash Mortal: o corpo em dash vira uma hitbox ofensiva, uma vez por inimigo por dash.
+                if (player.dashing && player.evolution?.hasSkill?.('Dash Mortal')) {
+                    if (!player._dashHitEnemies) player._dashHitEnemies = new Set();
+                    const enemyBoxDash = enemy.getCollisionBox ? enemy.getCollisionBox() : enemy;
+                    const playerBody = player.getBodyBounds ? player.getBodyBounds() : {x:player.x,y:player.y,w:player.w,h:player.h};
+                    if (!player._dashHitEnemies.has(enemy) && rects(playerBody, enemyBoxDash) && enemy.life > 0) {
+                        player._dashHitEnemies.add(enemy);
+                        const levelBonus = player.evolution?.getMeleeDamageBonus?.() || 0;
+                        const mult = player.evolution?.getOutgoingDamageMultiplier?.() || 1;
+                        const dashDamage = Math.round((24 + levelBonus * 0.65) * mult);
+                        if (typeof enemy.takeDamage === 'function') enemy.takeDamage(dashDamage);
+                        else { enemy.life = Math.max(0, enemy.life - dashDamage); enemy.hitFlash = 12; }
+                        if (enemy.life <= 0) {
+                            enemy.dead = true;
+                            awardEnemyXP(enemy, player, { melee:true, combo:player.combo || 0 });
+                            if (player._vampirism && !enemy.isBoss) player.heal?.(Math.ceil(player.maxLife * 0.05));
+                        }
+                        applySkillKnockback(enemy, player, enemy.isBoss ? 0 : 46);
+                        createTextPopup(enemy.x + (enemy.w||50)/2, enemy.y - 14, `DASH -${dashDamage}`, '#7eeaff');
+                        createParticle(enemy.x + (enemy.w||50)/2, enemy.y + (enemy.h||60)/2, '#7eeaff', 7, 'spark');
+                        screenShake = Math.max(screenShake || 0, 3);
+                    }
+                } else if (player._dashHitEnemies?.size) {
+                    player._dashHitEnemies.clear();
+                }
                 
                 // Resetar set quando não está atacando
                 if (!player.attacking) {
@@ -3604,19 +3683,28 @@ function gameLoop() {
                     const comboDamage = player.combo * 2;
                     const strengthBonus = player.hasActivePowerUp('strength') ? baseDamage : 0;
                     const levelBonus = player.evolution?.getMeleeDamageBonus?.() || 0;
-                    const damage = Math.round(baseDamage + comboDamage + strengthBonus + levelBonus);
-                    
-                    // Usar takeDamage ao invés de hit
-                    if (typeof enemy.takeDamage === 'function') {
-                        enemy.takeDamage(damage);
-                    } else {
-                        // Fallback manual
-                        enemy.life = Math.max(0, enemy.life - damage);
-                        enemy.hitFlash = 10;
-                    }
+                    const damageMult = player.evolution?.getOutgoingDamageMultiplier?.() || 1;
+                    const damage = Math.round((baseDamage + comboDamage + strengthBonus + levelBonus) * damageMult);
+                    const hitCount = player.evolution?.getComboHitCount?.() || 1;
+                    // Combo Duplo/Triplo: hits adicionais são reais, mas com queda de dano para não quebrar o balanceamento.
+                    const hitScales = hitCount >= 3 ? [1, 0.55, 0.45] : hitCount === 2 ? [1, 0.60] : [1];
+                    let totalDamage = 0;
+                    hitScales.forEach((scale, hitIndex) => {
+                        if (enemy.life <= 0 && hitIndex > 0) return;
+                        const hitDamage = Math.max(1, Math.round(damage * scale));
+                        totalDamage += hitDamage;
+                        if (typeof enemy.takeDamage === 'function') enemy.takeDamage(hitDamage);
+                        else { enemy.life = Math.max(0, enemy.life - hitDamage); enemy.hitFlash = 10; }
+                        if (hitIndex > 0) createParticle(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, '#fff0a8', 2, 'spark');
+                    });
+
+                    const knockback = player.evolution?.getKnockbackBonus?.() || 0;
+                    if (knockback) applySkillKnockback(enemy, player, knockback);
+                    applySonicKnockdown(enemy, player);
                     
                     score += 10 + player.combo;
-                    player.addCombo();
+                    for (let h=0; h<hitScales.length; h++) player.addCombo();
+                    triggerComboExplosion(player, totalDamage || damage);
                     
                     // Sons
                     soundSystem.playSound('hit');
@@ -3636,7 +3724,7 @@ function gameLoop() {
                     }
                     
                     // Texto de dano
-                    createTextPopup(enemy.x + enemy.w / 2, enemy.y, `-${damage}`, '#ff6666');
+                    createTextPopup(enemy.x + enemy.w / 2, enemy.y, `-${totalDamage || damage}`, '#ff6666');
                     
                     // Texto de combo
                     if (player.combo > 1) {

@@ -3,7 +3,7 @@
  * O jogador ganha XP matando inimigos e sobe de nível
  */
 
-const EVOLUTION_VERSION = 2;
+const EVOLUTION_VERSION = 3;
 const CHARACTER_GROWTH = {
     'João': {
         maxLife: 10,
@@ -68,7 +68,6 @@ class PlayerEvolution {
         this.unlockedSkills = [];
         this.skillTree = [
             { level: 3,  name: 'Combo Duplo',    description: 'Ataque combo faz 2 hits' },
-            { level: 5,  name: 'Super Pulo',      description: 'Pula 50% mais alto' },
             { level: 7,  name: 'Dash Mortal',     description: 'Dash causa dano' },
             { level: 10, name: 'Regeneração',     description: 'Regenera 1 HP a cada 5 segundos' },
             { level: 12, name: 'Impacto Sônico',  description: 'Ataques derrubam inimigos fracos' },
@@ -215,14 +214,31 @@ class PlayerEvolution {
      * Aplica efeito de skill desbloqueada
      */
     applySkill(skill) {
-        console.log(`🎯 Skill desbloqueada: ${skill.name} - ${skill.description}`);
-        
+        // Flags explícitas consumidas pelo combate. Evita skills “só de descrição”.
         switch(skill.name) {
-            case 'Super Pulo':
-                this.player._superJumpMultiplier = 1.35;
+            case 'Combo Duplo':
+                this.player._comboDouble = true;
+                break;
+            case 'Dash Mortal':
+                this.player._dashDamage = true;
+                break;
+            case 'Impacto Sônico':
+                this.player._sonicImpact = true;
+                break;
+            case 'Fúria':
+                this.player._fury = true;
                 break;
             case 'Aura Protetora':
                 this.player._auraProtection = true;
+                break;
+            case 'Escudo':
+                this.player._shieldSkill = true;
+                break;
+            case 'Super Força':
+                this.player._superStrength = true;
+                break;
+            case 'Reflexos':
+                this.player._reflexes = true;
                 break;
             case 'Vampirismo':
                 this.player._vampirism = true;
@@ -230,21 +246,80 @@ class PlayerEvolution {
             case 'Combo Triplo':
                 this.player._comboTriple = true;
                 break;
+            case 'Explosão de Combo':
+                this.player._comboExplosion = true;
+                break;
             case 'Dash Infinito':
-                if (this.player.dashDuration) this.player.dashDuration = Math.ceil(this.player.dashDuration * 0.4);
+                this.player._dashCooldownMultiplier = 0.4; // -60% cooldown, duração intacta
+                break;
+            case 'Imortal':
+                this.player._immortalSkill = true;
                 break;
             case 'Modo Berserker':
-                if (this.player.attackCooldownBase) this.player.attackCooldownBase = Math.ceil(this.player.attackCooldownBase * 0.5);
+                this.player._berserkerMode = true;
                 break;
             case 'LENDÁRIO':
-                this.player.maxLife *= 2;
-                this.player.life = this.player.maxLife;
-                if (this.player.attackDamage) this.player.attackDamage *= 2;
-                this.player.speed *= 2;
+                this.player._legendary = true;
+                // Vida e velocidade são stats visíveis e devem refletir o desbloqueio.
+                if (!this.player._legendaryStatsApplied) {
+                    this.player._legendaryStatsApplied = true;
+                    this.player.maxLife *= 2;
+                    this.player.life = Math.min(this.player.maxLife, Math.max(this.player.life * 2, this.player.maxLife));
+                    this.player.speed *= 2;
+                }
                 break;
         }
     }
-    
+
+    getComboHitCount() {
+        if (this.hasSkill('Combo Triplo')) return 3;
+        if (this.hasSkill('Combo Duplo')) return 2;
+        return 1;
+    }
+
+    getOutgoingDamageMultiplier() {
+        let mult = 1;
+        if (this.hasSkill('Fúria') && this.player.life > 0 && this.player.life / Math.max(1, this.player.maxLife) < 0.30) mult *= 1.5;
+        if (this.hasSkill('LENDÁRIO')) mult *= 2;
+        return mult;
+    }
+
+    getAttackCooldown(base = 20) {
+        let value = Math.max(1, Number(base) || 20);
+        if (this.hasSkill('Modo Berserker')) value *= 0.5; // +100% velocidade de ataque
+        return Math.max(4, Math.round(value));
+    }
+
+    getDashCooldown(base = 60) {
+        const mult = this.hasSkill('Dash Infinito') ? 0.4 : 1;
+        return Math.max(8, Math.round((Number(base) || 60) * mult));
+    }
+
+    getKnockbackBonus() {
+        return this.hasSkill('Super Força') ? 38 : 0;
+    }
+
+    isWeakEnemy(enemy) {
+        if (!enemy || enemy.isBoss || enemy.isBossMinion) return false;
+        const type = String(enemy.type || enemy.name || '').toLowerCase();
+        if (/(tank|strong|berserker|elite|assassin|engineer|shadow|god)/.test(type)) return false;
+        const maxLife = Number(enemy.maxLife || enemy.life || 0);
+        return maxLife <= 180;
+    }
+
+    shouldSonicKnockdown(enemy) {
+        return this.hasSkill('Impacto Sônico') && this.isWeakEnemy(enemy);
+    }
+
+    shouldTriggerComboExplosion(combo) {
+        if (!this.hasSkill('Explosão de Combo') || combo < 10) return false;
+        // Uma onda a cada marco de 5 hits: 10x, 15x, 20x... sem disparar todo frame.
+        const mark = Math.floor(combo / 5) * 5;
+        if (mark < 10 || this._lastComboExplosionMark === mark) return false;
+        this._lastComboExplosionMark = mark;
+        return true;
+    }
+
     /**
      * Verifica se tem uma skill específica
      */
@@ -256,7 +331,10 @@ class PlayerEvolution {
      * Calcula redução de dano baseada em defesa
      */
     calculateDamageReduction(damage) {
-        const defensePercent = Math.min((this.level - 1) * this.growthRates.defense, 45); // limite equilibrado
+        let defensePercent = Math.min((this.level - 1) * this.growthRates.defense, 45);
+        if (this.hasSkill('Aura Protetora')) defensePercent += 15;
+        if (this.hasSkill('LENDÁRIO')) defensePercent += 10;
+        defensePercent = Math.min(defensePercent, 70);
         const reduction = damage * (defensePercent / 100);
         return Math.max(1, damage - reduction);
     }
@@ -266,7 +344,7 @@ class PlayerEvolution {
      */
     tryEvade() {
         if (this.hasSkill('Reflexos')) {
-            return Math.random() < 0.2; // 20% chance
+            return Math.random() < 0.25; // 25% chance
         }
         return false;
     }
@@ -277,7 +355,7 @@ class PlayerEvolution {
     tryShield() {
         if (this.hasSkill('Escudo')) {
             const now = Date.now();
-            if (now - this.lastShieldTime >= 10000) { // 10 segundos
+            if (now - this.lastShieldTime >= 8000) { // 8 segundos
                 this.lastShieldTime = now;
                 this.shieldActive = true;
                 
@@ -335,10 +413,6 @@ class PlayerEvolution {
             }
         }
         
-        // Desativar escudo após usar
-        if (this.shieldActive) {
-            this.shieldActive = false;
-        }
     }
     
     /**
@@ -426,7 +500,14 @@ class PlayerEvolution {
         this.xpToNextLevel = newRequirement;
         this.totalXpEarned = Math.max(0, Number(data.totalXpEarned) || 0);
         this.killStats = { melee:0, ranged:0, assist:0, boss:0, ...(data.killStats || {}) };
-        this.unlockedSkills = Array.isArray(data.unlockedSkills) ? [...data.unlockedSkills] : [];
+        const removedSkills = new Set(['Super Pulo', 'Pulo Duplo', 'Duplo Pulo']);
+        this.unlockedSkills = Array.isArray(data.unlockedSkills)
+            ? [...new Set(data.unlockedSkills.filter(name => !removedSkills.has(name)))]
+            : [];
+        // Migração: saves antigos recebem automaticamente as skills correspondentes ao nível atual.
+        this.skillTree.filter(skill => skill.level <= this.level).forEach(skill => {
+            if (!this.unlockedSkills.includes(skill.name)) this.unlockedSkills.push(skill.name);
+        });
         
         // Reaplicar stats
         const levelDiff = this.level - 1;
@@ -436,6 +517,18 @@ class PlayerEvolution {
         this.player.life = this.player.maxLife;
         
         this.player.speed = this.baseStats.speed + (levelDiff * this.growthRates.speed);
+        this.player._legendaryStatsApplied = false;
+        this.player._comboDouble = false;
+        this.player._comboTriple = false;
+        this.player._dashDamage = false;
+        this.player._sonicImpact = false;
+        this.player._fury = false;
+        this.player._auraProtection = false;
+        this.player._superStrength = false;
+        this.player._comboExplosion = false;
+        this.player._dashCooldownMultiplier = 1;
+        this.player._berserkerMode = false;
+        this.player._legendary = false;
         
         // Reaplicar skills
         this.unlockedSkills.forEach(skillName => {

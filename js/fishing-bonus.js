@@ -4,6 +4,8 @@
   const W=1000,H=650,GROUND=530;
   const farmBg=new Image(); farmBg.src='assets/backgrounds/fishing-bonus-lake.webp';
   const chico=new Image(); chico.src='assets/npc/chico-fumaca/chico-fumaca-idle.webp';
+  const dialogHudJoao=new Image(); dialogHudJoao.src='assets/ui/dialog-hud-joao.png';
+  const dialogHudCrist=new Image(); dialogHudCrist.src='assets/ui/dialog-hud-crist.png';
   const sharkImgs={};
   ['idle','walk1','walk2','walk3','attack1','attack2','attack3','special','hurt','dead','roar'].forEach(k=>{const i=new Image();i.src=`assets/bosses/shark/${k}.webp`;sharkImgs[k]=i;});
 
@@ -127,7 +129,47 @@
       ctx.restore();
       ctx.fillStyle='#ffe28b';ctx.font='bold 12px Righteous';ctx.textAlign='center';ctx.fillText('CHICO • NPC',x+n.w/2,y-6);
     }
-    drawDialog(ctx,name,text){ctx.fillStyle='rgba(5,7,10,.9)';ctx.strokeStyle='#e1a845';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(105,525,790,92,14);ctx.fill();ctx.stroke();ctx.fillStyle='#f3be55';ctx.font='bold 19px Bebas Neue';ctx.textAlign='left';ctx.fillText(name,130,553);ctx.fillStyle='#fff3d8';ctx.font='15px Righteous';ctx.fillText(text,130,581);ctx.fillStyle='#8fdcff';ctx.font='11px Righteous';ctx.textAlign='right';ctx.fillText('ATAQUE / ENTER para avançar',870,604);}
+    drawDialog(ctx,name,text){
+      const speaker=(name||'').toLowerCase();
+      const isJoao=speaker.includes('joão')||speaker.includes('joao');
+      const isCrist=speaker.includes('crist');
+      const hud=isJoao?dialogHudJoao:(isCrist?dialogHudCrist:null);
+      if(hud?.complete&&hud.naturalWidth){
+        const w=860;
+        const h=Math.round(hud.naturalHeight*(w/hud.naturalWidth));
+        const x=Math.round((W-w)/2);
+        const y=H-h-6;
+        ctx.save();
+        ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(hud,x,y,w,h);
+        ctx.fillStyle='#fff4dc';
+        ctx.font='bold 28px Bebas Neue';
+        ctx.textAlign='left';
+        ctx.fillText(name, x+245, y+78);
+        ctx.textAlign='right';
+        ctx.fillStyle='#8fdcff';
+        ctx.font='11px Righteous';
+        ctx.fillText('ATAQUE / ENTER para avançar', x+w-28, y+79);
+        ctx.textAlign='left';
+        ctx.fillStyle='#eef6ff';
+        ctx.font='17px Righteous';
+        const maxWidth=w-290;
+        const words=String(text||'').split(/\s+/);
+        let line='';
+        const lines=[];
+        for(const word of words){
+          const test=line?line+' '+word:word;
+          if(ctx.measureText(test).width>maxWidth && line){ lines.push(line); line=word; }
+          else line=test;
+        }
+        if(line)lines.push(line);
+        const maxLines=Math.min(3,lines.length);
+        for(let i=0;i<maxLines;i++) ctx.fillText(lines[i], x+245, y+136+i*27);
+        ctx.restore();
+        return;
+      }
+      ctx.fillStyle='rgba(5,7,10,.9)';ctx.strokeStyle='#e1a845';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(105,525,790,92,14);ctx.fill();ctx.stroke();ctx.fillStyle='#f3be55';ctx.font='bold 19px Bebas Neue';ctx.textAlign='left';ctx.fillText(name,130,553);ctx.fillStyle='#fff3d8';ctx.font='15px Righteous';ctx.fillText(text,130,581);ctx.fillStyle='#8fdcff';ctx.font='11px Righteous';ctx.textAlign='right';ctx.fillText('ATAQUE / ENTER para avançar',870,604);
+    }
     updateIntro(ctx,keys,gp,controls){
       const lines=[
         ['CHICO FUMAÇA','O açude tá calmo hoje... mas eu não confiaria demais nisso.'],
@@ -157,14 +199,23 @@
     drawShark(ctx,imgKey,x,y,w=170,h=180,flip=false){const im=sharkImgs[imgKey]||sharkImgs.idle;if(!im?.complete||!im.naturalWidth)return;ctx.save();ctx.imageSmoothingEnabled=false;if(flip){ctx.translate(x+w,0);ctx.scale(-1,1);ctx.drawImage(im,0,y,w,h);}else ctx.drawImage(im,x,y,w,h);ctx.restore();}
     updateReveal(ctx,dt){this.resultTimer+=dt;this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>this.drawScenePlayer(ctx,p));const t=clamp(this.resultTimer/2.8,0,1);ctx.save();ctx.globalAlpha=Math.min(1,t*2);for(let i=0;i<10;i++){ctx.fillStyle=`rgba(140,225,255,${.45*(1-t*.4)})`;ctx.beginPath();ctx.arc(620+Math.cos(i*.7)*t*90,410-Math.sin(i*.9)*t*120,12+i%3*6,0,Math.PI*2);ctx.fill();}ctx.restore();const sy=430-Math.sin(Math.min(1,t)*Math.PI)*220;this.drawShark(ctx,'roar',560,sy,220,220,false);ctx.fillStyle='#fff';ctx.font='bold 38px Bebas Neue';ctx.textAlign='center';ctx.fillText(t<.55?'ISSO NÃO É UM PEIXE!':'TUBARÃO DO AÇUDE',500,96);if(this.resultTimer>2.8){this.state='fight';this.resultTimer=0;this.shark.x=745;this.shark.y=GROUND-165;window.soundSystem?.playSound?.('bossAppear');}}
     updatePlayerFight(p,pl,dt,keys,gp,controls){
-      if(p.life<=0)return;const left=this.action(pl,'left',keys,gp,controls),right=this.action(pl,'right',keys,gp,controls),jump=this.action(pl,'up',keys,gp,controls),attack=this.action(pl,'attack',keys,gp,controls);
-      if(!p.attacking){if(left){p.x-=p.speed*60*dt;p.facingRight=false;p.isMoving=true;}else if(right){p.x+=p.speed*60*dt;p.facingRight=true;p.isMoving=true;}else p.isMoving=false;}
+      if(p.life<=0)return;
+      const left=this.action(pl,'left',keys,gp,controls),right=this.action(pl,'right',keys,gp,controls),jump=this.action(pl,'up',keys,gp,controls),attack=this.action(pl,'attack',keys,gp,controls),dash=this.action(pl,'dash',keys,gp,controls);
+      if(dash&&!p.dashing&&p.dashCooldown<=0&&!p.attacking){
+        p.dashing=true;p.dashTimer=p.dashDuration||8;p.dashCooldown=p.evolution?.getDashCooldown?.(60)??60;p.invulnerable=p.dashDuration||8;p._fishingDashHit=false;
+      }
+      if(p.dashing){
+        p.dashTimer--;p.x+=(p.facingRight?1:-1)*(p.dashSpeed||15);
+        if(p.dashTimer<=0){p.dashing=false;p._fishingDashHit=false;}
+      }
+      if(!p.attacking&&!p.dashing){if(left){p.x-=p.speed*60*dt;p.facingRight=false;p.isMoving=true;}else if(right){p.x+=p.speed*60*dt;p.facingRight=true;p.isMoving=true;}else p.isMoving=false;}
       p.x=clamp(p.x,15,925-p.w);
-      if(jump&&!p.isJumping){p.isJumping=true;p.jumpPower=-16;}
+      if(jump&&!p.isJumping&&!p.dashing){p.isJumping=true;p.jumpPower=-16;}
       if(p.isJumping){p.y+=p.jumpPower;p.jumpPower+=.8;if(p.y+p.h>=GROUND){p.y=GROUND-p.h;p.jumpPower=0;p.isJumping=false;}}
-      if(attack&&!p.attacking&&p.attackCooldown<=0){p.attacking=true;p.attackTimer=15;p.attackCooldown=20;p._fishingHitDone=false;window.soundSystem?.playSound?.('punch');}
+      if(attack&&!p.attacking&&p.attackCooldown<=0&&!p.dashing){p.attacking=true;p.attackTimer=15;p.attackCooldown=p.evolution?.getAttackCooldown?.(20)??20;p._fishingHitDone=false;window.soundSystem?.playSound?.('punch');}
       if(p.attacking){p.attackTimer--;if(p.attackTimer<=0){p.attacking=false;p._fishingHitDone=false;}}
-      if(p.attackCooldown>0)p.attackCooldown--;if(p.invulnerable>0)p.invulnerable--;
+      if(p.attackCooldown>0)p.attackCooldown--;if(p.dashCooldown>0)p.dashCooldown--;if(p.invulnerable>0)p.invulnerable--;
+      p.evolution?.update?.();
     }
     bossBody(){const s=this.shark;return{x:s.x+20,y:s.y+20,w:s.w-35,h:s.h-20};}
     damageShark(amount){const s=this.shark;if(s.life<=0)return;s.life=Math.max(0,s.life-amount);s.flash=8;window.soundSystem?.playSound?.('enemyHit');if(s.life<=s.maxLife*.55)s.phase=2;if(s.life<=0){s.state='dead';s.deadTimer=0;window.soundSystem?.playSound?.('enemyDeath');}}
@@ -179,7 +230,31 @@
     }
     resolveCombat(){
       const s=this.shark;if(s.life<=0)return;const body=this.bossBody();
-      this.players.forEach(p=>{if(p.life<=0)return;if(p.attacking&&!p._fishingHitDone&&p.attackTimer<=10&&p.attackTimer>=6){const hb=p.getHitbox?.();if(hb&&hb.x<body.x+body.w&&hb.x+hb.w>body.x&&hb.y<body.y+body.h&&hb.y+hb.h>body.y){p._fishingHitDone=true;this.damageShark(p.name==='Crist'?22:19);this.score+=100;}}});
+      this.players.forEach(p=>{
+        if(p.life<=0)return;
+        if(p.dashing&&p.evolution?.hasSkill?.('Dash Mortal')&&!p._fishingDashHit){
+          const pb=p.getBodyBounds?.()||{x:p.x,y:p.y,w:p.w,h:p.h};
+          if(pb.x<body.x+body.w&&pb.x+pb.w>body.x&&pb.y<body.y+body.h&&pb.y+pb.h>body.y){
+            p._fishingDashHit=true;
+            const mult=p.evolution?.getOutgoingDamageMultiplier?.()||1;
+            const dd=Math.round((24+(p.evolution?.getMeleeDamageBonus?.()||0)*.65)*mult);
+            this.damageShark(dd);this.score+=75;
+          }
+        }
+        if(p.attacking&&!p._fishingHitDone&&p.attackTimer<=10&&p.attackTimer>=6){
+          const hb=p.getHitbox?.();
+          if(hb&&hb.x<body.x+body.w&&hb.x+hb.w>body.x&&hb.y<body.y+body.h&&hb.y+hb.h>body.y){
+            p._fishingHitDone=true;
+            const mult=p.evolution?.getOutgoingDamageMultiplier?.()||1;
+            const base=(p.name==='Crist'?22:p.name==='Chico Fumaça'?25:19)+(p.evolution?.getMeleeDamageBonus?.()||0);
+            const count=p.evolution?.getComboHitCount?.()||1;
+            const scales=count>=3?[1,.55,.45]:count===2?[1,.60]:[1];
+            let total=0;scales.forEach(sc=>{const d=Math.max(1,Math.round(base*sc*mult));total+=d;this.damageShark(d);p.addCombo?.();});
+            if(p.evolution?.shouldTriggerComboExplosion?.(p.combo||0)){const wave=Math.max(10,Math.round(total*.35));this.damageShark(wave);this.score+=wave*2;}
+            this.score+=100;
+          }
+        }
+      });
       if(s.state==='bite'&&s.timer<.35&&s.timer>.12){this.players.forEach(p=>{if(Math.abs((p.x+p.w/2)-(s.x+s.w/2))<115&&Math.abs((p.y+p.h/2)-(s.y+s.h/2))<90)p.takeDamage?.(18);});}
       if(s.state==='charge'){this.players.forEach(p=>{if(p.x<body.x+body.w&&p.x+p.w>body.x&&p.y<body.y+body.h&&p.y+p.h>body.y)p.takeDamage?.(14);});}
       if(s.state==='special'&&s.waveTimer>0){s.waveTimer-=1/60;if(s.waveTimer<=0){this.players.forEach(p=>{if(Math.abs((p.x+p.w/2)-(s.x+s.w/2))<330)p.takeDamage?.(16);});window.gamepadSystem?.rumble?.(1,180,.65,.35);}}

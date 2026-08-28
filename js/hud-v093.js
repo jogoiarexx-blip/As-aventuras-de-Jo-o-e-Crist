@@ -4,7 +4,8 @@
   const load=(src)=>{const i=new Image();i.src=src;return i;};
   const hudFrames={
     'João':load('assets/ui/hud-joao-frame.webp'),
-    'Crist':load('assets/ui/hud-crist-frame.webp')
+    'Crist':load('assets/ui/hud-crist-frame.webp'),
+    'Chico Fumaça':load('assets/ui/hud-chico-frame.webp')
   };
   const portraits={
     'João':load('assets/ui/portrait-joao.webp'),
@@ -56,14 +57,16 @@
     if(frame?.complete&&frame.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(frame,x,y,w,h);ctx.restore();}
     else {pixelPanel(x,y,w,h);}
 
-    // Retrato real do personagem, extraído do spritesheet usado no jogo.
-    pixelPanel(x+9,y+15,58,76,'#0a4a91','#73c8ff');
-    const portrait=portraits[p.name];
-    if(portrait?.complete&&portrait.naturalWidth){
-      ctx.save();ctx.imageSmoothingEnabled=false;
-      const scale=Math.min(52/portrait.naturalWidth,68/portrait.naturalHeight);
-      const pw=Math.round(portrait.naturalWidth*scale),ph=Math.round(portrait.naturalHeight*scale);
-      ctx.drawImage(portrait,x+38-pw/2,y+53-ph/2,pw,ph);ctx.restore();
+    // João e Crist recebem retrato dinâmico. No Chico, o retrato já faz parte da HUD oficial enviada pelo usuário.
+    if(p.name!=='Chico Fumaça'){
+      pixelPanel(x+9,y+15,58,76,'#0a4a91','#73c8ff');
+      const portrait=portraits[p.name];
+      if(portrait?.complete&&portrait.naturalWidth){
+        ctx.save();ctx.imageSmoothingEnabled=false;
+        const scale=Math.min(52/portrait.naturalWidth,68/portrait.naturalHeight);
+        const pw=Math.round(portrait.naturalWidth*scale),ph=Math.round(portrait.naturalHeight*scale);
+        ctx.drawImage(portrait,x+38-pw/2,y+53-ph/2,pw,ph);ctx.restore();
+      }
     }
 
     // Nome e slot são dinâmicos: João pode ser P1 ou P2, e Crist também.

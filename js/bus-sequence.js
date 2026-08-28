@@ -15,8 +15,8 @@
     const SPEEDRUN_TARGET = 72; // segundos; equilibrado para percurso nominal de ~75s
 
     const spritePaths = {
-        idle: 'assets/bus/idle.webp', moving: 'assets/bus/andando.webp', accelerating: 'assets/bus/acelerando.webp', braking: 'assets/bus/freando.webp',
-        turning: 'assets/bus/virando.webp', collision: 'assets/bus/colisao.webp', damaged: 'assets/bus/danificado.webp', critical: 'assets/bus/muito-danificado.webp',
+        idle: 'assets/bus/idle.webp', moving: 'assets/bus/andando.webp', moving2: 'assets/bus/andando-2.webp', accelerating: 'assets/bus/acelerando.webp', braking: 'assets/bus/freando.webp',
+        turning: 'assets/bus/virando.webp', turningUp: 'assets/bus/virando-cima.webp', turningDown: 'assets/bus/virando-baixo.webp', collision: 'assets/bus/colisao.webp', damaged: 'assets/bus/danificado.webp', critical: 'assets/bus/muito-danificado.webp',
         doorClosed: 'assets/bus/porta-fechada.webp', doorOpening: 'assets/bus/porta-abrindo.webp', doorOpen: 'assets/bus/porta-aberta.webp', doorClosing: 'assets/bus/porta-fechando.webp',
         leaving: 'assets/bus/saida.webp', arriving: 'assets/bus/chegada.webp'
     };
@@ -482,8 +482,18 @@
             // objects
             r.items.forEach(i=>{const img=this.itemSprites[i.type];if(img?.complete&&img.naturalWidth)ctx.drawImage(img,i.x,i.y-i.h/2,i.w,i.h);});
             r.obstacles.forEach(o=>{const img=this.obstacleSprites[o.spriteKey]||this.obstacleSprites[o.type];if(img?.complete&&img.naturalWidth)ctx.drawImage(img,o.x,o.y-o.h/2,o.w,o.h);});
-            // bus sprite
-            let spr=this.sprites.moving;if(r.collisionFlash>0)spr=this.sprites.collision;else if(r.resistance<=30)spr=this.sprites.critical;else if(r.resistance<=60)spr=this.sprites.damaged;else if(r.turbo>0||r.speed>1.2)spr=this.sprites.accelerating;else if(r.speed<.75)spr=this.sprites.braking;else if(Math.abs(LANES[r.targetLane]-r.y)>4)spr=this.sprites.turning;
+            // ônibus: usa os novos quadros da sprite sheet, incluindo dois frames de rodagem
+            // e inclinações diferentes ao trocar de faixa para dar mais vida ao movimento.
+            let spr=(Math.floor(r.elapsed*8)%2===0 ? this.sprites.moving : this.sprites.moving2);
+            if(r.collisionFlash>0)spr=this.sprites.collision;
+            else if(r.resistance<=30)spr=this.sprites.critical;
+            else if(r.resistance<=60)spr=this.sprites.damaged;
+            else if(r.turbo>0||r.speed>1.2)spr=this.sprites.accelerating;
+            else if(r.speed<.75)spr=this.sprites.braking;
+            else {
+                const laneDelta=LANES[r.targetLane]-r.y;
+                if(Math.abs(laneDelta)>4)spr=laneDelta<0?(this.sprites.turningUp||this.sprites.turning):(this.sprites.turningDown||this.sprites.turning);
+            }
             ctx.save();ctx.translate(BUS_X + BUS_W,r.y-BUS_H/2);ctx.scale(-1,1);if(r.invincible>0&&Math.floor(r.elapsed*10)%2===0)ctx.globalAlpha=.55;if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,0,0,BUS_W,BUS_H);ctx.restore();
             if(r.speed>1.18)this.drawDust(ctx,BUS_X+28,r.y+44,2);
             ctx.restore();
