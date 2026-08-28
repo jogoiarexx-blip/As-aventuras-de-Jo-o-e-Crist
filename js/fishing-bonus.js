@@ -14,10 +14,16 @@
     constructor(){this.active=false;this.state='intro';this.players=[];this.chicoNpc=null;this.chicoJustUnlocked=false;this._unlockProcessed=false;this.dialogIndex=0;this.dialogTime=0;this.progress=0;this.tension=25;this.pull=0;this.shark=null;this.resultTimer=0;this.last=performance.now();this.score=0;this.splash=0;this._acceptLast=false;}
     start(count=1){
       this.active=true;this.state='intro';this.dialogIndex=0;this.dialogTime=performance.now();this.progress=0;this.tension=24;this.pull=0;this.score=0;this.splash=0;this.resultTimer=0;this.last=performance.now();
-      this.players=[];this.chicoJustUnlocked=false;this._unlockProcessed=false;
+      this.players=[];this.chicoJustUnlocked=false;this._unlockProcessed=false;this._bossXpAwarded=false;
       this.chicoNpc={x:105,y:GROUND-150,w:115,h:150,facingRight:true,attackTimer:0,cooldown:25,hitDone:false,bob:0};
-      const p1=new PlayerJoao(240,GROUND,1);p1.x=245;p1.groundY=GROUND;p1.y=GROUND-p1.h;this.players.push(p1);
-      if(count>1){const p2=new PlayerCrist(330,GROUND,2);p2.x=335;p2.groundY=GROUND;p2.y=GROUND-p2.h;this.players.push(p2);}
+      const p1=new PlayerJoao(240,GROUND,1);p1.x=245;p1.groundY=GROUND;p1.y=GROUND-p1.h;
+      p1.evolution=new PlayerEvolution(p1);p1.evolution.load(window.saveSystem?.loadPlayerProgress?.('João'));
+      p1.life=p1.maxLife;this.players.push(p1);
+      if(count>1){
+        const p2=new PlayerCrist(330,GROUND,2);p2.x=335;p2.groundY=GROUND;p2.y=GROUND-p2.h;
+        p2.evolution=new PlayerEvolution(p2);p2.evolution.load(window.saveSystem?.loadPlayerProgress?.('Crist'));
+        p2.life=p2.maxLife;this.players.push(p2);
+      }
       this.shark={x:760,y:GROUND-165,w:150,h:165,life:count>1?1050:760,maxLife:count>1?1050:760,state:'idle',timer:0,cooldown:80,facingRight:false,flash:0,phase:1,chargeV:0,waveTimer:0,deadTimer:0};
       window.soundSystem?.stopMusic?.();
       window.GameDebugConsole?.info?.('[BÔNUS] Pescaria do Chico Fumaça iniciada');
@@ -45,6 +51,48 @@
         }
       }
       ctx.restore();
+    }
+    drawScenePlayer(ctx,p){
+      if(!p)return;
+      ctx.save();
+      ctx.fillStyle='rgba(0,0,0,.26)';ctx.beginPath();ctx.ellipse(p.x+p.w/2,p.groundY+2,p.w/2,4,0,0,Math.PI*2);ctx.fill();
+      if(p.name==='João'){
+        if(p.rangedCharging||p.rangedRecovery>0)p.drawRangedSprite?.(ctx);else p.drawJoaoSprite?.(ctx);
+      }else if(p.name==='Crist'){
+        p.drawCristSprite?.(ctx);
+      }else{
+        p.draw?.(ctx);
+      }
+      ctx.restore();
+    }
+    drawPlayerHud(ctx,p,index,total){
+      if(!p)return;
+      const x=total>1&&index===1?672:10,y=10,w=318,h=92;
+      const accent=p.name==='João'?'#2b9fe8':'#e9574a';
+      ctx.save();
+      ctx.fillStyle='rgba(4,11,24,.90)';ctx.strokeStyle=accent;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,10);ctx.fill();ctx.stroke();
+      ctx.textAlign='left';ctx.fillStyle='#fff4dc';ctx.font='bold 16px Righteous';ctx.fillText(`${p.name.toUpperCase()}  P${index+1}`,x+15,y+23);
+      const lv=p.evolution?.level||1,xp=p.evolution?.xp||0,need=Math.max(1,p.evolution?.xpToNextLevel||100);
+      ctx.textAlign='right';ctx.font='bold 12px Righteous';ctx.fillText(`${Math.max(0,Math.ceil(p.life))}/${Math.max(1,Math.ceil(p.maxLife))}`,x+w-14,y+23);
+      const bar=(bx,by,bw,bh,ratio,color)=>{ctx.fillStyle='#101b2a';ctx.fillRect(bx,by,bw,bh);ctx.fillStyle=color;ctx.fillRect(bx+2,by+2,Math.max(0,(bw-4)*clamp(ratio,0,1)),bh-4);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.strokeRect(bx+.5,by+.5,bw-1,bh-1);};
+      ctx.textAlign='left';ctx.fillStyle='#d8eaff';ctx.font='10px Righteous';ctx.fillText('VIDA',x+15,y+43);bar(x+52,y+33,w-67,13,p.life/Math.max(1,p.maxLife),p.life/p.maxLife<.3?'#ef4a43':'#48df69');
+      ctx.fillText(`NV ${lv}`,x+15,y+68);bar(x+52,y+58,w-67,12,xp/need,'#35cfff');
+      ctx.textAlign='right';ctx.fillStyle='#8edfff';ctx.fillText(`XP ${xp}/${need}`,x+w-14,y+80);
+      ctx.restore();
+    }
+    drawFightHud(ctx){
+      const total=this.players.length;
+      this.players.forEach((p,i)=>this.drawPlayerHud(ctx,p,i,total));
+    }
+    awardBossXp(){
+      if(this._bossXpAwarded)return;this._bossXpAwarded=true;
+      const reward=500;
+      this.players.forEach(p=>{
+        if(!p?.evolution)return;
+        p.evolution.addXP?.(reward,{boss:true,source:'fishing_bonus'});
+        window.saveSystem?.savePlayerProgress?.(p.name,p.evolution.save());
+      });
+      window.GameDebugConsole?.info?.(`[BÔNUS] XP do Tubarão salvo: +${reward} por jogador`);
     }
     drawChico(ctx){
       if(chico.complete&&chico.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(chico,55,348,115,150);ctx.restore();}
@@ -89,10 +137,10 @@
       ];
       const accept=this.accept(keys,gp,controls);if(accept&&!this._acceptLast){this.dialogIndex++;window.soundSystem?.playSound?.('menuSelect');if(this.dialogIndex>=lines.length){this.state='fishing';this.dialogIndex=0;}}
       this._acceptLast=accept;
-      this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>p.draw(ctx));if(this.state==='intro'){const l=lines[this.dialogIndex];this.drawDialog(ctx,l[0],l[1]);}
+      this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>this.drawScenePlayer(ctx,p));if(this.state==='intro'){const l=lines[this.dialogIndex];this.drawDialog(ctx,l[0],l[1]);}
     }
     updateFishing(ctx,dt,keys,gp,controls){
-      this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>p.draw(ctx));
+      this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>this.drawScenePlayer(ctx,p));
       // linha/boia
       ctx.strokeStyle='#e9e6d8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(320,455);ctx.quadraticCurveTo(460,400,605,390);ctx.stroke();ctx.fillStyle='#e64f3a';ctx.beginPath();ctx.arc(605,390,8,0,Math.PI*2);ctx.fill();
       const reel=this.accept(keys,gp,controls);
@@ -107,7 +155,7 @@
       if(this.progress>=100){this.state='reveal';this.resultTimer=0;this.splash=1;window.soundSystem?.playSound?.('explosion');window.gamepadSystem?.rumble?.(1,350,.9,.55);}
     }
     drawShark(ctx,imgKey,x,y,w=170,h=180,flip=false){const im=sharkImgs[imgKey]||sharkImgs.idle;if(!im?.complete||!im.naturalWidth)return;ctx.save();ctx.imageSmoothingEnabled=false;if(flip){ctx.translate(x+w,0);ctx.scale(-1,1);ctx.drawImage(im,0,y,w,h);}else ctx.drawImage(im,x,y,w,h);ctx.restore();}
-    updateReveal(ctx,dt){this.resultTimer+=dt;this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>p.draw(ctx));const t=clamp(this.resultTimer/2.8,0,1);ctx.save();ctx.globalAlpha=Math.min(1,t*2);for(let i=0;i<10;i++){ctx.fillStyle=`rgba(140,225,255,${.45*(1-t*.4)})`;ctx.beginPath();ctx.arc(620+Math.cos(i*.7)*t*90,410-Math.sin(i*.9)*t*120,12+i%3*6,0,Math.PI*2);ctx.fill();}ctx.restore();const sy=430-Math.sin(Math.min(1,t)*Math.PI)*220;this.drawShark(ctx,'roar',560,sy,220,220,false);ctx.fillStyle='#fff';ctx.font='bold 38px Bebas Neue';ctx.textAlign='center';ctx.fillText(t<.55?'ISSO NÃO É UM PEIXE!':'TUBARÃO DO AÇUDE',500,96);if(this.resultTimer>2.8){this.state='fight';this.resultTimer=0;this.shark.x=745;this.shark.y=GROUND-165;window.soundSystem?.playSound?.('bossAppear');}}
+    updateReveal(ctx,dt){this.resultTimer+=dt;this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>this.drawScenePlayer(ctx,p));const t=clamp(this.resultTimer/2.8,0,1);ctx.save();ctx.globalAlpha=Math.min(1,t*2);for(let i=0;i<10;i++){ctx.fillStyle=`rgba(140,225,255,${.45*(1-t*.4)})`;ctx.beginPath();ctx.arc(620+Math.cos(i*.7)*t*90,410-Math.sin(i*.9)*t*120,12+i%3*6,0,Math.PI*2);ctx.fill();}ctx.restore();const sy=430-Math.sin(Math.min(1,t)*Math.PI)*220;this.drawShark(ctx,'roar',560,sy,220,220,false);ctx.fillStyle='#fff';ctx.font='bold 38px Bebas Neue';ctx.textAlign='center';ctx.fillText(t<.55?'ISSO NÃO É UM PEIXE!':'TUBARÃO DO AÇUDE',500,96);if(this.resultTimer>2.8){this.state='fight';this.resultTimer=0;this.shark.x=745;this.shark.y=GROUND-165;window.soundSystem?.playSound?.('bossAppear');}}
     updatePlayerFight(p,pl,dt,keys,gp,controls){
       if(p.life<=0)return;const left=this.action(pl,'left',keys,gp,controls),right=this.action(pl,'right',keys,gp,controls),jump=this.action(pl,'up',keys,gp,controls),attack=this.action(pl,'attack',keys,gp,controls);
       if(!p.attacking){if(left){p.x-=p.speed*60*dt;p.facingRight=false;p.isMoving=true;}else if(right){p.x+=p.speed*60*dt;p.facingRight=true;p.isMoving=true;}else p.isMoving=false;}
@@ -137,17 +185,20 @@
       if(s.state==='special'&&s.waveTimer>0){s.waveTimer-=1/60;if(s.waveTimer<=0){this.players.forEach(p=>{if(Math.abs((p.x+p.w/2)-(s.x+s.w/2))<330)p.takeDamage?.(16);});window.gamepadSystem?.rumble?.(1,180,.65,.35);}}
     }
     drawFight(ctx){
-      this.drawBackdrop(ctx);this.drawChicoNpc(ctx);this.players.forEach(p=>p.draw(ctx));const s=this.shark;let key='idle';if(s.life<=0)key='dead';else if(s.flash>0)key='hurt';else if(s.state==='special')key='special';else if(s.state==='bite')key='attack3';else if(s.state==='charge')key='attack1';else key=['walk1','walk2','walk3'][Math.floor(performance.now()/150)%3];this.drawShark(ctx,key,s.x,s.y,s.w,s.h,!s.facingRight);
-      // boss bar
-      ctx.fillStyle='rgba(4,7,12,.9)';ctx.strokeStyle='#58c9ff';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(240,24,520,58,12);ctx.fill();ctx.stroke();ctx.fillStyle='#fff4d5';ctx.font='bold 22px Bebas Neue';ctx.textAlign='center';ctx.fillText('TUBARÃO DO AÇUDE',500,49);ctx.fillStyle='#1a2430';ctx.fillRect(275,58,450,12);ctx.fillStyle=s.phase===2?'#ff4b3e':'#4fc7ff';ctx.fillRect(275,58,450*(s.life/s.maxLife),12);
+      this.drawBackdrop(ctx);this.drawChicoNpc(ctx);this.players.forEach(p=>this.drawScenePlayer(ctx,p));
+      const s=this.shark;let key='idle';if(s.life<=0)key='dead';else if(s.flash>0)key='hurt';else if(s.state==='special')key='special';else if(s.state==='bite')key='attack3';else if(s.state==='charge')key='attack1';else key=['walk1','walk2','walk3'][Math.floor(performance.now()/150)%3];this.drawShark(ctx,key,s.x,s.y,s.w,s.h,!s.facingRight);
+      // HUD dos jogadores só nasce quando a batalha começa.
+      this.drawFightHud(ctx);
+      // boss bar central abaixo das HUDs dos jogadores
+      ctx.fillStyle='rgba(4,7,12,.9)';ctx.strokeStyle='#58c9ff';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(260,112,480,54,12);ctx.fill();ctx.stroke();ctx.fillStyle='#fff4d5';ctx.font='bold 20px Bebas Neue';ctx.textAlign='center';ctx.fillText('TUBARÃO DO AÇUDE',500,134);ctx.fillStyle='#1a2430';ctx.fillRect(292,143,416,11);ctx.fillStyle=s.phase===2?'#ff4b3e':'#4fc7ff';ctx.fillRect(292,143,416*(s.life/s.maxLife),11);
       if(s.state==='special'&&s.life>0){ctx.strokeStyle='rgba(65,195,255,.75)';ctx.lineWidth=14;ctx.beginPath();ctx.arc(s.x+s.w/2,s.y+s.h/2,115,-1.2,1.2);ctx.stroke();}
-      ctx.fillStyle='#fff';ctx.font='11px Righteous';ctx.textAlign='left';ctx.fillText(`BÔNUS • SCORE ${this.score}`,18,28);
+      ctx.fillStyle='#fff';ctx.font='11px Righteous';ctx.textAlign='center';ctx.fillText(`BÔNUS • SCORE ${this.score}`,500,178);
     }
-    updateFight(ctx,dt,keys,gp,controls){this.players.forEach((p,i)=>this.updatePlayerFight(p,i+1,dt,keys,gp,controls));this.updateBoss(dt);this.updateChicoNpc(dt);this.resolveCombat();this.drawFight(ctx);if(this.shark.life<=0&&this.shark.deadTimer>2.2){this.state='win';this.resultTimer=0;this.score+=2000;}}
+    updateFight(ctx,dt,keys,gp,controls){this.players.forEach((p,i)=>this.updatePlayerFight(p,i+1,dt,keys,gp,controls));this.updateBoss(dt);this.updateChicoNpc(dt);this.resolveCombat();this.drawFight(ctx);if(this.shark.life<=0&&this.shark.deadTimer>2.2){this.awardBossXp();this.state='win';this.resultTimer=0;this.score+=2000;}}
     updateWin(ctx,dt,keys,gp,controls){
       this.resultTimer+=dt;
       if(!this._unlockProcessed){this._unlockProcessed=true;this.chicoJustUnlocked=!!window.saveSystem?.unlockChico?.();window.GameDebugConsole?.info?.(this.chicoJustUnlocked?'[BÔNUS] Chico Fumaça desbloqueado como personagem jogável':'[BÔNUS] Chico Fumaça já estava desbloqueado');}
-      this.drawBackdrop(ctx);this.drawChicoNpc(ctx);this.players.forEach(p=>p.draw(ctx));this.drawShark(ctx,'dead',650,GROUND-120,190,90,false);ctx.fillStyle='rgba(0,0,0,.68)';ctx.fillRect(170,120,660,220);ctx.strokeStyle='#f0bd55';ctx.lineWidth=4;ctx.strokeRect(170,120,660,220);ctx.fillStyle='#ffe07a';ctx.font='bold 42px Bebas Neue';ctx.textAlign='center';ctx.fillText('LENDAS DO AÇUDE!',500,180);ctx.fillStyle='#fff';ctx.font='17px Righteous';ctx.fillText('CHICO: “Eu avisei que esse açude não era normal...”',500,224);ctx.fillText('JOÃO: “Da próxima vez eu pesco no mercado.”',500,256);ctx.fillStyle='#8fdcff';ctx.fillText(`BÔNUS CONCLUÍDO • +${this.score} pontos`,500,292);ctx.fillStyle='#79ef9a';ctx.font='bold 17px Bebas Neue';ctx.fillText(this.chicoJustUnlocked?'NOVO LUTADOR DESBLOQUEADO: CHICO FUMAÇA!':'CHICO FUMAÇA JÁ ESTÁ DISPONÍVEL',500,316);ctx.fillStyle='#f5c04a';ctx.font='13px Righteous';ctx.fillText('ATAQUE / ENTER para voltar ao seletor',500,338);const acc=this.accept(keys,gp,controls);if(acc&&!this._acceptLast&&this.resultTimer>.7){this.active=false;return 'DONE';}this._acceptLast=acc;return null;}
+      this.drawBackdrop(ctx);this.drawChicoNpc(ctx);this.players.forEach(p=>this.drawScenePlayer(ctx,p));this.drawShark(ctx,'dead',650,GROUND-120,190,90,false);ctx.fillStyle='rgba(0,0,0,.68)';ctx.fillRect(170,120,660,220);ctx.strokeStyle='#f0bd55';ctx.lineWidth=4;ctx.strokeRect(170,120,660,220);ctx.fillStyle='#ffe07a';ctx.font='bold 42px Bebas Neue';ctx.textAlign='center';ctx.fillText('LENDAS DO AÇUDE!',500,180);ctx.fillStyle='#fff';ctx.font='17px Righteous';ctx.fillText('CHICO: “Eu avisei que esse açude não era normal...”',500,224);ctx.fillText('JOÃO: “Da próxima vez eu pesco no mercado.”',500,256);ctx.fillStyle='#8fdcff';ctx.fillText(`BÔNUS CONCLUÍDO • +${this.score} pontos`,500,292);ctx.fillStyle='#79ef9a';ctx.font='bold 17px Bebas Neue';ctx.fillText(this.chicoJustUnlocked?'NOVO LUTADOR DESBLOQUEADO: CHICO FUMAÇA!':'CHICO FUMAÇA JÁ ESTÁ DISPONÍVEL',500,316);ctx.fillStyle='#f5c04a';ctx.font='13px Righteous';ctx.fillText('ATAQUE / ENTER para voltar ao seletor',500,338);const acc=this.accept(keys,gp,controls);if(acc&&!this._acceptLast&&this.resultTimer>.7){this.active=false;return 'DONE';}this._acceptLast=acc;return null;}
     updateDraw(ctx,keys,gp,controls){if(!this.active)return'DONE';const now=performance.now();const dt=Math.min(.033,Math.max(.001,(now-this.last)/1000));this.last=now;if(this.state==='intro'){this.updateIntro(ctx,keys,gp,controls);return null;}if(this.state==='fishing'){this.updateFishing(ctx,dt,keys,gp,controls);return null;}if(this.state==='reveal'){this.updateReveal(ctx,dt);return null;}if(this.state==='fight'){this.updateFight(ctx,dt,keys,gp,controls);return null;}if(this.state==='win')return this.updateWin(ctx,dt,keys,gp,controls);return null;}
   }
   window.FishingBonusController=FishingBonusController;window.fishingBonus=new FishingBonusController();
