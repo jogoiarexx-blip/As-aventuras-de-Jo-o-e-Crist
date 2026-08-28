@@ -3,7 +3,7 @@
 (() => {
   if (window.GameHardening) return;
 
-  if (typeof window.DEBUG_GAME === 'undefined') window.DEBUG_GAME = false;
+  window.DEBUG_GAME = false;
   const rawConsoleLog = console.log.bind(console);
   console.log = (...args) => {
     const first = String(args[0] ?? '');

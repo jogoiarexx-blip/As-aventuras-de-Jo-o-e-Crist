@@ -72,13 +72,7 @@
         </div>
         <canvas id='game' width='1000' height='650'></canvas>
     </div>
-    
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- 🆕 SPRINT 1: DEBUG SYSTEM (CARREGAR PRIMEIRO) -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <script src='js/debug-console.js'></script> <!-- Console interno no rodapé -->
-    
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- CONTROLES E SISTEMAS BASE -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <script src='js/controles.js'></script>
@@ -143,61 +137,7 @@
     <script src='js/game-global-bridge.js'></script> <!-- compatibilidade segura para módulos legados -->
     <script src='js/missing-sprites-pack.js'></script> <!-- sprites extras: elite/ghost/assassin/bosses/drone -->
     <script src='js/hud-v093.js'></script>
-    <script src='js/dev-test-tools.js'></script> <!-- F9: modo de teste, desligado por padrão -->
     <script src='js/regression-guards.js'></script> <!-- proteção contra regressões estruturais -->
     <script src='js/touch-controls.js'></script>
-    
-    <script>
-        console.log('%c═══════════════════════════════════════════════════════════════', 'color: #00ffff; font-size: 12px');
-        console.log('%c🎮 JOÃO E CRIST: RUMO A VEGAS - v0.9.4 16-BIT EDITION + GAMEPAD', 'color: #00ffff; font-size: 20px; font-weight: bold');
-        console.log('%c═══════════════════════════════════════════════════════════════', 'color: #00ffff; font-size: 12px');
-        console.log('');
-        console.log('%c✅ SPRINT 1 - CORREÇÕES CRÍTICAS APLICADAS:', 'color: #00ff00; font-size: 16px; font-weight: bold');
-        console.log('  🔧 Memory leaks corrigidos (partículas + projéteis + power-ups)');
-        console.log('  🔧 GameState enum completamente consistente');
-        console.log('  🔧 Cleanup automático a cada frame');
-        console.log('  🔧 Performance otimizada');
-        console.log('  🔧 Debug mode: F12 para ativar debugMode = true');
-        console.log('');
-        console.log('%c🆕 NOVA VERSÃO v4.0 - SISTEMA DE COMBATE AVANÇADO:', 'color: #ffd700; font-size: 16px; font-weight: bold');
-        console.log('  ✨ Sistema de combos de 3 hits com timing');
-        console.log('  ✨ Perfect Timing = CRITICAL HIT (2x dano + slow motion)');
-        console.log('  ✨ Perfect Dodge com counter window');
-        console.log('  ✨ Hit Stop / Freeze Frames em impactos');
-        console.log('  ✨ Screen Shake dinâmico');
-        console.log('  ✨ Partículas e efeitos visuais massivamente melhorados');
-        console.log('  ✨ João com gráficos 300% mais detalhados');
-        console.log('  ✨ Feedback de impacto cinematográfico');
-        console.log('');
-        console.log('%c🔧 Versão v3.3:', 'color: #fff; font-size: 14px');
-        console.log('  • 2 novos tipos de inimigos: Cowboy e Barata');
-        console.log('  • Sistema de tiro com mira para o Cowboy');
-        console.log('  • Barata anda em paredes e teto');
-        console.log('');
-        console.log('%c✨ Recursos da v3.0:', 'color: #fff; font-size: 14px');
-        console.log('  • Sistema de XP e Evolução');
-        console.log('  • 10 Skills desbloqueáveis');
-        console.log('  • Berserker com 3 níveis de rage');
-        console.log('  • Bosses em fases 3 e 5');
-        console.log('  • Boss Final: REI DE VEGAS');
-        console.log('  • Sistema de Troféus (Bronze, Prata, Ouro, Platina)');
-        console.log('');
-        console.log('%c🎮 CONTROLES:', 'color: #00ff00; font-size: 14px; font-weight: bold');
-        console.log('  João:  WASD + ESPAÇO (Ataque) + SHIFT (Dash)');
-        console.log('  Crist: Setas + ENTER (Ataque) + ↓ (Dash)');
-        console.log('');
-        console.log('%c💡 DICAS DE COMBATE:', 'color: #ffaa00; font-size: 14px; font-weight: bold');
-        console.log('  • Aperte ATAQUE 3x seguidas para COMBO COMPLETO');
-        console.log('  • Círculo DOURADO = Perfect Timing (2x dano!)');
-        console.log('  • Dash no momento exato = Perfect Dodge (counter attack!)');
-        console.log('  • Critical Hits causam SLOW MOTION épico');
-        console.log('');
-        console.log('%c⚠️  CAPS LOCK deve estar DESLIGADO!', 'color: #ff0000; font-size: 14px; font-weight: bold');
-        console.log('%cPressione F12 para Debug Mode', 'color: #888; font-size: 12px');
-        console.log('');
-        console.log('%c📊 Total de tipos de inimigos: 10', 'color: #fff; font-size: 12px');
-        console.log('%c🏆 Total de troféus: 22', 'color: #fff; font-size: 12px');
-        console.log('%c⭐ Skills: 10', 'color: #fff; font-size: 12px');
-    </script>
 </body>
 </html>

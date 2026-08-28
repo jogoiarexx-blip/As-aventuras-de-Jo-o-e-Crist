@@ -710,11 +710,8 @@ document.addEventListener('keydown', e => {
         }
     }
     
-    // Melhoria #14: Toggle debug mode
-    if (e.key === 'F12') {
-        e.preventDefault();
-        debugMode = !debugMode;
-    }
+    // Debug desabilitado na build pública.
+    debugMode = false;
     
     // Melhoria #47: Toggle high contrast mode
     if (e.key === 'h' || e.key === 'H') {
