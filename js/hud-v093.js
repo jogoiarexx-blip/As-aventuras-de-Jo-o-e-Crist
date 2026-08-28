@@ -8,7 +8,8 @@
   };
   const portraits={
     'João':load('assets/ui/portrait-joao.webp'),
-    'Crist':load('assets/ui/portrait-crist.webp')
+    'Crist':load('assets/ui/portrait-crist.webp'),
+    'Chico Fumaça':load('assets/ui/portrait-chico.webp')
   };
 
   function pixelPanel(x,y,w,h,fill='#071b42',stroke='#29a8ff'){

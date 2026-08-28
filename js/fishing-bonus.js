@@ -2,8 +2,8 @@
 (() => {
   'use strict';
   const W=1000,H=650,GROUND=530;
-  const farmBg=new Image(); farmBg.src='assets/backgrounds/fazenda-16bit.webp';
-  const chico=new Image(); chico.src='assets/npc/chico-fumaca-idle.webp';
+  const farmBg=new Image(); farmBg.src='assets/backgrounds/fishing-bonus-lake.webp';
+  const chico=new Image(); chico.src='assets/npc/chico-fumaca/chico-fumaca-idle.webp';
   const sharkImgs={};
   ['idle','walk1','walk2','walk3','attack1','attack2','attack3','special','hurt','dead','roar'].forEach(k=>{const i=new Image();i.src=`assets/bosses/shark/${k}.webp`;sharkImgs[k]=i;});
 
@@ -11,10 +11,11 @@
   const rects=(a,b)=>a.x<a.x+a.w&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 
   class FishingBonusController{
-    constructor(){this.active=false;this.state='intro';this.players=[];this.dialogIndex=0;this.dialogTime=0;this.progress=0;this.tension=25;this.pull=0;this.shark=null;this.resultTimer=0;this.last=performance.now();this.score=0;this.splash=0;this._acceptLast=false;}
+    constructor(){this.active=false;this.state='intro';this.players=[];this.chicoNpc=null;this.chicoJustUnlocked=false;this._unlockProcessed=false;this.dialogIndex=0;this.dialogTime=0;this.progress=0;this.tension=25;this.pull=0;this.shark=null;this.resultTimer=0;this.last=performance.now();this.score=0;this.splash=0;this._acceptLast=false;}
     start(count=1){
       this.active=true;this.state='intro';this.dialogIndex=0;this.dialogTime=performance.now();this.progress=0;this.tension=24;this.pull=0;this.score=0;this.splash=0;this.resultTimer=0;this.last=performance.now();
-      this.players=[];
+      this.players=[];this.chicoJustUnlocked=false;this._unlockProcessed=false;
+      this.chicoNpc={x:105,y:GROUND-150,w:115,h:150,facingRight:true,attackTimer:0,cooldown:25,hitDone:false,bob:0};
       const p1=new PlayerJoao(240,GROUND,1);p1.x=245;p1.groundY=GROUND;p1.y=GROUND-p1.h;this.players.push(p1);
       if(count>1){const p2=new PlayerCrist(330,GROUND,2);p2.x=335;p2.groundY=GROUND;p2.y=GROUND-p2.h;this.players.push(p2);}
       this.shark={x:760,y:GROUND-165,w:150,h:165,life:count>1?1050:760,maxLife:count>1?1050:760,state:'idle',timer:0,cooldown:80,facingRight:false,flash:0,phase:1,chargeV:0,waveTimer:0,deadTimer:0};
@@ -24,18 +25,60 @@
     action(pl,act,keys,gp,controls){return !!(controls?.acaoAtiva?.(pl,act,keys)||gp?.isActionDown?.(pl,act));}
     accept(keys,gp,controls){return !!keys?.enter||this.action(1,'attack',keys,gp,controls)||this.action(1,'ranged',keys,gp,controls);}
     drawBackdrop(ctx){
-      if(farmBg.complete&&farmBg.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(farmBg,0,0,W,H);ctx.restore();}
-      else {ctx.fillStyle='#88b958';ctx.fillRect(0,0,W,H);}
-      // Açude
-      const g=ctx.createLinearGradient(0,300,0,490);g.addColorStop(0,'#4fa6b9');g.addColorStop(.5,'#2d7c96');g.addColorStop(1,'#174f6b');ctx.fillStyle=g;ctx.fillRect(0,302,W,185);
-      ctx.fillStyle='rgba(255,255,255,.18)';for(let x=0;x<W;x+=110)ctx.fillRect(x+(performance.now()/22)%110,338,52,3);
-      // margem / deck
-      ctx.fillStyle='#6f4d29';ctx.fillRect(150,460,430,22);ctx.fillStyle='#8e6539';for(let x=160;x<570;x+=42)ctx.fillRect(x,462,30,17);
-      ctx.fillStyle='#4d351f';ctx.fillRect(180,482,12,74);ctx.fillRect(535,482,12,74);
-      ctx.fillStyle='#77512b';ctx.fillRect(0,487,W,163);
-      ctx.fillStyle='#5f8c3d';ctx.fillRect(0,487,W,18);
+      if(farmBg.complete&&farmBg.naturalWidth){
+        ctx.save();
+        ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(farmBg,0,0,W,H);
+        ctx.restore();
+      } else {
+        ctx.fillStyle='#5ca4d6'; ctx.fillRect(0,0,W,H);
+      }
+      // brilho sutil na água para dar vida ao lago sem esconder o background
+      ctx.save();
+      ctx.globalAlpha=0.12;
+      ctx.fillStyle='#ffffff';
+      const shimmerY=[322,346,370,394,418,442];
+      for(let i=0;i<shimmerY.length;i++){
+        const offset=(performance.now()*0.05 + i*53) % 180;
+        for(let x=-30;x<W+30;x+=180){
+          ctx.fillRect(x+offset, shimmerY[i], 58, 2);
+        }
+      }
+      ctx.restore();
     }
-    drawChico(ctx){if(chico.complete&&chico.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(chico,55,348,115,150);ctx.restore();}ctx.fillStyle='#fff2c8';ctx.font='bold 14px Righteous';ctx.textAlign='center';ctx.fillText('CHICO FUMAÇA',112,338);}
+    drawChico(ctx){
+      if(chico.complete&&chico.naturalWidth){ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(chico,55,348,115,150);ctx.restore();}
+      ctx.fillStyle='#fff2c8';ctx.font='bold 14px Righteous';ctx.textAlign='center';ctx.fillText('CHICO FUMAÇA',112,338);
+    }
+    updateChicoNpc(dt){
+      const n=this.chicoNpc,s=this.shark;if(!n||!s||s.life<=0)return;
+      const targetX=clamp(s.x-(n.w+52),35,850);
+      const dx=targetX-n.x;
+      n.facingRight=(s.x+s.w/2)>(n.x+n.w/2);
+      n.bob+=dt*9;
+      if(n.attackTimer>0){
+        n.attackTimer-=dt*60;
+        if(n.attackTimer<=7&&!n.hitDone){n.hitDone=true;this.damageShark(s.phase===2?14:12);this.score+=45;window.soundSystem?.playSound?.('punch2');}
+      } else {
+        n.cooldown-=dt*60;
+        if(Math.abs(dx)>14)n.x+=Math.sign(dx)*Math.min(Math.abs(dx),115*dt);
+        if(Math.abs((s.x+s.w/2)-(n.x+n.w/2))<145&&n.cooldown<=0){n.attackTimer=15;n.cooldown=48;n.hitDone=false;}
+      }
+      n.x=clamp(n.x,20,850);
+    }
+    drawChicoNpc(ctx){
+      const n=this.chicoNpc;if(!n)return;
+      const attack=n.attackTimer>0;
+      const bob=attack?0:Math.sin(n.bob)*2;
+      const lean=attack?(n.facingRight?10:-10):0;
+      const x=n.x+lean,y=n.y+bob;
+      ctx.save();ctx.imageSmoothingEnabled=false;
+      ctx.globalAlpha=.24;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(x+n.w/2,GROUND+1,43,7,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+      if(chico.complete&&chico.naturalWidth){if(!n.facingRight){ctx.translate(x+n.w,0);ctx.scale(-1,1);ctx.drawImage(chico,0,y,n.w,n.h);}else ctx.drawImage(chico,x,y,n.w,n.h);}
+      if(attack&&n.attackTimer<=11&&n.attackTimer>=5){ctx.globalAlpha=.35;ctx.strokeStyle='#ffd25e';ctx.lineWidth=8;ctx.beginPath();const cx=n.facingRight?x+n.w+16:x-16;ctx.arc(cx,y+72,28,n.facingRight?-1.2:2.05,n.facingRight?1.15:4.25);ctx.stroke();}
+      ctx.restore();
+      ctx.fillStyle='#ffe28b';ctx.font='bold 12px Righteous';ctx.textAlign='center';ctx.fillText('CHICO • NPC',x+n.w/2,y-6);
+    }
     drawDialog(ctx,name,text){ctx.fillStyle='rgba(5,7,10,.9)';ctx.strokeStyle='#e1a845';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(105,525,790,92,14);ctx.fill();ctx.stroke();ctx.fillStyle='#f3be55';ctx.font='bold 19px Bebas Neue';ctx.textAlign='left';ctx.fillText(name,130,553);ctx.fillStyle='#fff3d8';ctx.font='15px Righteous';ctx.fillText(text,130,581);ctx.fillStyle='#8fdcff';ctx.font='11px Righteous';ctx.textAlign='right';ctx.fillText('ATAQUE / ENTER para avançar',870,604);}
     updateIntro(ctx,keys,gp,controls){
       const lines=[
@@ -94,14 +137,17 @@
       if(s.state==='special'&&s.waveTimer>0){s.waveTimer-=1/60;if(s.waveTimer<=0){this.players.forEach(p=>{if(Math.abs((p.x+p.w/2)-(s.x+s.w/2))<330)p.takeDamage?.(16);});window.gamepadSystem?.rumble?.(1,180,.65,.35);}}
     }
     drawFight(ctx){
-      this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>p.draw(ctx));const s=this.shark;let key='idle';if(s.life<=0)key='dead';else if(s.flash>0)key='hurt';else if(s.state==='special')key='special';else if(s.state==='bite')key='attack3';else if(s.state==='charge')key='attack1';else key=['walk1','walk2','walk3'][Math.floor(performance.now()/150)%3];this.drawShark(ctx,key,s.x,s.y,s.w,s.h,!s.facingRight);
+      this.drawBackdrop(ctx);this.drawChicoNpc(ctx);this.players.forEach(p=>p.draw(ctx));const s=this.shark;let key='idle';if(s.life<=0)key='dead';else if(s.flash>0)key='hurt';else if(s.state==='special')key='special';else if(s.state==='bite')key='attack3';else if(s.state==='charge')key='attack1';else key=['walk1','walk2','walk3'][Math.floor(performance.now()/150)%3];this.drawShark(ctx,key,s.x,s.y,s.w,s.h,!s.facingRight);
       // boss bar
       ctx.fillStyle='rgba(4,7,12,.9)';ctx.strokeStyle='#58c9ff';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(240,24,520,58,12);ctx.fill();ctx.stroke();ctx.fillStyle='#fff4d5';ctx.font='bold 22px Bebas Neue';ctx.textAlign='center';ctx.fillText('TUBARÃO DO AÇUDE',500,49);ctx.fillStyle='#1a2430';ctx.fillRect(275,58,450,12);ctx.fillStyle=s.phase===2?'#ff4b3e':'#4fc7ff';ctx.fillRect(275,58,450*(s.life/s.maxLife),12);
       if(s.state==='special'&&s.life>0){ctx.strokeStyle='rgba(65,195,255,.75)';ctx.lineWidth=14;ctx.beginPath();ctx.arc(s.x+s.w/2,s.y+s.h/2,115,-1.2,1.2);ctx.stroke();}
       ctx.fillStyle='#fff';ctx.font='11px Righteous';ctx.textAlign='left';ctx.fillText(`BÔNUS • SCORE ${this.score}`,18,28);
     }
-    updateFight(ctx,dt,keys,gp,controls){this.players.forEach((p,i)=>this.updatePlayerFight(p,i+1,dt,keys,gp,controls));this.updateBoss(dt);this.resolveCombat();this.drawFight(ctx);if(this.shark.life<=0&&this.shark.deadTimer>2.2){this.state='win';this.resultTimer=0;this.score+=2000;}}
-    updateWin(ctx,dt,keys,gp,controls){this.resultTimer+=dt;this.drawBackdrop(ctx);this.drawChico(ctx);this.players.forEach(p=>p.draw(ctx));this.drawShark(ctx,'dead',650,GROUND-120,190,90,false);ctx.fillStyle='rgba(0,0,0,.68)';ctx.fillRect(170,120,660,220);ctx.strokeStyle='#f0bd55';ctx.lineWidth=4;ctx.strokeRect(170,120,660,220);ctx.fillStyle='#ffe07a';ctx.font='bold 42px Bebas Neue';ctx.textAlign='center';ctx.fillText('LENDAS DO AÇUDE!',500,180);ctx.fillStyle='#fff';ctx.font='17px Righteous';ctx.fillText('CHICO: “Eu avisei que esse açude não era normal...”',500,224);ctx.fillText('JOÃO: “Da próxima vez eu pesco no mercado.”',500,256);ctx.fillStyle='#8fdcff';ctx.fillText(`BÔNUS CONCLUÍDO • +${this.score} pontos`,500,292);ctx.fillStyle='#f5c04a';ctx.font='13px Righteous';ctx.fillText('ATAQUE / ENTER para voltar ao seletor',500,322);const acc=this.accept(keys,gp,controls);if(acc&&!this._acceptLast&&this.resultTimer>.7){this.active=false;return 'DONE';}this._acceptLast=acc;return null;}
+    updateFight(ctx,dt,keys,gp,controls){this.players.forEach((p,i)=>this.updatePlayerFight(p,i+1,dt,keys,gp,controls));this.updateBoss(dt);this.updateChicoNpc(dt);this.resolveCombat();this.drawFight(ctx);if(this.shark.life<=0&&this.shark.deadTimer>2.2){this.state='win';this.resultTimer=0;this.score+=2000;}}
+    updateWin(ctx,dt,keys,gp,controls){
+      this.resultTimer+=dt;
+      if(!this._unlockProcessed){this._unlockProcessed=true;this.chicoJustUnlocked=!!window.saveSystem?.unlockChico?.();window.GameDebugConsole?.info?.(this.chicoJustUnlocked?'[BÔNUS] Chico Fumaça desbloqueado como personagem jogável':'[BÔNUS] Chico Fumaça já estava desbloqueado');}
+      this.drawBackdrop(ctx);this.drawChicoNpc(ctx);this.players.forEach(p=>p.draw(ctx));this.drawShark(ctx,'dead',650,GROUND-120,190,90,false);ctx.fillStyle='rgba(0,0,0,.68)';ctx.fillRect(170,120,660,220);ctx.strokeStyle='#f0bd55';ctx.lineWidth=4;ctx.strokeRect(170,120,660,220);ctx.fillStyle='#ffe07a';ctx.font='bold 42px Bebas Neue';ctx.textAlign='center';ctx.fillText('LENDAS DO AÇUDE!',500,180);ctx.fillStyle='#fff';ctx.font='17px Righteous';ctx.fillText('CHICO: “Eu avisei que esse açude não era normal...”',500,224);ctx.fillText('JOÃO: “Da próxima vez eu pesco no mercado.”',500,256);ctx.fillStyle='#8fdcff';ctx.fillText(`BÔNUS CONCLUÍDO • +${this.score} pontos`,500,292);ctx.fillStyle='#79ef9a';ctx.font='bold 17px Bebas Neue';ctx.fillText(this.chicoJustUnlocked?'NOVO LUTADOR DESBLOQUEADO: CHICO FUMAÇA!':'CHICO FUMAÇA JÁ ESTÁ DISPONÍVEL',500,316);ctx.fillStyle='#f5c04a';ctx.font='13px Righteous';ctx.fillText('ATAQUE / ENTER para voltar ao seletor',500,338);const acc=this.accept(keys,gp,controls);if(acc&&!this._acceptLast&&this.resultTimer>.7){this.active=false;return 'DONE';}this._acceptLast=acc;return null;}
     updateDraw(ctx,keys,gp,controls){if(!this.active)return'DONE';const now=performance.now();const dt=Math.min(.033,Math.max(.001,(now-this.last)/1000));this.last=now;if(this.state==='intro'){this.updateIntro(ctx,keys,gp,controls);return null;}if(this.state==='fishing'){this.updateFishing(ctx,dt,keys,gp,controls);return null;}if(this.state==='reveal'){this.updateReveal(ctx,dt);return null;}if(this.state==='fight'){this.updateFight(ctx,dt,keys,gp,controls);return null;}if(this.state==='win')return this.updateWin(ctx,dt,keys,gp,controls);return null;}
   }
   window.FishingBonusController=FishingBonusController;window.fishingBonus=new FishingBonusController();

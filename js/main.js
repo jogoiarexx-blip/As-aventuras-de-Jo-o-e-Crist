@@ -76,6 +76,8 @@ function refreshMenuOptions() {
     if (checkpoint && !completed) menuOptions.push('CONTINUAR CAMPANHA');
     if (completed) menuOptions.push('SELECIONAR FASE');
     if (saveSystem?.load?.().busMinigameUnlocked) menuOptions.push('BÔNUS — ESTRADA PARA VEGAS');
+    // v0.9.4: bônus da pescaria é independente da campanha e fica sempre disponível.
+    menuOptions.push('BÔNUS — PESCARIA DO CHICO FUMAÇA');
     if (menuSelection >= menuOptions.length) menuSelection = menuOptions.length - 1;
 }
 
@@ -94,6 +96,8 @@ const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','QUALIDADE GRÁFICA','V
 let selectedCharacters = [null, null]; // [Player1, Player2]
 let characterSelectCursor = 0; // Qual jogador está selecionando (0 ou 1)
 let characterSelectReady = false; // Evita seleção imediata ao entrar na tela
+let characterSelectTransition = null; // animação de confirmação na seleção de personagem
+let characterSelectTransitionToken = 0;
 let screenShake = 0; // Intensidade do screen shake
 let hitStopFrames = 0; // Freeze frames em hits fortes
 const pauseMenuBg = new Image();
@@ -599,36 +603,20 @@ document.addEventListener('keydown', e => {
 
     // Seleção de personagens
     if (gameState === GameState.CHARACTER_SELECT) {
-        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-            characterSelectCursor = 0; // Selecionar João
+        if (!characterSelectTransition && (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A')) {
+            nextCharacterCursor(-1);
             soundSystem.playSound('menuMove');
         }
-        if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-            characterSelectCursor = 1; // Selecionar Crist
+        if (!characterSelectTransition && (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D')) {
+            nextCharacterCursor(1);
             soundSystem.playSound('menuMove');
         }
         if (e.key === 'Enter') {
-            // Verificar se está pronto para selecionar (previne duplo-clique)
-            if (!characterSelectReady) return;
-            
-            soundSystem.playSound('menuSelect');
-            // Jogador 1 sempre seleciona primeiro
-            if (selectedCharacters[0] === null) {
-                selectedCharacters[0] = characterSelectCursor === 0 ? 'João' : 'Crist';
-                if (playerCount === 2) {
-                    // Aguardar seleção do jogador 2
-                    characterSelectCursor = selectedCharacters[0] === 'João' ? 1 : 0;
-                } else {
-                    // 1 jogador apenas, iniciar jogo
-                    startGameWithCharacters();
-                }
-            } else if (playerCount === 2 && selectedCharacters[1] === null) {
-                // Jogador 2 selecionando
-                selectedCharacters[1] = characterSelectCursor === 0 ? 'João' : 'Crist';
-                startGameWithCharacters();
-            }
+            if (!characterSelectReady || characterSelectTransition) return;
+            beginCharacterConfirm();
         }
-        if (e.key === 'Escape') {
+        if (!characterSelectTransition && e.key === 'Escape') {
+            cancelCharacterSelectTransition();
             gameState = GameState.MENU;
             menuSelection = 0;
             selectedCharacters = [null, null];
@@ -851,11 +839,9 @@ function startGameWithCharacters() {
     
     // NOVO: Criar jogador 1 com a classe específica baseada no personagem selecionado
     let player1;
-    if (selectedCharacters[0] === 'João') {
-        player1 = new PlayerJoao(150, 440, 1);
-    } else {
-        player1 = new PlayerCrist(150, 440, 1);
-    }
+    if (selectedCharacters[0] === 'João') player1 = new PlayerJoao(150, 440, 1);
+    else if (selectedCharacters[0] === 'Crist') player1 = new PlayerCrist(150, 440, 1);
+    else player1 = new PlayerChico(150, 440, 1);
     player1.evolution = new PlayerEvolution(player1);
     player1.hitEnemiesThisSwing = new Set(); // BUG FIX: evita multi-hit por swing
     // CARREGAR PROGRESSO SALVO
@@ -866,11 +852,9 @@ function startGameWithCharacters() {
     // NOVO: Criar jogador 2 se necessário com a classe específica
     if (playerCount === 2) {
         let player2;
-        if (selectedCharacters[1] === 'João') {
-            player2 = new PlayerJoao(200, 440, 2);
-        } else {
-            player2 = new PlayerCrist(200, 440, 2);
-        }
+        if (selectedCharacters[1] === 'João') player2 = new PlayerJoao(200, 440, 2);
+        else if (selectedCharacters[1] === 'Crist') player2 = new PlayerCrist(200, 440, 2);
+        else player2 = new PlayerChico(200, 440, 2);
         player2.evolution = new PlayerEvolution(player2);
         player2.hitEnemiesThisSwing = new Set(); // BUG FIX: evita multi-hit por swing
         // CARREGAR PROGRESSO SALVO
@@ -903,6 +887,61 @@ function startGameWithCharacters() {
             levelIntroTimer = 180;
         });
     }
+}
+
+function cancelCharacterSelectTransition() {
+    characterSelectTransition = null;
+    characterSelectTransitionToken++;
+    characterSelectReady = true;
+}
+
+function chicoPlayable(){ return !!saveSystem?.load?.().chicoUnlocked; }
+function characterCountForSelect(){ return chicoPlayable()?3:2; }
+function characterNameForIndex(index){ return index===0?'João':index===1?'Crist':'Chico Fumaça'; }
+function nextCharacterCursor(dir){
+    const count=characterCountForSelect();
+    characterSelectCursor=(characterSelectCursor+dir+count)%count;
+}
+
+function beginCharacterConfirm() {
+    if (!characterSelectReady || characterSelectTransition) return;
+    const chosenName = characterNameForIndex(characterSelectCursor);
+    const selectingPlayer = selectedCharacters[0] === null ? 1 : 2;
+    const accent = chosenName === 'João' ? '#4ba3ff' : chosenName === 'Crist' ? '#ff624b' : '#f0bd55';
+    characterSelectTransition = {
+        name: chosenName,
+        cardIndex: characterSelectCursor,
+        playerSlot: selectingPlayer,
+        startedAt: performance.now(),
+        duration: 520,
+        accent
+    };
+    characterSelectReady = false;
+    const token = ++characterSelectTransitionToken;
+    soundSystem.playSound('menuSelect');
+    setTimeout(() => {
+        if (token !== characterSelectTransitionToken || !characterSelectTransition) return;
+        if (selectedCharacters[0] === null) {
+            selectedCharacters[0] = chosenName;
+            if (playerCount === 2) {
+                characterSelectCursor = chosenName === 'João' ? 1 : 0;
+                characterSelectTransition = null;
+                characterSelectReady = true;
+            } else {
+                characterSelectTransition = null;
+                characterSelectReady = true;
+                startGameWithCharacters();
+            }
+        } else if (playerCount === 2 && selectedCharacters[1] === null) {
+            selectedCharacters[1] = chosenName;
+            characterSelectTransition = null;
+            characterSelectReady = true;
+            startGameWithCharacters();
+        } else {
+            characterSelectTransition = null;
+            characterSelectReady = true;
+        }
+    }, characterSelectTransition.duration);
 }
 
 function loadLevel(index) {
@@ -1521,7 +1560,7 @@ loadingScreenImage.src = 'assets/ui/loading-screen.webp';
 const mainMenuBackgroundImage = new Image();
 mainMenuBackgroundImage.src = 'assets/ui/menu-principal-vegas.webp';
 const chicoFumacaSelectImage = new Image();
-chicoFumacaSelectImage.src = 'assets/npc/chico-fumaca-idle.webp';
+chicoFumacaSelectImage.src = 'assets/npc/chico-fumaca/chico-fumaca-idle.webp';
 
 
 function drawLoading() {
@@ -1655,10 +1694,11 @@ function drawMenu() {
     const panelY = 204;
     const panelW = 364;
     const compactMenu = menuOptions.length >= 8;
-    const topPad = compactMenu ? 12 : 18;
-    const bottomPad = compactMenu ? 12 : 18;
-    const optionH = compactMenu ? 28 : 34;
-    const spacing = compactMenu ? 5 : 8;
+    const ultraCompactMenu = menuOptions.length >= 9;
+    const topPad = ultraCompactMenu ? 9 : (compactMenu ? 12 : 18);
+    const bottomPad = ultraCompactMenu ? 9 : (compactMenu ? 12 : 18);
+    const optionH = ultraCompactMenu ? 25 : (compactMenu ? 28 : 34);
+    const spacing = ultraCompactMenu ? 3 : (compactMenu ? 5 : 8);
     const panelH = Math.max(356, topPad + bottomPad + menuOptions.length * optionH + Math.max(0, menuOptions.length - 1) * spacing);
 
     ctx.save();
@@ -1691,16 +1731,16 @@ function drawMenu() {
             ctx.fillStyle = '#f9d152';
             ctx.font = 'bold 18px Bebas Neue';
             ctx.textAlign = 'center';
-            ctx.fillText('◀', buttonRect.x + 18, buttonRect.y + (compactMenu ? 20 : 23));
-            ctx.fillText('▶', buttonRect.x + buttonRect.w - 18, buttonRect.y + (compactMenu ? 20 : 23));
+            ctx.fillText('◀', buttonRect.x + 18, buttonRect.y + Math.round(optionH*0.72));
+            ctx.fillText('▶', buttonRect.x + buttonRect.w - 18, buttonRect.y + Math.round(optionH*0.72));
             ctx.fillStyle = '#fff9df';
-            ctx.font = compactMenu ? 'bold 20px Bebas Neue' : 'bold 24px Bebas Neue';
-            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + (compactMenu ? 20 : 23));
+            ctx.font = ultraCompactMenu ? 'bold 18px Bebas Neue' : (compactMenu ? 'bold 20px Bebas Neue' : 'bold 24px Bebas Neue');
+            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + Math.round(optionH*0.72));
         } else {
             ctx.fillStyle = '#e9dcc6';
-            ctx.font = compactMenu ? 'bold 18px Bebas Neue' : 'bold 21px Bebas Neue';
+            ctx.font = ultraCompactMenu ? 'bold 16px Bebas Neue' : (compactMenu ? 'bold 18px Bebas Neue' : 'bold 21px Bebas Neue');
             ctx.textAlign = 'center';
-            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + (compactMenu ? 20 : 23));
+            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + Math.round(optionH*0.72));
         }
     });
     ctx.restore();
@@ -1763,33 +1803,190 @@ function drawMenuSprite(sheet, frame, x, y, w, h, row=0) {
     ctx.drawImage(sheet, frame*128, row*128, 128,128, x,y,w,h); ctx.restore();
 }
 
-function drawCharacterCard(cx,index,sheet,name,accent,stats,role,chosen) {
-    const selected=characterSelectCursor===index;
+function drawMenuFrameFromRect(sheet, rect, x, y, w, h, flip=false) {
+    if(!sheet?.complete || !sheet.naturalWidth || !rect) return false;
+    const [sx,sy,sw,sh]=rect;
     ctx.save();
-    ctx.fillStyle=selected?'rgba(20,20,20,.93)':'rgba(10,10,10,.75)'; ctx.strokeStyle=selected?accent:'#66574a'; ctx.lineWidth=selected?5:2;
-    if(selected){ctx.shadowBlur=20;ctx.shadowColor=accent;}
-    ctx.beginPath();ctx.roundRect(cx-175,122,350,370,18);ctx.fill();ctx.stroke(); ctx.shadowBlur=0;
+    ctx.imageSmoothingEnabled=false;
+    if(flip){ctx.translate(x+w,0);ctx.scale(-1,1);ctx.drawImage(sheet,sx,sy,sw,sh,0,y,w,h);}else{ctx.drawImage(sheet,sx,sy,sw,sh,x,y,w,h);}
+    ctx.restore();
+    return true;
+}
 
-    // Preview animado: idle contínuo e um golpe curto a cada ~2,2 s quando selecionado.
-    if(sheet?.complete&&sheet.naturalWidth){
-        const t=performance.now();
-        const attackWindow=selected && (t%2200)>1580;
-        const row=attackWindow?4:0;
-        const frames=4;
-        const frame=attackWindow?Math.min(3,Math.floor(((t%2200)-1580)/145)):Math.floor(t/180)%frames;
-        const bob=attackWindow?0:Math.sin(t/260+index)*2;
-        const scale=selected?174:160;
-        ctx.imageSmoothingEnabled=false;
-        ctx.drawImage(sheet,frame*128,row*128,128,128,cx-scale/2,142+bob,scale,scale);
-        if(selected && attackWindow){
-            ctx.globalAlpha=.22; ctx.strokeStyle=accent; ctx.lineWidth=7; ctx.beginPath(); ctx.arc(cx+55,220,42,-1.1,1.1); ctx.stroke(); ctx.globalAlpha=1;
+function drawMenuFrameImage(img, x, y, w, h, flip=false) {
+    if(!img?.complete || !img.naturalWidth) return false;
+    ctx.save();
+    ctx.imageSmoothingEnabled=false;
+    if(flip){ctx.translate(x+w,0);ctx.scale(-1,1);ctx.drawImage(img,0,0,img.naturalWidth,img.naturalHeight,0,y,w,h);}else{ctx.drawImage(img,x,y,w,h);}
+    ctx.restore();
+    return true;
+}
+
+function getCharacterPreviewAnim(name, selected){
+    const t=performance.now();
+    if(name==='João'){
+        const cycle=selected?5600:3600;
+        const p=t%cycle;
+        if(selected){
+            if(p<900) return {state:'walk', frameMs:100, drift:Math.sin((p/900)*Math.PI)*14, bob:Math.sin(p/90)*1.8, scale:1.03};
+            if(p<1700) return {state:'run', frameMs:88, drift:Math.sin((p-900)/800*Math.PI)*18, bob:Math.sin(p/70)*2.2, scale:1.05, fx:'dust'};
+            if(p<2400) return {state:'dash', frameMs:84, drift:18, bob:-2, scale:1.07, fx:'dash'};
+            if(p<3350) return {state:'attack', frameMs:105, drift:10, bob:0, scale:1.04, fx:'impact'};
+            if(p<4300) return {state:'ranged', frameMs:120, drift:14, bob:0, scale:1.03, fx:'shot'};
+            if(p<5000) return {state:'jump', frameMs:120, drift:8, bob:-10-Math.sin((p-4300)/700*Math.PI)*18, scale:1.02, fx:'air'};
+            return {state:'idle', frameMs:150, drift:0, bob:Math.sin(p/120)*2.1, scale:1.02, fx:'shine'};
         }
+        if(p<1200) return {state:'walk', frameMs:125, drift:Math.sin((p/1200)*Math.PI)*10, bob:Math.sin(p/150)*1.3, scale:1};
+        if(p<2100) return {state:'attack', frameMs:125, drift:6, bob:0, scale:1.01, fx:'impact'};
+        return {state:'idle', frameMs:185, drift:0, bob:Math.sin(p/170)*1.5, scale:1};
     }
-    ctx.fillStyle=accent;ctx.font='bold 39px Bebas Neue';ctx.textAlign='center';ctx.fillText(name,cx,334);
-    ctx.fillStyle='#efe3d1';ctx.font='14px Righteous';ctx.fillText(role,cx,360);
-    ctx.textAlign='left';ctx.font='14px Righteous'; stats.forEach((t,i)=>ctx.fillText(t,cx-115,397+i*25));
-    if(chosen){ctx.fillStyle='#66f28f';ctx.font='bold 16px Righteous';ctx.textAlign='center';ctx.fillText('✓ SELECIONADO',cx,476);}
-    else if(selected){ctx.fillStyle='#f5c04a';ctx.font='bold 14px Righteous';ctx.textAlign='center';ctx.fillText('ENTER / A PARA ESCOLHER',cx,476);}
+    if(name==='Crist'){
+        const cycle=selected?5600:3700;
+        const p=t%cycle;
+        if(selected){
+            if(p<950) return {state:'walk', frameMs:96, drift:Math.sin((p/950)*Math.PI)*14, bob:Math.sin(p/90)*1.5, scale:1.02};
+            if(p<1750) return {state:'run', frameMs:82, drift:Math.sin((p-950)/800*Math.PI)*20, bob:Math.sin(p/68)*2.2, scale:1.05, fx:'dust'};
+            if(p<2450) return {state:'dash', frameMs:95, drift:22, bob:-1, scale:1.07, fx:'dash'};
+            if(p<3400) return {state:'attack', frameMs:108, drift:9, bob:0, scale:1.05, fx:'slash'};
+            if(p<4250) return {state:'jump', frameMs:120, drift:7, bob:-12-Math.sin((p-3400)/850*Math.PI)*18, scale:1.03, fx:'air'};
+            return {state:'idle', frameMs:165, drift:0, bob:Math.sin(p/115)*1.9, scale:1.02, fx:'shine'};
+        }
+        if(p<1200) return {state:'walk', frameMs:120, drift:Math.sin((p/1200)*Math.PI)*9, bob:Math.sin(p/150)*1.2, scale:1};
+        if(p<2200) return {state:'dash', frameMs:110, drift:10, bob:-1, scale:1.02, fx:'dash'};
+        return {state:'idle', frameMs:180, drift:0, bob:Math.sin(p/170)*1.5, scale:1};
+    }
+    if(name==='Chico Fumaça'){
+        const p=t%2800;
+        return {state:'idle', frameMs:220, drift:Math.sin(p/350)*2.2, bob:Math.sin(p/180)*2.8, scale:1.02+Math.sin(p/240)*0.015, fx:(p>1800&&p<2400)?'shine':'idle'};
+    }
+    return {state:'idle', frameMs:220, drift:0, bob:Math.sin((t%3000)/220)*1.2, scale:1};
+}
+
+function drawCharacterPreview(name, cx, cardY, selected){
+    const anim=getCharacterPreviewAnim(name, selected);
+    const previewTop=cardY+20;
+    const previewH=172;
+    const previewW=164;
+    const frameBox={x:cx-previewW/2,y:previewTop,w:previewW,h:previewH};
+    const baseX=frameBox.x + (selected?8:0) + (anim.drift||0);
+    const baseY=frameBox.y + (anim.bob||0);
+    const scale=anim.scale||1;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(frameBox.x-8, frameBox.y-8, frameBox.w+16, frameBox.h+16);
+    ctx.clip();
+
+    const shadowBase = (anim.state==='jump'||anim.fx==='air') ? 44 : 62;
+    ctx.save();
+    ctx.globalAlpha=(anim.state==='jump'||anim.fx==='air') ? 0.16 : 0.28;
+    ctx.fillStyle='#000';
+    ctx.beginPath();
+    ctx.ellipse(cx + (selected?6:0) + (anim.drift||0), frameBox.y + frameBox.h - 5, shadowBase*(2-scale*0.7), 10, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    const drawSparkles=(color,centerX,centerY)=>{
+        ctx.save();
+        ctx.fillStyle=color;
+        for(let i=0;i<3;i++){
+            const ang=(performance.now()/220)+(i*2.1);
+            const rx=Math.cos(ang)*38;
+            const ry=Math.sin(ang*1.3)*26;
+            ctx.globalAlpha=0.28+0.12*Math.sin(ang*1.7+i);
+            ctx.fillRect(centerX+rx,centerY+ry,3,3);
+        }
+        ctx.restore();
+    };
+    const drawDashFx=(x,y,w,h,color)=>{
+        ctx.save();
+        ctx.globalAlpha=.16; ctx.fillStyle=color; ctx.fillRect(x+w-22,y+22,28,56);
+        ctx.globalAlpha=.11; ctx.fillRect(x+w+8,y+32,18,38);
+        ctx.restore();
+    };
+
+    if(name==='João'){
+        const fallback = (JOAO_16_FRAMES?.idle||[])[0];
+        const frames=JOAO_16_FRAMES?.[anim.state]||JOAO_16_FRAMES?.idle||[];
+        const idx=Math.floor(performance.now()/anim.frameMs)%Math.max(1,frames.length);
+        const rect=frames[idx]||fallback;
+        if(rect && JOAO_SPRITE_SHEET?.complete && JOAO_SPRITE_SHEET.naturalWidth){
+            const [sx,sy,sw,sh]=rect;
+            const ratio=sw/sh;
+            let drawH=(anim.state==='ranged'?120:(anim.state==='attack'?118:(anim.state==='dash'?116:(anim.state==='jump'?128:132))))*scale;
+            let drawW=Math.min(160,Math.max(88,drawH*ratio));
+            const x=Math.round(baseX+(frameBox.w-drawW)/2);
+            const y=Math.round(baseY+frameBox.h-drawH-2);
+            drawMenuFrameFromRect(JOAO_SPRITE_SHEET, rect, x, y, drawW, drawH, false);
+            if(anim.fx==='shot'){ ctx.save();ctx.globalAlpha=.92;ctx.fillStyle='#ffd76a';ctx.fillRect(x+drawW-6,y+46,28,3);ctx.fillStyle='#ff8c34';ctx.fillRect(x+drawW+22,y+45,14,5);ctx.restore(); }
+            if(anim.fx==='impact'){ ctx.save();ctx.globalAlpha=.22;ctx.strokeStyle='#4ba3ff';ctx.lineWidth=7;ctx.beginPath();ctx.arc(cx+46,previewTop+92,40,-1.2,1.15);ctx.stroke();ctx.restore(); }
+            if(anim.fx==='dash') drawDashFx(x,y,drawW,drawH,'#4ba3ff');
+            if(anim.fx==='dust'){ ctx.save();ctx.globalAlpha=.22;ctx.fillStyle='#d8f0ff';ctx.fillRect(x-10,y+drawH-20,18,8);ctx.fillRect(x-24,y+drawH-14,14,6);ctx.restore(); }
+            if(selected) drawSparkles('#84c4ff',cx+36,previewTop+78);
+        }
+        ctx.restore();
+        return;
+    }
+
+    if(name==='Crist'){
+        const fallback = (CRIST_FRAMES?.idle||[])[0];
+        const frames=CRIST_FRAMES?.[anim.state]||CRIST_FRAMES?.idle||[];
+        const idx=Math.floor(performance.now()/anim.frameMs)%Math.max(1,frames.length);
+        const img=frames[idx]||fallback;
+        if(img?.complete&&img.naturalWidth){
+            const ratio=img.naturalWidth/img.naturalHeight;
+            let drawH=(anim.state==='dash'?118:(anim.state==='attack'?124:(anim.state==='jump'?128:132)))*scale;
+            let drawW=Math.min(154,Math.max(86,drawH*ratio));
+            const x=Math.round(baseX+(frameBox.w-drawW)/2);
+            const y=Math.round(baseY+frameBox.h-drawH-2);
+            drawMenuFrameImage(img, x, y, drawW, drawH, true);
+            if(anim.fx==='slash'){ ctx.save();ctx.globalAlpha=.24;ctx.strokeStyle='#ff6c56';ctx.lineWidth=8;ctx.beginPath();ctx.arc(cx-40,previewTop+98,42,2.05,4.1);ctx.stroke();ctx.restore(); }
+            if(anim.fx==='dash') drawDashFx(x,y,drawW,drawH,'#75f6ff');
+            if(anim.fx==='dust'){ ctx.save();ctx.globalAlpha=.22;ctx.fillStyle='#ffe4df';ctx.fillRect(x+drawW-20,y+drawH-18,18,8);ctx.fillRect(x+drawW-34,y+drawH-12,14,6);ctx.restore(); }
+            if(selected) drawSparkles('#ff8678',cx-30,previewTop+78);
+        }
+        ctx.restore();
+        return;
+    }
+
+    if(name==='Chico Fumaça' && chicoFumacaSelectImage.complete && chicoFumacaSelectImage.naturalWidth){
+        const drawH=132*scale, drawW=Math.min(130, chicoFumacaSelectImage.naturalWidth*(drawH/chicoFumacaSelectImage.naturalHeight));
+        const x=Math.round(baseX+(frameBox.w-drawW)/2);
+        const y=Math.round(baseY+frameBox.h-drawH-2);
+        drawMenuFrameImage(chicoFumacaSelectImage, x, y, drawW, drawH, false);
+        ctx.save(); ctx.globalAlpha=.12; ctx.fillStyle='#ffd06a'; ctx.fillRect(x+18, y+18, drawW-36, 8); ctx.restore();
+        drawSparkles('#f0bd55', cx, previewTop+80);
+    }
+    ctx.restore();
+}
+
+function drawCharacterCard(cx,index,name,accent,stats,role,chosen,opts={}) {
+    const selected=!opts.locked && characterSelectCursor===index;
+    const transitioning=!!(characterSelectTransition && characterSelectTransition.cardIndex===index);
+    const locked=!!opts.locked;
+    const cardW=250, cardH=360, cardY=132;
+    ctx.save();
+    ctx.fillStyle=(selected||transitioning)?'rgba(20,20,20,.94)':locked?'rgba(24,18,14,.84)':'rgba(10,10,10,.76)';
+    ctx.strokeStyle=(selected||transitioning)?accent:locked?'#8b6847':'#66574a';
+    ctx.lineWidth=(selected||transitioning)?5:2;
+    if(selected||transitioning){ctx.shadowBlur=22+(transitioning?10:0);ctx.shadowColor=accent;}
+    ctx.beginPath();ctx.roundRect(cx-cardW/2,cardY,cardW,cardH,18);ctx.fill();ctx.stroke(); ctx.shadowBlur=0;
+
+    drawCharacterPreview(name, cx, cardY, selected||locked);
+
+    if(locked){
+        ctx.fillStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.roundRect(cx-86,186,172,28,12);ctx.fill();
+        ctx.fillStyle='#f5c04a';ctx.font='bold 16px Bebas Neue';ctx.textAlign='center';ctx.fillText('3º LUTADOR • EM BREVE',cx,206);
+    }
+
+    ctx.fillStyle=locked?'#f0bd55':accent;ctx.font='bold 31px Bebas Neue';ctx.textAlign='center';ctx.fillText(name,cx,338);
+    ctx.fillStyle='#efe3d1';ctx.font='13px Righteous';ctx.fillText(role,cx,362);
+    ctx.textAlign='left';ctx.font='13px Righteous'; stats.forEach((t,i)=>ctx.fillText(t,cx-92,398+i*24));
+    if(chosen){ctx.fillStyle='#66f28f';ctx.font='bold 15px Righteous';ctx.textAlign='center';ctx.fillText('✓ SELECIONADO',cx,470);}
+    else if(locked){ctx.fillStyle='#d7b27a';ctx.font='bold 15px Righteous';ctx.textAlign='center';ctx.fillText('CHICO FUMAÇA',cx,464); ctx.font='12px Righteous'; ctx.fillText('EM BREVE NA ESTRADA',cx,484);}
+    else if(transitioning){ctx.fillStyle='#fff4cf';ctx.font='bold 14px Righteous';ctx.textAlign='center';ctx.fillText('CONFIRMANDO...',cx,476);}
+    else if(selected){ctx.fillStyle='#f5c04a';ctx.font='bold 13px Righteous';ctx.textAlign='center';ctx.fillText('ENTER / A PARA ESCOLHER',cx,476);}
+    else {ctx.fillStyle='#bfae97';ctx.font='12px Righteous';ctx.textAlign='center';ctx.fillText('PRONTO PARA A ESTRADA',cx,478);}
     ctx.restore();
 }
 
@@ -1896,6 +2093,13 @@ function activateMenuSelection() {
     }
     else if(option==='SELECIONAR FASE' && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
     else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}
+    else if(option==='BÔNUS — PESCARIA DO CHICO FUMAÇA'){
+        soundSystem?.stopMusic?.();
+        stageSelectPlayers = Math.max(1, Math.min(2, playerCount || 1));
+        window.fishingBonus?.start?.(stageSelectPlayers);
+        gameState=GameState.FISHING_BONUS;
+        soundSystem.playSound('menuSelect');
+    }
 }
 window.refreshMenuOptions = refreshMenuOptions;
 
@@ -1924,7 +2128,7 @@ function handleGamepadInput() {
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
-    else if(gameState===GameState.CHARACTER_SELECT){if(left){characterSelectCursor=0;soundSystem.playSound('menuMove');}if(right){characterSelectCursor=1;soundSystem.playSound('menuMove');}if(back){gameState=GameState.MENU;selectedCharacters=[null,null];soundSystem.playSound('menuBack');}if(accept&&characterSelectReady){if(selectedCharacters[0]===null){selectedCharacters[0]=characterSelectCursor===0?'João':'Crist';if(playerCount===1)startGameWithCharacters();else characterSelectCursor=selectedCharacters[0]==='João'?1:0;}else if(playerCount===2&&selectedCharacters[1]===null){selectedCharacters[1]=characterSelectCursor===0?'João':'Crist';startGameWithCharacters();}}}
+    else if(gameState===GameState.CHARACTER_SELECT){if(!characterSelectTransition&&left){nextCharacterCursor(-1);soundSystem.playSound('menuMove');}if(!characterSelectTransition&&right){nextCharacterCursor(1);soundSystem.playSound('menuMove');}if(!characterSelectTransition&&back){cancelCharacterSelectTransition();gameState=GameState.MENU;selectedCharacters=[null,null];soundSystem.playSound('menuBack');}if(accept&&characterSelectReady&&!characterSelectTransition){beginCharacterConfirm();}}
     else if(gameState===GameState.OPTIONS){
         if(up){optionsSelection=(optionsSelection+optionsItems.length-1)%optionsItems.length;soundSystem.playSound('menuMove');}
         if(down){optionsSelection=(optionsSelection+1)%optionsItems.length;soundSystem.playSound('menuMove');}
@@ -2040,14 +2244,39 @@ function drawCharacterSelect() {
 
     ctx.save(); ctx.shadowBlur=18; ctx.shadowColor='#ff9d3b'; ctx.fillStyle='#fff1c8'; ctx.font='bold 49px Bebas Neue'; ctx.textAlign='center'; ctx.fillText('ESCOLHA SEU PARCEIRO DE ESTRADA',500,66); ctx.restore();
     let selectingText=selectedCharacters[0]===null?(playerCount===1?'ESCOLHA SEU LUTADOR':'JOGADOR 1 • ESCOLHA'):'JOGADOR 2 • ESCOLHA';
+    if(characterSelectTransition) selectingText = `${characterSelectTransition.name.toUpperCase()} • JOGADOR ${characterSelectTransition.playerSlot} PRONTO`;
     ctx.fillStyle='#f5c04a'; ctx.font='bold 19px Righteous'; ctx.textAlign='center'; ctx.fillText(selectingText,500,98);
 
-    drawCharacterCard(245, 0, JOAO_SPRITE_SHEET, 'JOÃO', '#4ba3ff', ['FORÇA  7/10','VELOC. 6/10','DEFESA 8/10'], 'Brigão resistente • socos fortes', selectedCharacters.includes('João'));
-    drawCharacterCard(755, 1, CRIST_SPRITE_SHEET, 'CRIST', '#ff624b', ['FORÇA  8/10','VELOC. 8/10','DEFESA 6/10'], 'Bengala rápida • ótimo no avanço', selectedCharacters.includes('Crist'));
+    drawCharacterCard(180, 0, 'JOÃO', '#4ba3ff', ['FORÇA  7/10','VELOC. 6/10','DEFESA 8/10'], 'Brigão resistente • socos fortes', selectedCharacters.includes('João'));
+    drawCharacterCard(500, 1, 'CRIST', '#ff624b', ['FORÇA  8/10','VELOC. 8/10','DEFESA 6/10'], 'Bengala rápida • ótimo no avanço', selectedCharacters.includes('Crist'));
+    const chicoUnlocked=chicoPlayable();
+    drawCharacterCard(820, 2, 'Chico Fumaça', '#f0bd55', chicoUnlocked?['FORÇA  9/10','VELOC. 5/10','DEFESA 9/10']:['FORÇA  ???','VELOC. ???','DEFESA ???'], chicoUnlocked?'Fazendeiro bruto • força e resistência':'Fazendeiro bruto • vença o bônus da pescaria', selectedCharacters.includes('Chico Fumaça'), {locked:!chicoUnlocked});
+
+    if(characterSelectTransition){
+        const cardCenters=[180,500,820];
+        const cx=cardCenters[characterSelectTransition.cardIndex]||180;
+        const elapsed=performance.now()-characterSelectTransition.startedAt;
+        const p=Math.min(1, elapsed/characterSelectTransition.duration);
+        const pulse=Math.sin(p*Math.PI);
+        ctx.save();
+        ctx.globalAlpha=0.12+0.16*pulse;
+        ctx.fillStyle='#fff1c8';
+        ctx.beginPath(); ctx.roundRect(cx-145-pulse*10,124-pulse*6,290+pulse*20,378+pulse*12,24); ctx.fill();
+        ctx.globalAlpha=1;
+        ctx.strokeStyle=characterSelectTransition.accent; ctx.shadowColor=characterSelectTransition.accent; ctx.shadowBlur=24; ctx.lineWidth=6;
+        ctx.beginPath(); ctx.roundRect(cx-145-pulse*8,124-pulse*5,290+pulse*16,378+pulse*10,24); ctx.stroke();
+        ctx.shadowBlur=0;
+        ctx.fillStyle='#fff6db'; ctx.font='bold 24px Bebas Neue'; ctx.textAlign='center';
+        ctx.fillText(`${characterSelectTransition.name.toUpperCase()} CONFIRMADO!`, 500, 536);
+        ctx.fillStyle='#f5c04a'; ctx.font='13px Righteous';
+        ctx.fillText(playerCount===2 && characterSelectTransition.playerSlot===1 ? 'Agora escolha o segundo parceiro' : 'Preparando a próxima cena...', 500, 558);
+        ctx.restore();
+    }
 
     ctx.fillStyle='#d6c6ad'; ctx.font='16px Righteous'; ctx.textAlign='center';
-    if(!characterSelectReady){ ctx.fillStyle='#ffb34d'; ctx.fillText('PREPARANDO...',500,612); }
-    else { ctx.fillText('← → / A D / Analógico: escolher   •   ENTER / A: confirmar   •   ESC / B: voltar',500,612); }
+    if(characterSelectTransition){ ctx.fillStyle='#fff4cf'; ctx.fillText('CONFIRMANDO SEU PARCEIRO...',500,612); }
+    else if(!characterSelectReady){ ctx.fillStyle='#ffb34d'; ctx.fillText('PREPARANDO...',500,612); }
+    else { ctx.fillText('← → / A D / Analógico: navegar   •   ENTER / A: confirmar   •   ESC / B: voltar',500,612); }
 }
 
 // Melhoria #20: Tela de tutorial/controles

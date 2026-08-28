@@ -22,7 +22,17 @@ const CHARACTER_GROWTH = {
         defense: 1.05,
         rangedXpBonus: 0,
         comboXpBonus: 0.018
-    }
+    },
+
+    'Chico Fumaça': {
+        maxLife: 14,
+        meleeDamagePerLevel: 0.95,
+        rangedDamagePerLevel: 0,
+        speed: 0.03,
+        defense: 1.15,
+        rangedXpBonus: 0,
+        comboXpBonus: 0.012
+    },
 };
 
 class PlayerEvolution {

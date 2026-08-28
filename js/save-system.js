@@ -15,9 +15,12 @@ class SaveSystem {
             busBestResistance: 0,
             busNoCollision: false,
             busTrophies: [],
+            chicoUnlocked: false,
+            fishingBonusCompleted: false,
             playerProgress: {
                 João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
-                Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
+                Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
+                'Chico Fumaça': { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
             }
         };
         this.loadSave();
@@ -169,6 +172,19 @@ class SaveSystem {
         return this.data.playerProgress[characterName];
     }
     
+    unlockChico() {
+        const firstUnlock = !this.data.chicoUnlocked;
+        this.data.chicoUnlocked = true;
+        this.data.fishingBonusCompleted = true;
+        if (!this.data.playerProgress['Chico Fumaça']) {
+            this.data.playerProgress['Chico Fumaça'] = { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] };
+        }
+        this.saveSave();
+        return firstUnlock;
+    }
+
+    isChicoUnlocked() { return !!this.data.chicoUnlocked; }
+
     saveSave() {
         try {
             localStorage.setItem('joaoCristSave', JSON.stringify(this.data));
@@ -188,6 +204,9 @@ class SaveSystem {
                 this.data.busBestResistance = Number(this.data.busBestResistance) || 0;
                 this.data.busNoCollision = !!this.data.busNoCollision;
                 if (!Array.isArray(this.data.busTrophies)) this.data.busTrophies = [];
+                this.data.chicoUnlocked = !!this.data.chicoUnlocked;
+                this.data.fishingBonusCompleted = !!this.data.fishingBonusCompleted;
+                if (!this.data.playerProgress['Chico Fumaça']) this.data.playerProgress['Chico Fumaça'] = { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] };
                 // Migração de saves antigos: quem já alcançou/zerou a última fase também recebe o seletor.
                 if (typeof this.data.gameCompleted !== 'boolean') {
                     this.data.gameCompleted = Number(this.data.highestLevel || 0) >= 8;
@@ -216,9 +235,12 @@ class SaveSystem {
                 busBestResistance: 0,
                 busNoCollision: false,
                 busTrophies: [],
+                chicoUnlocked: false,
+                fishingBonusCompleted: false,
                 playerProgress: {
                     João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
-                    Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
+                    Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
+                    'Chico Fumaça': { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] }
                 }
             };
             this.saveSave();

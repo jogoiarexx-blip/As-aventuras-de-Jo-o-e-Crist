@@ -1,14 +1,14 @@
 const CRIST_SPRITE_SHEET = new Image();
-CRIST_SPRITE_SHEET.src = 'assets/crist-16bit-spaced.webp'; // preview compatível para menus
+CRIST_SPRITE_SHEET.src = 'assets/players/crist/crist-16bit-spaced.webp'; // preview compatível para menus
 const CRIST_FRAME_FILES = {
-  idle: ['assets/crist/idle1.webp', 'assets/crist/idle2.webp', 'assets/crist/idle3.webp', 'assets/crist/idle4.webp'],
-  walk: ['assets/crist/walk1.webp', 'assets/crist/walk2.webp', 'assets/crist/walk3.webp', 'assets/crist/walk4.webp', 'assets/crist/walk5.webp', 'assets/crist/walk6.webp'],
-  run: ['assets/crist/run1.webp', 'assets/crist/run2.webp', 'assets/crist/run3.webp', 'assets/crist/run4.webp', 'assets/crist/run5.webp', 'assets/crist/run6.webp'],
-  jump: ['assets/crist/jump1.webp', 'assets/crist/jump2.webp', 'assets/crist/jump3.webp', 'assets/crist/jump4.webp'],
-  attack: ['assets/crist/attack1.webp', 'assets/crist/attack2.webp', 'assets/crist/attack3.webp', 'assets/crist/attack4.webp', 'assets/crist/attack5.webp', 'assets/crist/attack6.webp'],
-  hurt: ['assets/crist/hurt1.webp', 'assets/crist/hurt2.webp', 'assets/crist/hurt3.webp'],
-  dead: ['assets/crist/dead1.webp', 'assets/crist/dead2.webp', 'assets/crist/dead3.webp', 'assets/crist/dead4.webp', 'assets/crist/dead5.webp'],
-  dash: ['assets/crist/dash1.webp', 'assets/crist/dash2.webp', 'assets/crist/dash3.webp']
+  idle: ['assets/players/crist/frames/idle1.webp', 'assets/players/crist/frames/idle2.webp', 'assets/players/crist/frames/idle3.webp', 'assets/players/crist/frames/idle4.webp'],
+  walk: ['assets/players/crist/frames/walk1.webp', 'assets/players/crist/frames/walk2.webp', 'assets/players/crist/frames/walk3.webp', 'assets/players/crist/frames/walk4.webp', 'assets/players/crist/frames/walk5.webp', 'assets/players/crist/frames/walk6.webp'],
+  run: ['assets/players/crist/frames/run1.webp', 'assets/players/crist/frames/run2.webp', 'assets/players/crist/frames/run3.webp', 'assets/players/crist/frames/run4.webp', 'assets/players/crist/frames/run5.webp', 'assets/players/crist/frames/run6.webp'],
+  jump: ['assets/players/crist/frames/jump1.webp', 'assets/players/crist/frames/jump2.webp', 'assets/players/crist/frames/jump3.webp', 'assets/players/crist/frames/jump4.webp'],
+  attack: ['assets/players/crist/frames/attack1.webp', 'assets/players/crist/frames/attack2.webp', 'assets/players/crist/frames/attack3.webp', 'assets/players/crist/frames/attack4.webp', 'assets/players/crist/frames/attack5.webp', 'assets/players/crist/frames/attack6.webp'],
+  hurt: ['assets/players/crist/frames/hurt1.webp', 'assets/players/crist/frames/hurt2.webp', 'assets/players/crist/frames/hurt3.webp'],
+  dead: ['assets/players/crist/frames/dead1.webp', 'assets/players/crist/frames/dead2.webp', 'assets/players/crist/frames/dead3.webp', 'assets/players/crist/frames/dead4.webp', 'assets/players/crist/frames/dead5.webp'],
+  dash: ['assets/players/crist/frames/dash1.webp', 'assets/players/crist/frames/dash2.webp', 'assets/players/crist/frames/dash3.webp']
 };
 
 const CRIST_FRAMES = Object.fromEntries(
