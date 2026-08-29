@@ -2,6 +2,19 @@
 (function(){
 'use strict';
 
+
+const DIALOG_PORTRAITS = {
+  'JOÃO':'assets/ui/portrait-joao.webp',
+  'CRIST':'assets/ui/portrait-crist.webp',
+  'CHICO FUMAÇA':'assets/ui/portrait-chico.webp',
+  'O CORONEL':'assets/sprite-pack/colonel_idle.webp',
+  'VICTOR':'assets/sprite-pack/vegas_idle.webp',
+  'REI DE VEGAS':'assets/sprite-pack/vegas_idle.webp',
+  'A SOMBRA':'assets/sprite-pack/shadow_idle.webp',
+  'DEUS DAS APOSTAS':'assets/sprite-pack/god_idle.webp',
+  'BANDIDO':'assets/enemies/cowboy-16bit.webp'
+};
+
 const SCENES = {
   intro: {
     bg:0, title:'UMA ÚLTIMA VIAGEM', actors:'farm',
@@ -131,7 +144,10 @@ const SCENES = {
 
 const __sceneImageCache = {};
 function getSceneImage(src){
-  if(!__sceneImageCache[src]){ const i = new Image(); i.src = src; __sceneImageCache[src] = i; }
+  if(!__sceneImageCache[src]){
+    const group=src.startsWith('assets/ui/')?'shared':(window.levelManager?.currentGroup||'shared');
+    __sceneImageCache[src]=window.assetManager.image(src,group);
+  }
   return __sceneImageCache[src];
 }
 function drawSceneSprite(ctx, src, x, y, w, h, flip=false){
@@ -151,12 +167,10 @@ class StoryCutsceneManager {
     const scene=SCENES[id]; if(!scene){ onComplete?.(); return false; }
     this.active={id,...scene}; this.index=0; this.startedAt=performance.now(); this.lineStartedAt=this.startedAt; this.onComplete=onComplete||null; this.flash=20; this.seen.add(id);
     window.soundSystem?.playSound?.('menuSelect');
-    console.log(`[STORY] Cutscene iniciada: ${id}`); window.GameDebugConsole?.log?.(`[STORY] Cutscene iniciada: ${id}`);
     return true;
   }
   finish(){
-    const cb=this.onComplete; const id=this.active?.id; this.active=null; this.onComplete=null; this.index=0; window.soundSystem?.playSound?.('menuSelect');
-    console.log(`[STORY] Cutscene concluída: ${id||'?'}`); window.GameDebugConsole?.log?.(`[STORY] Cutscene concluída: ${id||'?'}`); cb?.();
+    const cb=this.onComplete; const id=this.active?.id; this.active=null; this.onComplete=null; this.index=0; window.soundSystem?.playSound?.('menuSelect'); cb?.();
   }
   advance(){ if(!this.active)return; if(this.index < this.active.lines.length-1){this.index++;this.lineStartedAt=performance.now();window.soundSystem?.playSound?.('menuMove');} else this.finish(); }
   skip(){ if(!this.active)return; this.finish(); }
@@ -196,6 +210,37 @@ class StoryCutsceneManager {
       ctx.restore();
     }
   }
+  drawDialogueHud(ctx,speaker,text,scene){
+    // CAIXA DE DIÁLOGO: separada do HUD de gameplay (vida/XP).
+    const key=String(speaker||'NARRADOR').toUpperCase();
+    const portraitSrc=DIALOG_PORTRAITS[key];
+    const portrait=portraitSrc?getSceneImage(portraitSrc):null;
+    const x=42,y=474,w=916,h=158;
+    ctx.save();
+    ctx.fillStyle='rgba(3,10,25,.95)';
+    ctx.strokeStyle=key==='NARRADOR'?'#d7a84a':'#29a8ff';
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.roundRect(x,y,w,h,15);ctx.fill();ctx.stroke();
+    // brilho interno azul discreto
+    ctx.strokeStyle='rgba(101,196,255,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x+8,y+8,w-16,h-16,10);ctx.stroke();
+
+    let textX=x+28;
+    if(portrait?.complete&&portrait.naturalWidth){
+      const boxX=x+18,boxY=y+18,boxW=112,boxH=122;
+      ctx.fillStyle='#08295f';ctx.fillRect(boxX,boxY,boxW,boxH);
+      ctx.strokeStyle='#55c5ff';ctx.lineWidth=2;ctx.strokeRect(boxX+.5,boxY+.5,boxW-1,boxH-1);
+      const scale=Math.min((boxW-10)/portrait.naturalWidth,(boxH-10)/portrait.naturalHeight);
+      const pw=portrait.naturalWidth*scale,ph=portrait.naturalHeight*scale;
+      ctx.imageSmoothingEnabled=false;ctx.drawImage(portrait,boxX+(boxW-pw)/2,boxY+(boxH-ph)/2,pw,ph);
+      textX=x+154;
+    }
+    ctx.textAlign='left';ctx.fillStyle='#ffd76a';ctx.font='bold 23px Bebas Neue';ctx.fillText(speaker,textX,y+38);
+    ctx.fillStyle='#f4f8ff';ctx.font='16px Righteous';
+    const maxWidth=x+w-textX-30;const words=String(text||'').split(/\s+/);let line='',yy=y+72;
+    for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,textX,yy);line=word;yy+=25;}else line=test;}if(line)ctx.fillText(line,textX,yy);
+    ctx.fillStyle='#8fdcff';ctx.font='10px Righteous';ctx.textAlign='right';ctx.fillText(`ENTER/ATAQUE: avançar   ESC: pular   ${this.index+1}/${scene.lines.length}`,x+w-22,y+h-18);
+    ctx.restore();
+  }
   draw(ctx,currentLevel,players,levels){
     if(!this.active)return;
     const scene=this.active; const bg=levels?.[scene.bg]||currentLevel;
@@ -203,13 +248,9 @@ class StoryCutsceneManager {
     ctx.save();ctx.fillStyle='rgba(0,0,0,.22)';ctx.fillRect(0,0,1000,650);ctx.restore();
     this.drawSceneActors(ctx,players,scene.actors);
     const [speaker,text]=scene.lines[Math.min(this.index,scene.lines.length-1)];
+    this.drawDialogueHud(ctx,speaker,text,scene);
     ctx.save();
-    ctx.fillStyle='rgba(4,6,10,.88)';ctx.fillRect(55,470,890,145);ctx.strokeStyle='#d6ae58';ctx.lineWidth=3;ctx.strokeRect(55,470,890,145);
-    ctx.fillStyle='#ffd66b';ctx.font='bold 24px Bebas Neue';ctx.textAlign='left';ctx.fillText(speaker,82,505);
-    ctx.fillStyle='#fff4dc';ctx.font='18px Righteous';
-    const words=text.split(' '); let line='',y=538; for(const word of words){const test=line+word+' ';if(ctx.measureText(test).width>820){ctx.fillText(line,82,y);line=word+' ';y+=27;}else line=test;}ctx.fillText(line,82,y);
     ctx.fillStyle='#ffe58a';ctx.font='bold 25px Bebas Neue';ctx.textAlign='center';ctx.fillText(scene.title,500,48);
-    ctx.fillStyle='#b7c8d9';ctx.font='13px Righteous';ctx.textAlign='right';ctx.fillText(`ENTER/ATAQUE: avançar   ESC: pular   ${this.index+1}/${scene.lines.length}`,920,600);
     if(this.flash>0){ctx.globalAlpha=this.flash/20*.35;ctx.fillStyle='#fff';ctx.fillRect(0,0,1000,650);}ctx.restore();
   }
 }

@@ -606,4 +606,4 @@ class AssassinEnemy extends Enemy {
     }
 }
 
-console.log('✅ Inimigos Elite, Fantasma e Assassino carregados!');
+if(window.DEV) console.log('✅ Inimigos Elite, Fantasma e Assassino carregados!');

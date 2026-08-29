@@ -30,7 +30,7 @@ class CowboyEnemy extends Enemy {
             height: Math.floor(this.h * 0.65)    // 65% da altura (torso+pernas)
         };
         
-        console.log('🤠 Cowboy criado em:', x, this.y, 'Ground:', this.groundY, 'Altura:', this.h, 
+        if(window.DEV) console.log('🤠 Cowboy criado em:', x, this.y, 'Ground:', this.groundY, 'Altura:', this.h, 
                     'Hitbox:', `${this.hitbox.width}×${this.hitbox.height}`);
         
         // Mecânicas de tiro

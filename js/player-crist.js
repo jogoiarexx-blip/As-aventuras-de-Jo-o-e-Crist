@@ -1,5 +1,4 @@
-const CRIST_SPRITE_SHEET = new Image();
-CRIST_SPRITE_SHEET.src = 'assets/players/crist/crist-16bit-spaced.webp'; // preview compatível para menus
+const CRIST_SPRITE_SHEET = window.assetManager.image('assets/players/crist/crist-16bit-spaced.webp','shared',{defer:true}); // carregado somente quando preview/tutorial precisar
 const CRIST_FRAME_FILES = {
   idle: ['assets/players/crist/frames/idle1.webp', 'assets/players/crist/frames/idle2.webp', 'assets/players/crist/frames/idle3.webp', 'assets/players/crist/frames/idle4.webp'],
   walk: ['assets/players/crist/frames/walk1.webp', 'assets/players/crist/frames/walk2.webp', 'assets/players/crist/frames/walk3.webp', 'assets/players/crist/frames/walk4.webp', 'assets/players/crist/frames/walk5.webp', 'assets/players/crist/frames/walk6.webp'],
@@ -14,9 +13,14 @@ const CRIST_FRAME_FILES = {
 const CRIST_FRAMES = Object.fromEntries(
   Object.entries(CRIST_FRAME_FILES).map(([state, list]) => [
     state,
-    list.map(src => { const img = new Image(); img.src = src; return img; })
+    list.map(src => window.assetManager.image(src,'player:crist',{defer:true}))
   ])
 );
+window.CharacterAssetRegistry=window.CharacterAssetRegistry||{};
+window.CharacterAssetRegistry.crist={
+  preview:[...CRIST_FRAME_FILES.idle],
+  full:Object.values(CRIST_FRAME_FILES).flat()
+};
 
 // Classe específica para o personagem CRIST
 class PlayerCrist {
@@ -592,7 +596,7 @@ class PlayerCrist {
         this.comboTimer = 0;
         if (this.life < 0) this.life = 0;
         if (this.life === 0 && this.evolution?.tryRevive?.()) return true;
-        if (this.life === 0) console.log(`💀 ${this.name} MORREU!`);
+        if (this.life === 0) if(window.DEV) console.log(`💀 ${this.name} MORREU!`);
         return true;
     }
 

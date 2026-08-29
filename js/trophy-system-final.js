@@ -419,7 +419,7 @@ class TrophySystem {
         
         this.saveProgress();
         
-        console.log(`🏆 Troféu desbloqueado: ${trophy.name} (${trophy.tier.toUpperCase()})`);
+        if(window.DEV) console.log(`🏆 Troféu desbloqueado: ${trophy.name} (${trophy.tier.toUpperCase()})`);
     }
     
     createUnlockEffects(trophy) {
@@ -801,7 +801,7 @@ class TrophySystem {
                 const parsed = JSON.parse(data);
                 this.unlockedTrophies = new Set(parsed.unlockedTrophies || []);
                 this.stats = { ...this.stats, ...parsed.stats };
-                console.log('✅ Troféus carregados:', this.unlockedTrophies.size);
+                if(window.DEV) console.log('✅ Troféus carregados:', this.unlockedTrophies.size);
             }
         } catch (e) {
             console.error('❌ Erro ao carregar troféus:', e);
@@ -831,12 +831,12 @@ class TrophySystem {
             busBestTime: Infinity
         };
         this.saveProgress();
-        console.log('🔄 Troféus resetados');
+        if(window.DEV) console.log('🔄 Troféus resetados');
     }
 }
 
 // Criar instância global
 if (typeof window !== 'undefined') {
     window.trophySystem = new TrophySystem();
-    console.log('✅ Sistema de Troféus carregado');
+    if(window.DEV) console.log('✅ Sistema de Troféus carregado');
 }

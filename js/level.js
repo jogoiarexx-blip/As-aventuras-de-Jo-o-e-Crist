@@ -40,18 +40,25 @@ class Level {
         if (this._backgroundImg) return this._backgroundImg;
         const manager = window.assetManager;
         if (manager?.image) {
-            this._backgroundImg = manager.image(this.backgroundImage);
+            this._backgroundImg = manager.image(this.backgroundImage, `level:${this.id}`, {defer:true});
+            if (!this._backgroundImg.complete || !this._backgroundImg.naturalWidth) manager.loadImage(this.backgroundImage, `level:${this.id}`).catch(()=>{ this._backgroundFailed=true; });
             return this._backgroundImg;
         }
         const img = new Image();
         img.onload = () => { this._backgroundFailed = false; };
-        img.onerror = () => { this._backgroundFailed = true; console.warn('[background] Falha ao carregar:', this.backgroundImage); };
+        img.onerror = () => { this._backgroundFailed = true; if(window.DEV) if(window.DEV) console.warn('[background] Falha ao carregar:', this.backgroundImage); };
         img.src = this.backgroundImage;
         this._backgroundImg = img;
         return img;
     }
 
     preload() { return this.ensureBackground(); }
+
+    dispose() {
+        // Libera somente referência específica da fase. O AssetManager decide se o arquivo ainda pertence a outro grupo.
+        this._backgroundImg = null;
+        this._backgroundFailed = false;
+    }
 
     // Aleatoriedade determinística para o cenário. Evita prédios/janelas/cactos
     // mudando de forma a cada frame (flicker visual).
@@ -84,6 +91,7 @@ class Level {
             // o recorte cair exatamente no viewport 0..canvasW.
             ctx.drawImage(this._backgroundImg, sx, 0, sw, imgH, safeCameraX, 0, canvasW, canvasH);
             ctx.restore();
+            if (this.customDrawBackground) this.customDrawBackground.call(this, ctx, cameraX, true);
             return;
         }
 
@@ -1234,6 +1242,7 @@ const LEVELS = [
     new Level({
         id: 7,
         name: 'O CLUBE DOS ASSASSINOS',
+        backgroundImage: 'assets/backgrounds/fase7-clube-assassinos.webp',
         description: 'Uma organização secreta de matadores de aluguel. Ninguém sai vivo.',
         bgColor1: '#0d0000',
         bgColor2: '#1a0000',
@@ -1246,14 +1255,16 @@ const LEVELS = [
         nextLevel: 8,
         levelRequirement: 18,
         difficultyMultiplier: 3.0,
-        drawBackground(ctx, cameraX) {
+        drawBackground(ctx, cameraX, hasBase=false) {
             const viewX = Math.max(0, Number(cameraX) || 0);
             const viewW = 1000;
+            if(!hasBase){
             const grad = ctx.createLinearGradient(0, 0, 0, 650);
             grad.addColorStop(0, '#0d0000');
             grad.addColorStop(1, '#1a0005');
             ctx.fillStyle = grad;
             ctx.fillRect(viewX, 0, viewW, 650);
+            }
 
             const firstLight = Math.floor((viewX - 220) / 400) * 400 + 200;
             for (let i = firstLight; i < viewX + viewW + 220; i += 400) {
@@ -1296,6 +1307,7 @@ const LEVELS = [
     new Level({
         id: 8,
         name: 'O TRONO DO DEUS DAS APOSTAS',
+        backgroundImage: 'assets/backgrounds/fase8-trono-deus-apostas.webp',
         description: 'O ápice de Vegas. O ser supremo que controla tudo. Derrote-o e seja LENDÁRIO!',
         bgColor1: '#000000',
         bgColor2: '#0a0500',
@@ -1308,15 +1320,17 @@ const LEVELS = [
         nextLevel: null,
         levelRequirement: 22,
         difficultyMultiplier: 4.0,
-        drawBackground(ctx, cameraX) {
+        drawBackground(ctx, cameraX, hasBase=false) {
             const viewX = Math.max(0, Number(cameraX) || 0);
             const viewW = 1000;
+            if(!hasBase){
             const grad = ctx.createLinearGradient(0, 0, 0, 650);
             grad.addColorStop(0, '#000005');
             grad.addColorStop(0.5, '#05000a');
             grad.addColorStop(1, '#0a0500');
             ctx.fillStyle = grad;
             ctx.fillRect(viewX, 0, viewW, 650);
+            }
 
             // Estrelas determinísticas apenas no trecho visível.
             for (let i = 0; i < 300; i++) {
@@ -1353,3 +1367,6 @@ const LEVELS = [
         }
     })
 ];
+
+// Referência explícita para módulos de carregamento sem alterar o uso legado de LEVELS.
+window.LEVELS_REF = LEVELS;

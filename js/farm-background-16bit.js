@@ -1,8 +1,7 @@
 
 /* Fazenda background 16-bit - visual only, does not alter phase dimensions */
 (() => {
-  const farmBg = new Image();
-  farmBg.src = 'assets/backgrounds/fazenda-16bit.webp';
+  const farmBg = window.assetManager.placeholder('assets/backgrounds/fazenda-16bit.webp');
 
   function isFarmLevel(level) {
     if (!level) return false;

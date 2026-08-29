@@ -606,7 +606,7 @@ class DodgeSystem {
      * Ativar perfect dodge
      */
     triggerPerfectDodge(player, state) {
-        console.log('💫 PERFECT DODGE!');
+        if(window.DEV) console.log('💫 PERFECT DODGE!');
         
         // Slow motion
         if (window.gameSpeed !== undefined) {

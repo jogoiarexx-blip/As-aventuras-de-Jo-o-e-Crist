@@ -189,7 +189,7 @@ class SaveSystem {
         try {
             localStorage.setItem('joaoCristSave', JSON.stringify(this.data));
         } catch (e) {
-            console.warn('Não foi possível salvar progresso');
+            if(window.DEV) console.warn('Não foi possível salvar progresso');
         }
     }
     
@@ -215,7 +215,7 @@ class SaveSystem {
                 if (this.data.gameCompleted) this.data.campaignCheckpoint = null;
             }
         } catch (e) {
-            console.warn('Não foi possível carregar progresso');
+            if(window.DEV) console.warn('Não foi possível carregar progresso');
         }
     }
     

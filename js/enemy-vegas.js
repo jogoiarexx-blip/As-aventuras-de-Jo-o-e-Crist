@@ -23,10 +23,8 @@
     images[type]={};
     const folder=ASSET_FOLDER[type]||type;
     for(const state of STATES){
-      const img=new Image();
-      img.onerror=()=>console.warn('[sprite-vegas] Falha ao carregar:',type,state,`(${folder}/${state}.webp)`);
-      img.src=`assets/enemies/vegas-frames/${folder}/${state}.webp`;
-      images[type][state]=img;
+      const src=`assets/enemies/vegas-frames/${folder}/${state}.webp`;
+      images[type][state]=window.assetManager.placeholder(src);
     }
   }
   function applyStats(e,type){

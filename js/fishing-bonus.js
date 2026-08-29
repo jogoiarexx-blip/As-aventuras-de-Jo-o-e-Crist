@@ -2,12 +2,17 @@
 (() => {
   'use strict';
   const W=1000,H=650,GROUND=530;
-  const farmBg=new Image(); farmBg.src='assets/backgrounds/fishing-bonus-lake.webp';
-  const chico=new Image(); chico.src='assets/npc/chico-fumaca/chico-fumaca-idle.webp';
-  const dialogHudJoao=new Image(); dialogHudJoao.src='assets/ui/dialog-hud-joao.png';
-  const dialogHudCrist=new Image(); dialogHudCrist.src='assets/ui/dialog-hud-crist.png';
+  const farmBg=window.assetManager.placeholder('assets/backgrounds/fishing-bonus-lake.webp');
+  const chico=window.assetManager.placeholder('assets/npc/chico-fumaca/chico-fumaca-idle.webp');
+  const dialogPortraitJoao=window.assetManager.placeholder('assets/ui/portrait-joao.webp');
+  const dialogPortraitCrist=window.assetManager.placeholder('assets/ui/portrait-crist.webp');
+  const dialogPortraitChico=window.assetManager.placeholder('assets/ui/portrait-chico.webp');
   const sharkImgs={};
-  ['idle','walk1','walk2','walk3','attack1','attack2','attack3','special','hurt','dead','roar'].forEach(k=>{const i=new Image();i.src=`assets/bosses/shark/${k}.webp`;sharkImgs[k]=i;});
+  let bonusAssetsLoaded=false;
+  function ensureBonusAssets(){
+    if(bonusAssetsLoaded)return; bonusAssetsLoaded=true;
+    ['idle','walk1','walk2','walk3','attack1','attack2','attack3','special','hurt','dead','roar'].forEach(k=>{sharkImgs[k]=window.assetManager.placeholder(`assets/bosses/shark/${k}.webp`);});
+  }
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const rects=(a,b)=>a.x<a.x+a.w&&a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
@@ -15,6 +20,7 @@
   class FishingBonusController{
     constructor(){this.active=false;this.state='intro';this.players=[];this.chicoNpc=null;this.chicoJustUnlocked=false;this._unlockProcessed=false;this.dialogIndex=0;this.dialogTime=0;this.progress=0;this.tension=25;this.pull=0;this.shark=null;this.resultTimer=0;this.last=performance.now();this.score=0;this.splash=0;this._acceptLast=false;}
     start(count=1){
+      ensureBonusAssets();
       this.active=true;this.state='intro';this.dialogIndex=0;this.dialogTime=performance.now();this.progress=0;this.tension=24;this.pull=0;this.score=0;this.splash=0;this.resultTimer=0;this.last=performance.now();
       this.players=[];this.chicoJustUnlocked=false;this._unlockProcessed=false;this._bossXpAwarded=false;
       this.chicoNpc={x:105,y:GROUND-150,w:115,h:150,facingRight:true,attackTimer:0,cooldown:25,hitDone:false,bob:0};
@@ -131,44 +137,24 @@
     }
     drawDialog(ctx,name,text){
       const speaker=(name||'').toLowerCase();
-      const isJoao=speaker.includes('joão')||speaker.includes('joao');
-      const isCrist=speaker.includes('crist');
-      const hud=isJoao?dialogHudJoao:(isCrist?dialogHudCrist:null);
-      if(hud?.complete&&hud.naturalWidth){
-        const w=860;
-        const h=Math.round(hud.naturalHeight*(w/hud.naturalWidth));
-        const x=Math.round((W-w)/2);
-        const y=H-h-6;
-        ctx.save();
-        ctx.imageSmoothingEnabled=false;
-        ctx.drawImage(hud,x,y,w,h);
-        ctx.fillStyle='#fff4dc';
-        ctx.font='bold 28px Bebas Neue';
-        ctx.textAlign='left';
-        ctx.fillText(name, x+245, y+78);
-        ctx.textAlign='right';
-        ctx.fillStyle='#8fdcff';
-        ctx.font='11px Righteous';
-        ctx.fillText('ATAQUE / ENTER para avançar', x+w-28, y+79);
-        ctx.textAlign='left';
-        ctx.fillStyle='#eef6ff';
-        ctx.font='17px Righteous';
-        const maxWidth=w-290;
-        const words=String(text||'').split(/\s+/);
-        let line='';
-        const lines=[];
-        for(const word of words){
-          const test=line?line+' '+word:word;
-          if(ctx.measureText(test).width>maxWidth && line){ lines.push(line); line=word; }
-          else line=test;
-        }
-        if(line)lines.push(line);
-        const maxLines=Math.min(3,lines.length);
-        for(let i=0;i<maxLines;i++) ctx.fillText(lines[i], x+245, y+136+i*27);
-        ctx.restore();
-        return;
+      const portrait=(speaker.includes('joão')||speaker.includes('joao'))?dialogPortraitJoao:(speaker.includes('crist')?dialogPortraitCrist:(speaker.includes('chico')?dialogPortraitChico:null));
+      const x=55,y=490,w=890,h=142;
+      ctx.save();
+      ctx.fillStyle='rgba(3,10,25,.95)';ctx.strokeStyle='#29a8ff';ctx.lineWidth=4;
+      ctx.beginPath();ctx.roundRect(x,y,w,h,15);ctx.fill();ctx.stroke();
+      let tx=x+28;
+      if(portrait?.complete&&portrait.naturalWidth){
+        const bx=x+16,by=y+14,bw=100,bh=112;
+        ctx.fillStyle='#08295f';ctx.fillRect(bx,by,bw,bh);ctx.strokeStyle='#55c5ff';ctx.lineWidth=2;ctx.strokeRect(bx+.5,by+.5,bw-1,bh-1);
+        const sc=Math.min((bw-8)/portrait.naturalWidth,(bh-8)/portrait.naturalHeight);const pw=portrait.naturalWidth*sc,ph=portrait.naturalHeight*sc;
+        ctx.imageSmoothingEnabled=false;ctx.drawImage(portrait,bx+(bw-pw)/2,by+(bh-ph)/2,pw,ph);tx=x+136;
       }
-      ctx.fillStyle='rgba(5,7,10,.9)';ctx.strokeStyle='#e1a845';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(105,525,790,92,14);ctx.fill();ctx.stroke();ctx.fillStyle='#f3be55';ctx.font='bold 19px Bebas Neue';ctx.textAlign='left';ctx.fillText(name,130,553);ctx.fillStyle='#fff3d8';ctx.font='15px Righteous';ctx.fillText(text,130,581);ctx.fillStyle='#8fdcff';ctx.font='11px Righteous';ctx.textAlign='right';ctx.fillText('ATAQUE / ENTER para avançar',870,604);
+      ctx.fillStyle='#ffd76a';ctx.font='bold 22px Bebas Neue';ctx.textAlign='left';ctx.fillText(name,tx,y+34);
+      ctx.fillStyle='#f4f8ff';ctx.font='15px Righteous';
+      const maxWidth=x+w-tx-24,words=String(text||'').split(/\s+/);let line='',yy=y+68;
+      for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,tx,yy);line=word;yy+=23;}else line=test;}if(line)ctx.fillText(line,tx,yy);
+      ctx.fillStyle='#8fdcff';ctx.font='10px Righteous';ctx.textAlign='right';ctx.fillText('ATAQUE / ENTER para avançar',x+w-20,y+h-15);
+      ctx.restore();
     }
     updateIntro(ctx,keys,gp,controls){
       const lines=[

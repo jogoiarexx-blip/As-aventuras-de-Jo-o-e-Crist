@@ -2,7 +2,7 @@
 (function(){
   'use strict';
 
-  const loadImage = (src) => { const img = new Image(); img.src = src; return img; };
+  const loadImage = (src) => window.assetManager.placeholder(src);
 
   const DOG_FRAMES = {
     idleFront: [

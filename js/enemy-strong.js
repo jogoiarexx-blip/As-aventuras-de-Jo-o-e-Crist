@@ -22,7 +22,7 @@ class StrongEnemy {
             height: Math.floor(this.h * 0.65)    // 65% da altura (torso+pernas)
         };
         
-        console.log('✅ Brutamontes criado em:', this.x, this.y, 'Ground:', this.groundY,
+        if(window.DEV) console.log('✅ Brutamontes criado em:', this.x, this.y, 'Ground:', this.groundY,
                     'Hitbox:', `${this.hitbox.width}×${this.hitbox.height}`);
         
         // Atributos

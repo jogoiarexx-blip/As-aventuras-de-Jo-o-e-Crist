@@ -1,8 +1,7 @@
-const JOAO_SPRITE_SHEET = new Image();
-JOAO_SPRITE_SHEET.src = 'assets/players/joao/joao-16bit.webp';
-
-const JOAO_RANGED_SPRITE_SHEET = new Image();
-JOAO_RANGED_SPRITE_SHEET.src = 'assets/players/joao/joao-16bit.webp';
+const JOAO_SPRITE_SHEET = window.assetManager.image('assets/players/joao/joao-16bit.webp','shared');
+const JOAO_RANGED_SPRITE_SHEET = JOAO_SPRITE_SHEET;
+window.CharacterAssetRegistry=window.CharacterAssetRegistry||{};
+window.CharacterAssetRegistry.joao={preview:['assets/players/joao/joao-16bit.webp'],full:['assets/players/joao/joao-16bit.webp']};
 const JOAO_16_FRAMES = {"idle":[[35,6,70,128],[149,8,69,126],[261,8,69,126],[374,8,70,126]],"walk":[[501,8,86,126],[615,7,83,126],[727,7,82,126],[836,6,81,127],[944,6,83,127],[1057,6,85,128]],"run":[[944,6,83,127],[1057,6,85,128],[1182,8,80,126],[1301,8,70,126],[1419,8,70,126]],"jump":[[21,165,99,122],[127,164,99,122],[236,166,96,120],[348,166,99,121],[456,166,108,125]],"attack":[[20,308,94,124],[118,315,90,117],[222,318,99,116],[323,321,159,115],[118,315,90,117]],"ranged":[[18,478,144,120],[174,480,118,117],[291,485,163,113]],"hurt":[[20,626,94,104],[31,747,94,109],[135,624,95,105]],"dead":[[659,755,142,101],[841,762,142,96],[995,624,126,108],[1031,771,140,91]],"dash":[[31,891,103,104],[152,902,88,91],[268,896,104,96],[405,915,164,76],[611,909,173,83],[813,910,177,86]]};
 
 
@@ -264,7 +263,7 @@ class PlayerJoao {
             hitEnemies: new Set(), color: charged ? '#ffd23f' : '#f4f1df'
         };
         window.projectiles.push(window.acquireProjectile ? window.acquireProjectile(projectileData) : projectileData);
-        console.log(`[TIRO JOAO] CRIADO id=${shotId} carregado=${charged ? 'sim' : 'nao'} x=${Math.round(muzzleX)} y=${Math.round(muzzleY)} dir=${direction > 0 ? 'direita' : 'esquerda'} dano=${damage}`);
+        if(window.DEV) console.log(`[TIRO JOAO] CRIADO id=${shotId} carregado=${charged ? 'sim' : 'nao'} x=${Math.round(muzzleX)} y=${Math.round(muzzleY)} dir=${direction > 0 ? 'direita' : 'esquerda'} dano=${damage}`);
         if (window.soundSystem?.playSound) window.soundSystem.playSound('hit');
         if (window.gamepadSystem?.rumble) window.gamepadSystem.rumble(this.controlPlayer || 1, charged ? 110 : 60, charged ? .45 : .2, charged ? .2 : .08);
         return true;
@@ -668,7 +667,7 @@ class PlayerJoao {
         this.comboTimer = 0;
         if (this.life < 0) this.life = 0;
         if (this.life === 0 && this.evolution?.tryRevive?.()) return true;
-        if (this.life === 0) console.log(`💀 ${this.name} MORREU!`);
+        if (this.life === 0) if(window.DEV) console.log(`💀 ${this.name} MORREU!`);
         return true;
     }
 

@@ -258,4 +258,4 @@ function drawLevelGate(ctx, levelIndex, players, onConfirm) {
     ctx.restore();
 }
 
-console.log('✅ Sistema de requisito de nível e ondas carregado!');
+if(window.DEV) console.log('✅ Sistema de requisito de nível e ondas carregado!');

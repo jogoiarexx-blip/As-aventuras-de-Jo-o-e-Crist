@@ -86,8 +86,8 @@ class BerserkerEnemy extends Enemy {
             height: Math.floor(this.h * 0.70)        // 56px (70% de 80)
         };
         
-        console.log('💀 BERSERKER MELHORADO criado!');
-        console.log(`✅ Berserker hitbox: ${this.hitbox.width}×${this.hitbox.height} (${Math.round((this.hitbox.width * this.hitbox.height) / (this.w * this.h) * 100)}% da área)`);
+        if(window.DEV) console.log('💀 BERSERKER MELHORADO criado!');
+        if(window.DEV) console.log(`✅ Berserker hitbox: ${this.hitbox.width}×${this.hitbox.height} (${Math.round((this.hitbox.width * this.hitbox.height) / (this.w * this.h) * 100)}% da área)`);
         
         // ✅ VALIDAÇÃO: Re-calcular Y se mudou altura (depois de super e alterações)
         if (this.groundY) {
@@ -126,7 +126,7 @@ class BerserkerEnemy extends Enemy {
      * NOVO: Transformação visual quando aumenta fúria
      */
     triggerRageTransformation(level) {
-        console.log(`🔥 BERSERKER → RAGE LEVEL ${level}!`);
+        if(window.DEV) console.log(`🔥 BERSERKER → RAGE LEVEL ${level}!`);
         
         // Explosão de partículas
         if (window.particles) {
@@ -427,7 +427,7 @@ class BerserkerEnemy extends Enemy {
         this.dashDirection = this.facingRight ? 1 : -1;
         this.dashCooldown = 180; // 3 segundos
         
-        console.log('⚡ BERSERKER DASH!');
+        if(window.DEV) console.log('⚡ BERSERKER DASH!');
     }
     
     executeDash() {
@@ -461,7 +461,7 @@ class BerserkerEnemy extends Enemy {
         this.roarDuration = 40;
         this.roarCooldown = 300; // 5 segundos
         
-        console.log('🦁 BERSERKER ROAR!');
+        if(window.DEV) console.log('🦁 BERSERKER ROAR!');
     }
     
     executeRoar(player) {
@@ -517,7 +517,7 @@ class BerserkerEnemy extends Enemy {
         this.groundPoundCooldown = 400; // 6.6 segundos
         this.jumpHeight = 0;
         
-        console.log('💥 BERSERKER GROUND POUND!');
+        if(window.DEV) console.log('💥 BERSERKER GROUND POUND!');
     }
     
     executeGroundPound(player) {

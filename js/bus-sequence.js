@@ -16,7 +16,7 @@
 
     const spritePaths = {
         idle: 'assets/bus/idle.webp', moving: 'assets/bus/andando.webp', moving2: 'assets/bus/andando-2.webp', accelerating: 'assets/bus/acelerando.webp', braking: 'assets/bus/freando.webp',
-        turning: 'assets/bus/virando.webp', turningUp: 'assets/bus/virando-cima.webp', turningDown: 'assets/bus/virando-baixo.webp', collision: 'assets/bus/colisao.webp', damaged: 'assets/bus/danificado.webp', critical: 'assets/bus/muito-danificado.webp',
+        turning: 'assets/bus/virando-cima.webp', turningUp: 'assets/bus/virando-cima.webp', turningDown: 'assets/bus/virando-baixo.webp', collision: 'assets/bus/colisao.webp', damaged: 'assets/bus/danificado.webp', critical: 'assets/bus/muito-danificado.webp',
         doorClosed: 'assets/bus/porta-fechada.webp', doorOpening: 'assets/bus/porta-abrindo.webp', doorOpen: 'assets/bus/porta-aberta.webp', doorClosing: 'assets/bus/porta-fechando.webp',
         leaving: 'assets/bus/saida.webp', arriving: 'assets/bus/chegada.webp'
     };
@@ -43,18 +43,18 @@
     function loadImages(map) {
         const result = {};
         Object.keys(map).forEach(key => {
-            const img = new Image(); img.src = map[key]; result[key] = img;
+            result[key] = window.assetManager.image(map[key],'bonus:bus');
         });
         return result;
     }
 
     class BusSequenceController {
         constructor() {
-            this.sprites = loadImages(spritePaths);
-            this.obstacleSprites = loadImages(obstaclePaths);
-            this.itemSprites = loadImages(itemPaths);
-            this.runBackground = new Image();
-            this.runBackground.src = 'assets/backgrounds/bus-bonus-vegas.webp';
+            this.sprites = {};
+            this.obstacleSprites = {};
+            this.itemSprites = {};
+            this.runBackground = window.assetManager.placeholder('assets/backgrounds/bus-bonus-vegas.webp');
+            this.assetsLoaded = false;
             this.phase2Waiting = false;
             this.boarding = null;
             this.arrival = null;
@@ -65,8 +65,17 @@
             this.bonusMode = false;
         }
 
+        ensureAssets() {
+            if (this.assetsLoaded) return;
+            this.assetsLoaded = true;
+            this.sprites = loadImages(spritePaths);
+            this.obstacleSprites = loadImages(obstaclePaths);
+            this.itemSprites = loadImages(itemPaths);
+            window.assetManager.loadImage('assets/backgrounds/bus-bonus-vegas.webp','bonus:bus').catch(()=>{});
+        }
+
         log(msg) {
-            console.log(msg);
+            if(window.DEV) console.log(msg);
             if (window.GameDebugConsole) window.GameDebugConsole.log(msg);
         }
 
@@ -82,11 +91,12 @@
         isPhase2Waiting() { return this.phase2Waiting; }
 
         preparePhase2Exit(level, players) {
+            this.ensureAssets();
             if (this.phase2Waiting || this.boarding || this.run) return;
             this.phase2Waiting = true;
             this.boardingPoint = Math.max(650, (level?.width || 5000) - 390);
             this.busWorldX = Math.max(700, (level?.width || 5000) - 320); // posição final de parada
-            this.busApproachX = (level?.width || 5000) + 320; // começa fora da tela pela direita
+            this.busApproachX = Math.max(0, (this.busWorldX - BUS_PHASE_W) - 900); // sprite novo olha para a direita: entra pela esquerda e avança até a parada
             this.phase2BusArrived = false;
             this.phase2BusStopTimer = 0;
             window.soundSystem?.startLoop?.('busEngine', .42);
@@ -125,10 +135,11 @@
 
         drawBusFacingRight(ctx, sprite, x, y, w=BUS_W, h=BUS_H) {
             if (!sprite?.complete || !sprite.naturalWidth) return;
+            // Os novos sprites do ônibus já foram desenhados com a frente para a direita.
+            // Não aplicar flip aqui: isso invertia o ônibus em cutscenes e chegada/saída.
             ctx.save();
-            ctx.translate(x + w, y);
-            ctx.scale(-1, 1);
-            ctx.drawImage(sprite, 0, 0, w, h);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(sprite, x, y, w, h);
             ctx.restore();
         }
 
@@ -151,6 +162,7 @@
         }
 
         startBoarding(players) {
+            this.ensureAssets();
             this.boarding = { start:performance.now(), duration:6200, players:players.map((p,i)=>({p, startX:p.x, startY:p.y, index:i})), doorOpenSfx:false, doorCloseSfx:false };
             window.soundSystem?.startLoop?.('busEngine', .45);
             this.log('[BUS] Cutscene de embarque iniciada');
@@ -201,6 +213,7 @@
         }
 
         startMinigame(bonusMode=false, checkpoint=null) {
+            this.ensureAssets();
             this.bonusMode=!!bonusMode;
             const progress = checkpoint ? checkpoint.progress : 0;
             const elapsed = checkpoint ? checkpoint.elapsed : 0;
@@ -379,7 +392,8 @@
             window.refreshMenuOptions?.();
         }
 
-        startArrival(players){this.arrival={start:performance.now(),duration:6500,players:(players||[]).map((p,i)=>({p,index:i})),doorOpenSfx:false,doorCloseSfx:false};window.soundSystem?.startLoop?.('busEngine',.42);this.log('[BUS] Iniciando Fase 3');}
+        startArrival(players){
+            this.ensureAssets();this.arrival={start:performance.now(),duration:6500,players:(players||[]).map((p,i)=>({p,index:i})),doorOpenSfx:false,doorCloseSfx:false};window.soundSystem?.startLoop?.('busEngine',.42);this.log('[BUS] Iniciando Fase 3');}
 
         updateDrawArrival(ctx, level, players){
             try{
@@ -494,7 +508,7 @@
                 const laneDelta=LANES[r.targetLane]-r.y;
                 if(Math.abs(laneDelta)>4)spr=laneDelta<0?(this.sprites.turningUp||this.sprites.turning):(this.sprites.turningDown||this.sprites.turning);
             }
-            ctx.save();ctx.translate(BUS_X + BUS_W,r.y-BUS_H/2);ctx.scale(-1,1);if(r.invincible>0&&Math.floor(r.elapsed*10)%2===0)ctx.globalAlpha=.55;if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,0,0,BUS_W,BUS_H);ctx.restore();
+            ctx.save();ctx.imageSmoothingEnabled=false;if(r.invincible>0&&Math.floor(r.elapsed*10)%2===0)ctx.globalAlpha=.55;if(spr?.complete&&spr.naturalWidth)ctx.drawImage(spr,BUS_X,r.y-BUS_H/2,BUS_W,BUS_H);ctx.restore();
             if(r.speed>1.18)this.drawDust(ctx,BUS_X+28,r.y+44,2);
             ctx.restore();
             this.drawBusHUD(ctx,r,finishing);

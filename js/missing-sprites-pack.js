@@ -4,7 +4,14 @@
 
   const cache = {};
   function img(name){
-    if(!cache[name]){ const i=new Image(); i.src='assets/sprite-pack/' + name; cache[name]=i; }
+    if(!cache[name]){
+      const src='assets/sprite-pack/' + name;
+      cache[name]=window.assetManager.placeholder(src);
+      if(!cache[name].complete||!cache[name].naturalWidth){
+        const gid=(window.levelManager?.currentLevelIndex!=null)?`level:${window.levelManager.currentLevelIndex+1}`:'shared';
+        window.assetManager.loadImage(src,gid).catch(()=>{});
+      }
+    }
     return cache[name];
   }
   const effectGet = name => img(name + '.webp');
@@ -153,5 +160,5 @@
     };
   }
 
-  console.log('✅ Sprite pack extra carregado: Elite/Ghost/Assassin/Bosses/Drone');
+  if(window.DEV) console.log('✅ Sprite pack extra carregado: Elite/Ghost/Assassin/Bosses/Drone');
 })();

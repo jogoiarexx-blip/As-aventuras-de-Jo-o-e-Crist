@@ -25,7 +25,7 @@ class CockroachEnemy extends Enemy {
             height: Math.floor(this.h * 0.65)
         };
         
-        console.log('🪳 Homem-Barata criado em:', this.x, this.y);
+        if(window.DEV) console.log('🪳 Homem-Barata criado em:', this.x, this.y);
         
         // Cores da fantasia
         this.shellColor = '#3d2817'; // Marrom escuro (carapaça)
@@ -62,9 +62,10 @@ class CockroachEnemy extends Enemy {
     draw(ctx) {
         // Tenta usar primeiro o sprite 16-bit real do Homem-Barata.
         const sprite = window.__cockroach16bitSprite || (() => {
-            const img = new Image();
-            img.src = 'assets/enemies/cockroach-16bit.webp';
+            const src='assets/enemies/cockroach-16bit.webp';
+            const img = window.assetManager.placeholder(src);
             window.__cockroach16bitSprite = img;
+            if(!img.complete||!img.naturalWidth) window.assetManager.loadImage(src,`level:${(window.levelManager?.currentLevelIndex??0)+1}`).catch(()=>{});
             return img;
         })();
         const frames = {

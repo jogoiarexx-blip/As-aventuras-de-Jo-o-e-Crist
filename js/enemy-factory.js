@@ -39,22 +39,6 @@ class EnemyFactory {
                 return typeof BerserkerEnemy !== 'undefined'
                     ? new BerserkerEnemy(x, y)
                     : new Enemy(x, y, 'berserker');
-            
-            case 'sniper':
-                return typeof SniperEnemy !== 'undefined'
-                    ? new SniperEnemy(x, y)
-                    : new Enemy(x, y, 'sniper');
-            
-            case 'healer':
-                return typeof HealerEnemy !== 'undefined'
-                    ? new HealerEnemy(x, y)
-                    : new Enemy(x, y, 'healer');
-            
-            case 'exploder':
-                return typeof ExploderEnemy !== 'undefined'
-                    ? new ExploderEnemy(x, y)
-                    : new Enemy(x, y, 'exploder');
-            
             case 'cowboy':
                 return typeof CowboyEnemy !== 'undefined'
                     ? new CowboyEnemy(x, y)
@@ -108,35 +92,32 @@ class EnemyFactory {
                     : new Enemy(x, y, 'boss');
             
             default:
-                console.warn(`Tipo de inimigo desconhecido: ${type}, criando inimigo básico`);
+                if(window.DEV) console.warn(`Tipo de inimigo desconhecido: ${type}, criando inimigo básico`);
                 return new Enemy(x, y, type);
         }
     }
 
     // Método auxiliar para debug
     static logAvailableEnemies() {
-        console.log('=== ENEMY FACTORY DEBUG ===');
-        console.log('Classes disponíveis:');
-        console.log('  Enemy:', typeof Enemy !== 'undefined' ? '✓' : '✗');
-        console.log('  CiclistaEnemy:', typeof CiclistaEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  BasicEnemy:', typeof BasicEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  FastEnemy:', typeof FastEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  StrongEnemy:', typeof StrongEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  TankEnemy:', typeof TankEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  BerserkerEnemy:', typeof BerserkerEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  SniperEnemy:', typeof SniperEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  HealerEnemy:', typeof HealerEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  ExploderEnemy:', typeof ExploderEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  CowboyEnemy:', typeof CowboyEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  CockroachEnemy:', typeof CockroachEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  TuristaEnemy:', typeof window.TuristaEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  SegurancaEnemy:', typeof window.SegurancaEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  ElvisFanEnemy:', typeof window.ElvisFanEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  MulherFeiaEnemy:', typeof window.MulherFeiaEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  TravestiEnemy:', typeof window.TravestiEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  BossEnemy:', typeof BossEnemy !== 'undefined' ? '✓' : '✗');
-        console.log('  FinalBoss:', typeof FinalBoss !== 'undefined' ? '✓' : '✗');
-        console.log('========================');
+        if(window.DEV) console.log('=== ENEMY FACTORY DEBUG ===');
+        if(window.DEV) console.log('Classes disponíveis:');
+        if(window.DEV) console.log('  Enemy:', typeof Enemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  CiclistaEnemy:', typeof CiclistaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  BasicEnemy:', typeof BasicEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  FastEnemy:', typeof FastEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  StrongEnemy:', typeof StrongEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  TankEnemy:', typeof TankEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  BerserkerEnemy:', typeof BerserkerEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  CowboyEnemy:', typeof CowboyEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  CockroachEnemy:', typeof CockroachEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  TuristaEnemy:', typeof window.TuristaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  SegurancaEnemy:', typeof window.SegurancaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  ElvisFanEnemy:', typeof window.ElvisFanEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  MulherFeiaEnemy:', typeof window.MulherFeiaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  TravestiEnemy:', typeof window.TravestiEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  BossEnemy:', typeof BossEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('  FinalBoss:', typeof FinalBoss !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) console.log('========================');
     }
 }
 

@@ -13,9 +13,11 @@ const CHICO_FRAME_FILES = {
 const CHICO_FRAMES = Object.fromEntries(
   Object.entries(CHICO_FRAME_FILES).map(([state,list])=>[
     state,
-    list.map(src=>{const img=new Image();img.src=src;return img;})
+    list.map(src=>window.assetManager.image(src,'player:chico',{defer:true}))
   ])
 );
+window.CharacterAssetRegistry=window.CharacterAssetRegistry||{};
+window.CharacterAssetRegistry.chico={preview:[...CHICO_FRAME_FILES.idle],full:Object.values(CHICO_FRAME_FILES).flat()};
 
 class PlayerChico extends PlayerCrist {
     constructor(x, y, controlPlayer = 1) {

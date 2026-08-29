@@ -89,7 +89,7 @@ let controlsConfigMessage = '';
 const controlsConfigActions = ['left', 'right', 'up', 'attack', 'ranged', 'dash', 'pause'];
 const controlsConfigLabels = { left:'Mover esquerda', right:'Mover direita', up:'Pular', attack:'Atacar', ranged:'Tiro / Ataque à distância', dash:'Dash / Esquiva', pause:'Pausar' };
 let gamepadSystem = new GamepadSystem(sistemControles); window.gamepadSystem = gamepadSystem;
-let soundSystem = new SoundSystem();
+let soundSystem = new SoundSystem(); window.soundSystem = soundSystem;
 let gameSettings = new SettingsSystem(); window.gameSettings = gameSettings; gameSettings.applyAudio(soundSystem);
 let optionsSelection = 0;
 const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','QUALIDADE GRÁFICA','VIBRAÇÃO','DIFICULDADE','TELA CHEIA'];
@@ -100,8 +100,7 @@ let characterSelectTransition = null; // animação de confirmação na seleçã
 let characterSelectTransitionToken = 0;
 let screenShake = 0; // Intensidade do screen shake
 let hitStopFrames = 0; // Freeze frames em hits fortes
-const pauseMenuBg = new Image();
-pauseMenuBg.src = 'assets/ui/pause-menu-vegas.webp';
+const pauseMenuBg = window.assetManager.image('assets/ui/pause-menu-vegas.webp','shared');
 
 let pauseReturnState = GameState.PLAYING;
 let pauseStartedAt = 0;
@@ -208,19 +207,16 @@ let destructibles = []; // Caixas/barris que guardam power-ups
 // ===== SPRITES 16-BIT DOS RECIPIENTES =====
 const containerSprites = {};
 ['crate', 'barrel'].forEach(type => {
-    const img = new Image();
-    img.src = type === 'crate' ? 'assets/objects/wood-crate-16bit.webp' : 'assets/objects/wood-barrel-16bit.webp';
-    containerSprites[type] = img;
+    const src=type === 'crate' ? 'assets/objects/wood-crate-16bit.webp' : 'assets/objects/wood-barrel-16bit.webp';
+    containerSprites[type] = window.assetManager.image(src,'shared');
 });
 window.containerSprites = containerSprites;
 
 // ===== SPRITES 16-BIT DOS POWER-UPS =====
 const powerUpSprites = {};
 ['health', 'speed', 'strength', 'invincible', 'score'].forEach(type => {
-    const img = new Image();
-    img.onerror = () => console.warn('[powerup-sprite] Falha ao carregar:', type);
-    img.src = `assets/powerups/${type}-16bit.webp`;
-    powerUpSprites[type] = img;
+    const src=`assets/powerups/${type}-16bit.webp`;
+    powerUpSprites[type] = window.assetManager.image(src,'shared');
 });
 window.powerUpSprites = powerUpSprites;
 
@@ -313,13 +309,13 @@ function cleanupParticles() {
         const removed = particles.length - particleLimit;
         particles.splice(0, particles.length - particleLimit);
         if (debugMode) {
-            console.warn(`⚠️ Limite de partículas atingido! Removendo ${removed} antigas`);
+            if(window.DEV) console.warn(`⚠️ Limite de partículas atingido! Removendo ${removed} antigas`);
         }
     }
     
     const removed = before - particles.length;
     if (debugMode && removed > 10) {
-        console.log(`🧹 Limpou ${removed} partículas`);
+        if(window.DEV) console.log(`🧹 Limpou ${removed} partículas`);
     }
 }
 
@@ -340,7 +336,7 @@ function cleanupProjectiles() {
     
     const removed = before - projectiles.length;
     if (debugMode && removed > 0) {
-        console.log(`🧹 Removidos ${removed} projéteis`);
+        if(window.DEV) console.log(`🧹 Removidos ${removed} projéteis`);
     }
 }
 
@@ -353,7 +349,7 @@ function cleanupPowerUps() {
     
     const removed = before - powerUps.length;
     if (debugMode && removed > 0) {
-        console.log(`🧹 Removidos ${removed} power-ups`);
+        if(window.DEV) console.log(`🧹 Removidos ${removed} power-ups`);
     }
 }
 
@@ -364,11 +360,7 @@ function replayPreviousLevelFromGate() {
     gameOverScreen?.deactivate?.();
     clearKeys?.();
     soundSystem?.stopMusic?.();
-    loadLevel(replayIndex);
-    if (gameState !== GameState.GAME_OVER) {
-        gameState = GameState.LEVEL_INTRO;
-        levelIntroTimer = 180;
-    }
+    transitionToLevel(replayIndex,()=>{ gameState=GameState.LEVEL_INTRO; levelIntroTimer=180; });
     soundSystem?.playSound?.('menuSelect');
     return true;
 }
@@ -380,6 +372,7 @@ function returnToMenuFromGameOver() {
     window.GameRuntime?.cancelTimersFor?.('level');
     window.GameRuntime?.cancelTimersFor?.('boss');
     clearKeys?.();
+    releaseCurrentLevelForMenu();
     gameState = GameState.MENU;
     refreshMenuOptions?.();
     menuSelection = 0;
@@ -423,10 +416,13 @@ document.addEventListener('keydown', e => {
         return;
     }
     
-    // Melhoria #19: Pular loading screen com qualquer tecla
-    if (gameState === GameState.LOADING && loadingProgress >= 1) {
-        gameState = GameState.MENU;
-        soundSystem.playSound('menuSelect');
+    // Loading real: erro permite retry; somente o bootstrap inicial aguarda tecla.
+    if (gameState === GameState.LOADING) {
+        const ls=window.LevelLoadState||{};
+        if(ls.error && (e.key==='Enter'||e.key===' ')) { window.retryCurrentLoad?.(); return; }
+        if(!ls.active && loadingProgress>=1 && ls.type==='bootstrap') {
+            gameState=GameState.MENU; soundSystem.playSound('menuSelect'); return;
+        }
     }
     
     // Menu principal
@@ -522,8 +518,8 @@ document.addEventListener('keydown', e => {
             e.preventDefault(); stageSelectPlayers = stageSelectPlayers === 1 ? 2 : 1; soundSystem.playSound('menuMove');
         }
         if (e.key === 'Enter') {
-            if (stageSelectIsBusBonus()) { window.busSequence?.startMinigame(true); gameState=GameState.BUS_MINIGAME; soundSystem.playSound('menuSelect'); }
-            else if (stageSelectIsChicoBonus()) { soundSystem?.stopMusic?.(); window.fishingBonus?.start?.(stageSelectPlayers); gameState=GameState.FISHING_BONUS; soundSystem.playSound('menuSelect'); }
+            if (stageSelectIsBusBonus()) { startBonusWithLoading('bus', stageSelectPlayers); }
+            else if (stageSelectIsChicoBonus()) { startBonusWithLoading('fishing', stageSelectPlayers); }
             else { pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect'); }
         }
         if (e.key === 'Escape') { gameState=GameState.MENU; menuSelection=6; soundSystem.playSound('menuBack'); }
@@ -747,9 +743,10 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 canvas.addEventListener('click', e => {
-    if (gameState === GameState.LOADING && loadingProgress >= 1) {
-        gameState = GameState.MENU;
-        soundSystem.playSound('menuSelect');
+    if (gameState === GameState.LOADING) {
+        const ls=window.LevelLoadState||{};
+        if(ls.error){ window.retryCurrentLoad?.(); return; }
+        if(!ls.active && loadingProgress>=1 && ls.type==='bootstrap') { gameState=GameState.MENU; soundSystem.playSound('menuSelect'); return; }
         return;
     }
     if (gameState !== GameState.MENU) return;
@@ -845,28 +842,101 @@ function startGame(numPlayers) {
         players.push(player2);
     }
     
-    // Carregar primeira fase
-    loadLevel(0);
+    // Carregar primeira fase pelo LevelManager
+    transitionToLevel(0,()=>{gameState=GameState.LEVEL_INTRO;levelIntroTimer=180;});
+}
+
+function cleanupCurrentLevelForTransition() {
+    // Limpeza segura antes de carregar a próxima fase.
+    window.GameRuntime?.cancelTimersFor?.('level');
+    window.GameRuntime?.cancelTimersFor?.('boss');
+    soundSystem?.stopMusic?.();
+    soundSystem?.stopAllLoops?.();
+    enemies.length = 0;
+    particles.length = 0;
+    powerUps.length = 0;
+    destructibles.length = 0;
+    if (typeof projectiles !== 'undefined') projectiles.length = 0;
+    waveSystem = null;
+    enemySpawnDirector = null;
+    bossSpawned = false;
+    bossPhase = false;
+    bossDefeated = false;
+    bossWarningTimer = 0;
+    phase3ColonelIntroPlayed = false;
+    window.farmDogNPCManager?.dispose?.();
+    clearKeys?.();
+}
+
+function releaseCurrentLevelForMenu() {
+    cleanupCurrentLevelForTransition();
+    const lm=window.levelManager;
+    if(lm?.currentGroup){
+        window.assetManager?.releaseGroup?.(lm.currentGroup);
+        window.soundSystem?.releaseTypes?.(lm.currentSounds||[]);
+        lm.currentSounds=[]; lm.currentGroup=null; lm.currentLevelIndex=null;
+    }
+    currentLevel?.dispose?.();
+}
+
+function selectedCharacterNamesForLoad() {
+    return selectedCharacters.slice(0, Math.max(1, playerCount)).filter(Boolean);
+}
+
+function transitionToLevel(index, afterLoaded) {
+    loadingProgress = 0;
+    gameState = GameState.LOADING;
+    return window.levelManager.transitionLevel(index, {
+        playerNames: selectedCharacterNamesForLoad(),
+        beforeLoad: () => {
+            // Salva o estado relevante antes de liberar referências da fase anterior.
+            if (currentLevel) {
+                try { saveSystem?.save?.({ score, level: currentLevelIndex + 1, playerCharacter: selectedCharacters[0] }); } catch (_) {}
+            }
+            cleanupCurrentLevelForTransition();
+        },
+        afterLoad: () => {
+            loadingProgress = 1;
+            loadLevel(index);
+            if (gameState !== GameState.GAME_OVER && gameState !== GameState.VICTORY) afterLoaded?.();
+        },
+        onError: () => { gameState = GameState.LOADING; }
+    });
+}
+
+function startBonusWithLoading(kind, count=1) {
+    loadingProgress = 0;
+    gameState = GameState.LOADING;
+    soundSystem?.stopMusic?.();
+    const bonusPlayerNames = kind==='fishing' ? (count>1?['João','Crist']:['João']) : selectedCharacterNamesForLoad();
+    return window.levelManager.loadBonus(kind, {
+        playerNames: bonusPlayerNames,
+        beforeLoad: () => { clearKeys?.(); },
+        afterLoad: () => {
+            loadingProgress = 1;
+            if (kind === 'bus') {
+                window.busSequence?.startMinigame(true);
+                gameState = GameState.BUS_MINIGAME;
+            } else {
+                window.fishingBonus?.start?.(count);
+                gameState = GameState.FISHING_BONUS;
+            }
+            soundSystem?.playSound?.('menuSelect');
+        },
+        onError: () => { gameState = GameState.LOADING; }
+    });
 }
 
 function startGameWithCharacters() {
-    // Limpar teclas do menu/seleção para evitar conflitos
     clearKeys();
-    
     const startLevelIndex = Math.max(0, Math.min(LEVELS.length - 1, pendingStartLevel || 0));
-    // História completa apenas ao iniciar uma campanha nova. No seletor, vai direto à introdução da fase.
-    if (startLevelIndex === 0) {
-        gameState = GameState.STORY_INTRO;
-    } else {
-        gameState = GameState.STORY_LEVEL;
-    }
-    
+
     players.length = 0;
-    enemies.length = 0; // Limpar array
+    enemies.length = 0;
     cameraX = 0;
     const resumeCheckpoint = pendingResumeCheckpoint;
     score = resumeCheckpoint ? Math.max(0, Number(resumeCheckpoint.score) || 0) : 0;
-    particles.length = 0; // Limpar array
+    particles.length = 0;
     powerUps.length = 0;
     destructibles.length = 0;
     currentLevelIndex = startLevelIndex;
@@ -875,59 +945,46 @@ function startGameWithCharacters() {
     victoryCommitted = false; gameOverCommitted=false; completedLevelStats.clear(); sessionPlaytimeSeconds=0; lastPlaytimeSaveAt=Date.now();
     saveSystem.beginGame?.();
     totalGameDamage = 0;
-    
-    // Resetar stats de conquistas para nova partida
-    
-    // NOVO: Criar jogador 1 com a classe específica baseada no personagem selecionado
+
     let player1;
     if (selectedCharacters[0] === 'João') player1 = new PlayerJoao(150, 440, 1);
     else if (selectedCharacters[0] === 'Crist') player1 = new PlayerCrist(150, 440, 1);
     else player1 = new PlayerChico(150, 440, 1);
     player1.evolution = new PlayerEvolution(player1);
-    player1.hitEnemiesThisSwing = new Set(); // BUG FIX: evita multi-hit por swing
-    // CARREGAR PROGRESSO SALVO
-    const savedProgress1 = saveSystem.loadPlayerProgress(selectedCharacters[0]);
-    player1.evolution.load(savedProgress1);
+    player1.hitEnemiesThisSwing = new Set();
+    player1.evolution.load(saveSystem.loadPlayerProgress(selectedCharacters[0]));
     players.push(player1);
-    
-    // NOVO: Criar jogador 2 se necessário com a classe específica
+
     if (playerCount === 2) {
         let player2;
         if (selectedCharacters[1] === 'João') player2 = new PlayerJoao(200, 440, 2);
         else if (selectedCharacters[1] === 'Crist') player2 = new PlayerCrist(200, 440, 2);
         else player2 = new PlayerChico(200, 440, 2);
         player2.evolution = new PlayerEvolution(player2);
-        player2.hitEnemiesThisSwing = new Set(); // BUG FIX: evita multi-hit por swing
-        // CARREGAR PROGRESSO SALVO
-        const savedProgress2 = saveSystem.loadPlayerProgress(selectedCharacters[1]);
-        player2.evolution.load(savedProgress2);
+        player2.hitEnemiesThisSwing = new Set();
+        player2.evolution.load(saveSystem.loadPlayerProgress(selectedCharacters[1]));
         players.push(player2);
     }
-    
-    // Inicializar sistema de troféus global
-    if (!window.trophySystem) {
-        window.trophySystem = new TrophySystem();
-    }
-    trophySystem = window.trophySystem; // Sincronizar variável local
-    
-    // Resetar o sistema de Game Over para novo jogo
-    gameOverScreen.deactivate();
-    
-    // Salvar personagem favorito
-    saveSystem.updateFavoriteCharacter(selectedCharacters[0]);
-    
-    // Carregar a fase escolhida (0 em campanha normal).
-    loadLevel(startLevelIndex);
-    pendingStartLevel = 0;
-    pendingResumeCheckpoint = null;
 
-    // Abertura cinematográfica da campanha. No seletor de fases mantemos o fluxo direto.
-    if (startLevelIndex === 0) {
-        startStoryScene('intro', () => {
-            gameState = GameState.LEVEL_INTRO;
+    if (!window.trophySystem) window.trophySystem = new TrophySystem();
+    trophySystem = window.trophySystem;
+    gameOverScreen.deactivate();
+    saveSystem.updateFavoriteCharacter(selectedCharacters[0]);
+
+    transitionToLevel(startLevelIndex, () => {
+        pendingStartLevel = 0;
+        pendingResumeCheckpoint = null;
+        if (startLevelIndex === 0) {
+            gameState = GameState.STORY_INTRO;
+            startStoryScene('intro', () => {
+                gameState = GameState.LEVEL_INTRO;
+                levelIntroTimer = 180;
+            });
+        } else {
+            gameState = GameState.STORY_LEVEL;
             levelIntroTimer = 180;
-        });
-    }
+        }
+    });
 }
 
 function cancelCharacterSelectTransition() {
@@ -996,8 +1053,6 @@ function loadLevel(index) {
     window.GameRuntime?.cancelTimersFor?.('boss');
     currentLevelIndex = index;
     currentLevel = LEVELS[index];
-    window.assetManager?.preloadLevel?.(currentLevel);
-    window.assetManager?.preloadNext?.(LEVELS,index);
     levelLoadToken++;
     const thisLevelToken = levelLoadToken;
 
@@ -1478,7 +1533,6 @@ function nextLevel() {
     recordLevelCompletion(currentLevelIndex);
     soundSystem?.stopMusic?.();
 
-    // Cutscenes narrativas pós-fase. Cada uma roda uma única vez por sessão.
     const postSceneByLevel = {0:'farmFarewell', 2:'desertClue', 3:'vegasArrival', 4:'victorReveal', 5:'secretDoor', 6:'shadowTruth'};
     const postScene = postSceneByLevel[currentLevelIndex];
     if (postScene && window.storyCutscenes && !window.storyCutscenes.hasSeen?.(postScene)) {
@@ -1486,29 +1540,24 @@ function nextLevel() {
         return;
     }
 
-    // Próxima fase com reset de estado consistente.
     const nextIndex = currentLevelIndex + 1;
-
     if (nextIndex >= LEVELS.length) {
+        cleanupCurrentLevelForTransition();
         finishGameWithStory();
         return;
     }
 
     if (typeof clearKeys === 'function') clearKeys();
-
-    loadLevel(nextIndex);
-
-    // Entrada especial da Fase 8: confronto com o Deus das Apostas.
-    if (nextIndex === 7 && gameState !== GameState.GAME_OVER && window.storyCutscenes && !window.storyCutscenes.hasSeen?.('godIntro')) {
-        startStoryScene('godIntro', () => { gameState = GameState.LEVEL_INTRO; levelIntroTimer = 180; });
-        return;
-    }
-
-    // Só entra na tela de história se o carregamento não tiver acionado um gate.
-    if (gameState !== GameState.GAME_OVER && gameState !== GameState.VICTORY) {
-        gameState = GameState.STORY_LEVEL;
-        levelIntroTimer = 180;
-    }
+    transitionToLevel(nextIndex, () => {
+        if (nextIndex === 7 && gameState !== GameState.GAME_OVER && window.storyCutscenes && !window.storyCutscenes.hasSeen?.('godIntro')) {
+            startStoryScene('godIntro', () => { gameState = GameState.LEVEL_INTRO; levelIntroTimer = 180; });
+            return;
+        }
+        if (gameState !== GameState.GAME_OVER && gameState !== GameState.VICTORY) {
+            gameState = GameState.STORY_LEVEL;
+            levelIntroTimer = 180;
+        }
+    });
 }
 
 function acquireParticle(data){const p=particlePool.pop()||{};Object.keys(p).forEach(k=>delete p[k]);Object.assign(p,data);return p;}
@@ -1596,88 +1645,64 @@ if (!window.particles.createText) {
 
 // Melhoria #19: Splash screen com loading
 // Imagem oficial da tela de carregamento
-const loadingScreenImage = new Image();
-loadingScreenImage.src = 'assets/ui/loading-screen.webp';
-const mainMenuBackgroundImage = new Image();
-mainMenuBackgroundImage.src = 'assets/ui/menu-principal-vegas.webp';
-const chicoFumacaSelectImage = new Image();
-chicoFumacaSelectImage.src = 'assets/npc/chico-fumaca/chico-fumaca-idle.webp';
+const loadingScreenImage = window.assetManager.image('assets/ui/loading-screen.webp','shared');
+const mainMenuBackgroundImage = window.assetManager.image('assets/ui/menu-principal-vegas.webp','shared');
+const chicoFumacaSelectImage = window.assetManager.image('assets/npc/chico-fumaca/chico-fumaca-idle.webp','shared');
 
 
 function drawLoading() {
+    const loadState = window.LevelLoadState || {};
+    const progress = Number.isFinite(loadState.progress) ? loadState.progress : loadingProgress;
+    loadingProgress = Math.max(0, Math.min(1, progress || 0));
     ctx.save();
     ctx.imageSmoothingEnabled = false;
 
-    // Fundo: arte oficial enviada pelo usuário.
     if (loadingScreenImage.complete && loadingScreenImage.naturalWidth) {
-        // "cover" para preencher todo o canvas sem deformar a imagem.
-        const cw = ctx.canvas.width;
-        const ch = ctx.canvas.height;
-        const iw = loadingScreenImage.naturalWidth;
-        const ih = loadingScreenImage.naturalHeight;
+        const cw = ctx.canvas.width, ch = ctx.canvas.height;
+        const iw = loadingScreenImage.naturalWidth, ih = loadingScreenImage.naturalHeight;
         const scale = Math.max(cw / iw, ch / ih);
-        const sw = cw / scale;
-        const sh = ch / scale;
-        const sx = (iw - sw) / 2;
-        const sy = (ih - sh) / 2;
-        ctx.drawImage(loadingScreenImage, sx, sy, sw, sh, 0, 0, cw, ch);
+        const sw = cw / scale, sh = ch / scale;
+        ctx.drawImage(loadingScreenImage, (iw-sw)/2, (ih-sh)/2, sw, sh, 0, 0, cw, ch);
     } else {
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.fillStyle = '#111'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     }
 
-    // Painel discreto para leitura da barra sem esconder a arte.
-    const barW = 430;
-    const barH = 24;
-    const barX = (ctx.canvas.width - barW) / 2;
-    const barY = ctx.canvas.height - 88;
+    const barW=480,barH=24,barX=(ctx.canvas.width-barW)/2,barY=ctx.canvas.height-104;
+    ctx.fillStyle='rgba(8,8,10,.82)';ctx.beginPath();ctx.roundRect(barX-18,barY-88,barW+36,148,14);ctx.fill();
 
-    ctx.fillStyle = 'rgba(8, 8, 10, 0.72)';
-    ctx.fillRect(barX - 14, barY - 16, barW + 28, 74);
+    ctx.textAlign='center';
+    ctx.fillStyle='#fff2c2';ctx.font='bold 31px Bebas Neue';
+    ctx.fillText(loadState.title || 'JOÃO & CRIST',ctx.canvas.width/2,barY-60);
+    ctx.fillStyle='#f0b52f';ctx.font='bold 17px Righteous';
+    ctx.fillText(loadState.subtitle || 'Preparando o jogo',ctx.canvas.width/2,barY-35);
 
-    // Moldura pixel-art.
-    ctx.fillStyle = '#1b130d';
-    ctx.fillRect(barX - 5, barY - 5, barW + 10, barH + 10);
-    ctx.fillStyle = '#d49a26';
-    ctx.fillRect(barX - 3, barY - 3, barW + 6, barH + 6);
-    ctx.fillStyle = '#241b16';
-    ctx.fillRect(barX, barY, barW, barH);
-
-    // Progresso.
-    const innerW = barW - 8;
-    const filled = Math.max(0, Math.min(innerW, Math.floor(innerW * loadingProgress)));
-    ctx.fillStyle = '#f0b52f';
-    ctx.fillRect(barX + 4, barY + 4, filled, barH - 8);
-
-    // Segmentação pixel-art.
-    ctx.fillStyle = 'rgba(70, 40, 18, .38)';
-    for (let x = barX + 22; x < barX + barW - 5; x += 22) {
-        ctx.fillRect(x, barY + 4, 3, barH - 8);
+    if (loadState.error) {
+        ctx.fillStyle='#ff625c';ctx.font='bold 18px Righteous';ctx.fillText('NÃO FOI POSSÍVEL CARREGAR',ctx.canvas.width/2,barY-7);
+        const first=loadState.failures?.[0]?.src || loadState.error?.message || 'Recurso desconhecido';
+        ctx.fillStyle='#ffe2d9';ctx.font='11px monospace';ctx.fillText(String(first).slice(0,72),ctx.canvas.width/2,barY+18);
+        ctx.fillStyle='#fff';ctx.font='bold 14px Righteous';ctx.fillText('ENTER / A / CLIQUE — TENTAR NOVAMENTE',ctx.canvas.width/2,barY+46);
+        ctx.restore();
+        return;
     }
 
-    const pct = Math.floor(loadingProgress * 100);
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 16px monospace';
-    ctx.fillStyle = '#fff2c2';
-    ctx.fillText(pct + '%', ctx.canvas.width / 2, barY - 22);
+    ctx.fillStyle='#1b130d';ctx.fillRect(barX-5,barY-5,barW+10,barH+10);
+    ctx.fillStyle='#d49a26';ctx.fillRect(barX-3,barY-3,barW+6,barH+6);
+    ctx.fillStyle='#241b16';ctx.fillRect(barX,barY,barW,barH);
+    const innerW=barW-8,filled=Math.floor(innerW*loadingProgress);
+    ctx.fillStyle='#f0b52f';ctx.fillRect(barX+4,barY+4,filled,barH-8);
+    ctx.fillStyle='rgba(70,40,18,.38)';for(let x=barX+22;x<barX+barW-5;x+=22)ctx.fillRect(x,barY+4,3,barH-8);
 
-    if (loadingProgress >= 1) {
-        ctx.font = 'bold 17px monospace';
-        ctx.fillStyle = '#ffffff';
-        if ((Math.floor(performance.now() / 450) & 1) === 0) {
-            ctx.fillText('PRESSIONE QUALQUER TECLA', ctx.canvas.width / 2, barY + 52);
-        }
-    } else {
-        ctx.font = 'bold 14px monospace';
-        ctx.fillStyle = '#e6d2a2';
-        ctx.fillText('CARREGANDO...', ctx.canvas.width / 2, barY + 50);
+    const pct=Math.floor(loadingProgress*100);
+    ctx.fillStyle='#fff2c2';ctx.font='bold 16px monospace';ctx.fillText(`${pct}%`,ctx.canvas.width/2,barY-10);
+    const dots='.'.repeat((Math.floor(performance.now()/320)%3)+1);
+    ctx.fillStyle='#e6d2a2';ctx.font='bold 14px monospace';ctx.fillText(`CARREGANDO${dots}`,ctx.canvas.width/2,barY+50);
+    if(loadState.tip){ctx.fillStyle='#b8dfff';ctx.font='11px Righteous';ctx.fillText(`DICA: ${loadState.tip}`,ctx.canvas.width/2,barY+78);}
+
+    if (!loadState.active && loadingProgress >= 1 && loadState.type === 'bootstrap') {
+        ctx.fillStyle='#fff';ctx.font='bold 13px Righteous';
+        if((Math.floor(performance.now()/450)&1)===0)ctx.fillText('PRESSIONE QUALQUER TECLA',ctx.canvas.width/2,barY+98);
     }
-
     ctx.restore();
-
-    if (loadingProgress < 1) {
-        loadingProgress = Math.min(1, loadingProgress + 0.01);
-    }
 }
 
 function drawMenuBackgroundCover(img) {
@@ -2041,6 +2066,7 @@ function drawCharacterCard(cx,index,name,accent,stats,role,chosen,opts={}) {
 function drawTutorialCharacter(cx,sheet,name,accent,tag,tips) {
     ctx.fillStyle='rgba(0,0,0,.58)';ctx.strokeStyle=accent;ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(cx-190,108,380,250,14);ctx.fill();ctx.stroke();
     if(sheet?.complete&&sheet.naturalWidth){ctx.imageSmoothingEnabled=false;ctx.drawImage(sheet,0,0,128,128,cx-165,135,145,145);}
+    else if(name==='CRIST' && CRIST_FRAMES?.idle?.[0]?.complete){const im=CRIST_FRAMES.idle[0];ctx.imageSmoothingEnabled=false;ctx.drawImage(im,cx-150,135,115,145);}
     ctx.fillStyle=accent;ctx.font='bold 34px Bebas Neue';ctx.textAlign='left';ctx.fillText(name,cx-2,157);
     ctx.fillStyle='#f5c04a';ctx.font='bold 14px Righteous';ctx.fillText(tag,cx-2,181);
     ctx.fillStyle='#fff';ctx.font='13px Righteous'; tips.forEach((t,i)=>ctx.fillText('• '+t,cx-2,215+i*34));
@@ -2140,13 +2166,11 @@ function activateMenuSelection() {
         } else { refreshMenuOptions(); menuSelection=0; soundSystem.playSound('menuBack'); }
     }
     else if(option==='SELECIONAR FASE' && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
-    else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}
+    else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){startBonusWithLoading('bus',1);}
     else if(option==='BÔNUS — PESCARIA DO CHICO FUMAÇA'){
         soundSystem?.stopMusic?.();
         stageSelectPlayers = Math.max(1, Math.min(2, playerCount || 1));
-        window.fishingBonus?.start?.(stageSelectPlayers);
-        gameState=GameState.FISHING_BONUS;
-        soundSystem.playSound('menuSelect');
+        startBonusWithLoading('fishing',stageSelectPlayers);
     }
 }
 window.refreshMenuOptions = refreshMenuOptions;
@@ -2161,7 +2185,8 @@ function handleGamepadInput() {
     const accept=gamepadSystem.wasPressed(p,0);
     const back=gamepadSystem.wasPressed(p,1);
 
-    if(gameState===GameState.CUTSCENE){if(accept)window.storyCutscenes?.advance?.();if(back||gamepadSystem.wasPressed(p,9))window.storyCutscenes?.skip?.();}
+    if(gameState===GameState.LOADING){const ls=window.LevelLoadState||{};if(ls.error&&accept){window.retryCurrentLoad?.();return;}if(!ls.active&&loadingProgress>=1&&ls.type==='bootstrap'&&accept){gameState=GameState.MENU;soundSystem.playSound('menuSelect');return;}}
+    else if(gameState===GameState.CUTSCENE){if(accept)window.storyCutscenes?.advance?.();if(back||gamepadSystem.wasPressed(p,9))window.storyCutscenes?.skip?.();}
     else if(gameState===GameState.MENU){if(up){menuSelection=(menuSelection+menuOptions.length-1)%menuOptions.length;soundSystem.playSound('menuMove');}if(down){menuSelection=(menuSelection+1)%menuOptions.length;soundSystem.playSound('menuMove');}if(accept)activateMenuSelection();}
     else if(gameState===GameState.TROPHIES){
         if(up&&window.trophySystem){window.trophySystem.scrollUp();soundSystem.playSound('menuMove');}
@@ -2172,7 +2197,7 @@ function handleGamepadInput() {
         if(up||left){stageSelectIndex=(stageSelectIndex+getStageSelectCount()-1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(down||right){stageSelectIndex=(stageSelectIndex+1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
-        if(accept){if(stageSelectIsBusBonus()){soundSystem?.stopMusic?.();window.busSequence?.startMinigame(true);gameState=GameState.BUS_MINIGAME;soundSystem.playSound('menuSelect');}else if(stageSelectIsChicoBonus()){soundSystem?.stopMusic?.();window.fishingBonus?.start?.(stageSelectPlayers);gameState=GameState.FISHING_BONUS;soundSystem.playSound('menuSelect');}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
+        if(accept){if(stageSelectIsBusBonus()){startBonusWithLoading('bus',stageSelectPlayers);}else if(stageSelectIsChicoBonus()){startBonusWithLoading('fishing',stageSelectPlayers);}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
@@ -2548,6 +2573,7 @@ function adjustPauseMenuSetting(dir=1, activate=false) {
             soundSystem?.resumeAll?.();
             window.GameRuntime?.resumeTimers?.();
             pauseStartedAt=0; pauseSnapshot=null;
+            releaseCurrentLevelForMenu();
             gameState=GameState.MENU; menuSelection=0; clearKeys();
         };
         return;
@@ -3488,7 +3514,7 @@ function gameLoop() {
                     const lifeAfter = Number.isFinite(enemy.life) ? enemy.life : null;
                     if (proj.owner?.name === 'João' || proj.owner?.constructor?.name?.toLowerCase().includes('joao')) {
                         const enemyName = enemy.type || enemy.name || enemy.constructor?.name || 'inimigo';
-                        if (window.DEBUG_GAME) console.log(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
+                        if (window.DEBUG_GAME) if(window.DEV) console.log(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
                     }
                     score += killed ? 30 : 8;
                     if (killed || (lifeAfter !== null && lifeAfter <= 0)) {
@@ -3891,7 +3917,7 @@ function gameLoop() {
         const allPlayersDead = players.every(p => p.life <= 0);
         
         if (allPlayersDead) {
-            console.log('🔴 GAME OVER - Score:', score, 'Fase:', currentLevelIndex + 1);
+            if(window.DEV) console.log('🔴 GAME OVER - Score:', score, 'Fase:', currentLevelIndex + 1);
             
             // CORREÇÃO DO BUG: Limpar inimigos imediatamente quando o jogador morre
             enemies.length = 0;
@@ -4063,6 +4089,7 @@ function gameLoop() {
         const fishingResult = window.fishingBonus?.updateDraw?.(ctx, keys, gamepadSystem, sistemControles);
         if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
         if (fishingResult === 'DONE') {
+            window.levelManager?.releaseBonus?.('fishing');
             gameState = GameState.STAGE_SELECT;
             stageSelectIndex = stageSelectChicoIndex();
             soundSystem?.playSound?.('menuSelect');
@@ -4077,13 +4104,14 @@ function gameLoop() {
         const busResult = window.busSequence?.updateDrawMinigame(ctx, keys, gamepadSystem, sistemControles);
         if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
         if (busResult === 'ARRIVAL') {
-            loadLevel(2);
-            // Se o gate de nível for acionado, não sobrescreve GAME_OVER com a cutscene.
-            if (!levelGateActive && gameState !== GameState.GAME_OVER) {
-                gameState = GameState.BUS_ARRIVAL;
-                window.busSequence?.startArrival(players);
-            }
+            transitionToLevel(2, () => {
+                if (!levelGateActive && gameState !== GameState.GAME_OVER) {
+                    gameState = GameState.BUS_ARRIVAL;
+                    window.busSequence?.startArrival(players);
+                }
+            });
         } else if (busResult === 'BONUS_DONE') {
+            window.levelManager?.releaseBonus?.('bus');
             gameState = GameState.MENU; refreshMenuOptions(); menuSelection = Math.max(0, menuOptions.indexOf('BÔNUS — ESTRADA PARA VEGAS'));
         }
     }
@@ -4169,5 +4197,38 @@ function gameLoop() {
     
 }
 
-// Iniciar o jogo
+async function beginInitialLoad() {
+    const reg=window.CharacterAssetRegistry||{};
+    const shared=[
+        'assets/ui/loading-screen.webp','assets/ui/menu-principal-vegas.webp','assets/ui/pause-menu-vegas.webp',
+        'assets/ui/hud-joao-frame.webp','assets/ui/hud-crist-frame.webp','assets/ui/hud-chico-frame.webp',
+        'assets/ui/portrait-joao.webp','assets/ui/portrait-crist.webp','assets/ui/portrait-chico.webp',
+        'assets/ui/dialog-hud-joao.webp','assets/ui/dialog-hud-crist.webp','assets/ui/dialog-hud-generic.webp',
+        'assets/objects/wood-crate-16bit.webp','assets/objects/wood-barrel-16bit.webp',
+        'assets/powerups/health-16bit.webp','assets/powerups/speed-16bit.webp','assets/powerups/strength-16bit.webp','assets/powerups/invincible-16bit.webp','assets/powerups/score-16bit.webp',
+        'assets/npc/chico-fumaca/chico-fumaca-idle.webp',
+        ...(reg.joao?.preview||[]),...(reg.crist?.preview||[]),...(reg.chico?.preview||[])
+    ];
+    window.LevelLoadState={active:true,type:'bootstrap',progress:0,title:'JOÃO & CRIST',subtitle:'Preparando recursos essenciais',tip:'As fases serão carregadas somente quando forem usadas.',error:null,failures:[],canRetry:false};
+    loadingProgress=0;
+    try{
+        await window.assetManager.loadGroup('shared',shared,(p)=>{
+            loadingProgress=p;
+            window.LevelLoadState.progress=p;
+        },{timeout:12000,retries:1});
+        loadingProgress=1;
+        Object.assign(window.LevelLoadState,{active:false,progress:1,error:null,failures:[],canRetry:false});
+    }catch(error){
+        Object.assign(window.LevelLoadState,{active:true,error,failures:error?.failures||[],canRetry:true});
+    }
+}
+
+window.retryCurrentLoad=()=>{
+    const ls=window.LevelLoadState||{};
+    if(ls.type==='bootstrap') return beginInitialLoad();
+    return window.levelManager?.retry?.();
+};
+
+// Iniciar o jogo: loop único + bootstrap com progresso real.
+beginInitialLoad();
 safeGameLoopFrame();
