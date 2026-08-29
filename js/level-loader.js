@@ -79,7 +79,7 @@
     for(const c of ['red','blue','yellow','green','black','white']) images.push(`assets/bus/cars/car-${c}.webp`);
     for(const f of ['repair','money','star','turbo']) images.push(`assets/bus/items/${f}.webp`);
     images.push('assets/bus/obstacles/rock.webp');
-    return {id:'bus',name:'Estrada para Vegas',images:uniq(images),sounds:['busEngine','busAccelerate','busBrake','busHorn','busCollision','busRepair','busMoney','busStar','busTurbo','busCheckpoint','busDoorOpen','busDoorClose','busBroken','busArrival']};
+    return {id:'bus',name:'Estrada para Vegas',images:uniq(images),sounds:['busEngine','busAccelerate','busBrake','busHorn','busCollision','busRepair','busMoney','busStar','busTurbo','busCheckpoint','busDoorOpen','busDoorClose','busBroken','busArrival','busLaneChange','busNearMiss','busRoad','busWarning']};
   }
 
   class LevelManager {
