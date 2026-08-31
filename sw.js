@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v095-club-assets-3';
+const VERSION='joao-crist-v095-club-crist-npc-sheet-8';
 const CORE=[
   './',
   './index.html',
@@ -11,6 +11,11 @@ const CORE=[
   './favicon-32.png',
   './favicon-64.png',
   './favicon.ico',
+  './assets/bonus/boate/players/joao/dance-sheet-transparent.png',
+  './assets/bonus/boate/players/crist/dance-sheet-transparent.png',
+  './assets/bonus/boate/npcs/crowd/crowd-girl-casual.png',
+  './assets/bonus/boate/npcs/crowd/crowd-guy-black.png',
+  './assets/bonus/boate/npcs/crowd/crowd-girl-pink.png',
   './js/boss-enemies.js',
   './js/boss-expansion.js',
   './js/bus-sequence.js',

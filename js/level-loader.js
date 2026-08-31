@@ -89,10 +89,14 @@
     const images=[
       ...['idle','walk1','walk2','attack','hurt','dead'].map(st=>`${base}/enemies/seguranca/${st}.webp`),
       `${base}/ui/portrait-joao.webp`,`${base}/ui/portrait-crist.webp`,
-      `${base}/players/joao/dance-sheet.png`,
+      `${base}/players/joao/dance-sheet-transparent.png`,
+      `${base}/players/crist/dance-sheet-transparent.png`,
       `${base}/backgrounds/noite-na-boate.png`,
       ...Array.from({length:5},(_,i)=>`${base}/npcs/muscular/dance-${i+1}.webp`),
       ...Array.from({length:6},(_,i)=>`${base}/npcs/neon/dance-${i+1}.webp`),
+      `${base}/npcs/crowd/crowd-girl-casual.png`,
+      `${base}/npcs/crowd/crowd-guy-black.png`,
+      `${base}/npcs/crowd/crowd-girl-pink.png`,
       ...characterAssets(playerNames)
     ];
     return {id:'club',name:'Noite na Boate',images:uniq(images),sounds:['clubPerfect','clubCombo','clubHit','clubEnemyHit','clubLevelComplete','clubMenuMove','clubMenuSelect']};

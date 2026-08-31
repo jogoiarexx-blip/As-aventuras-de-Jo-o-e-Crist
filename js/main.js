@@ -529,7 +529,7 @@ document.addEventListener('keydown', e => {
             e.preventDefault(); stageSelectPlayers = stageSelectPlayers === 1 ? 2 : 1; soundSystem.playSound('menuMove');
         }
         if (e.key === 'Enter') {
-            if (stageSelectIsClub()) { window.clubReplayPlayers=stageSelectPlayers; startClubWithLoading(); }
+            if (stageSelectIsClub()) { startClubWithLoading(true, stageSelectPlayers); }
             else if (stageSelectIsBusBonus()) { startBonusWithLoading('bus', stageSelectPlayers); }
             else if (stageSelectIsChicoBonus()) { startBonusWithLoading('fishing', stageSelectPlayers); }
             else { pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect'); }
@@ -939,13 +939,44 @@ function startBonusWithLoading(kind, count=1) {
     });
 }
 
-function startClubWithLoading() {
+function startClubWithLoading(standalone=false, count=1, returnTo='stage_select') {
     loadingProgress=0; gameState=GameState.LOADING; soundSystem?.stopMusic?.();
-    return window.levelManager.loadBonus('club',{playerNames:selectedCharacterNamesForLoad(),beforeLoad:()=>{cleanupCurrentLevelForTransition();clearKeys?.();},afterLoad:()=>{loadingProgress=1;gameState=GameState.CLUB;window.clubSequence?.start?.();},onError:()=>{gameState=GameState.LOADING;}});
+    const bonusCount=Math.max(1,Math.min(2,Number(count)||1));
+    const clubPlayerNames=standalone ? (bonusCount>1?['João','Crist']:['João']) : selectedCharacterNamesForLoad();
+    window.clubReplayPlayers=bonusCount;
+    return window.levelManager.loadBonus('club',{
+        playerNames:clubPlayerNames,
+        beforeLoad:()=>{
+            cleanupCurrentLevelForTransition();
+            clearKeys?.();
+            // No replay pelo menu/seletor, o bônus não pode herdar jogadores/vida/estado da campanha.
+            if(standalone) players.length=0;
+        },
+        afterLoad:()=>{
+            loadingProgress=1;
+            gameState=GameState.CLUB;
+            window.clubSequence?.start?.({standalone,returnTo});
+        },
+        onError:()=>{gameState=GameState.LOADING;}
+    });
 }
 window.setClubCombatState=()=>{ gameState=GameState.CLUB_COMBAT; enemySpawnDirector={allSpawned:false,total:0,spawnedCount:0,groups:[]}; waveSystem=null; bossSpawned=false; bossDefeated=false; };
 window.setClubSequenceState=()=>{ gameState=GameState.CLUB; enemySpawnDirector=null; };
 window.continueAfterClub=()=>{ window.levelManager?.releaseBonus?.('club'); transitionToLevel(5,()=>{if(gameState!==GameState.GAME_OVER){gameState=GameState.STORY_LEVEL;levelIntroTimer=180;}}); };
+window.returnFromClubBonus=(returnTo='stage_select')=>{
+    window.levelManager?.releaseBonus?.('club');
+    cleanupCurrentLevelForTransition();
+    players.length=0;
+    currentLevel=null;
+    if(returnTo==='menu'){
+        gameState=GameState.MENU;
+        refreshMenuOptions();
+    }else{
+        gameState=GameState.STAGE_SELECT;
+        stageSelectIndex=stageSelectClubIndex();
+    }
+    soundSystem?.playSound?.('menuSelect');
+};
 
 function startGameWithCharacters() {
     clearKeys();
@@ -2206,8 +2237,7 @@ function activateMenuSelection() {
     else if(option==='BÔNUS — NOITE NA BOATE'){
         soundSystem?.stopMusic?.();
         stageSelectPlayers = Math.max(1, Math.min(2, playerCount || 1));
-        window.clubReplayPlayers=stageSelectPlayers;
-        startClubWithLoading();
+        startClubWithLoading(true,stageSelectPlayers,'menu');
     }
     else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){startBonusWithLoading('bus',1);}
     else if(option==='BÔNUS — PESCARIA DO CHICO FUMAÇA'){
@@ -2240,7 +2270,7 @@ function handleGamepadInput() {
         if(up||left){stageSelectIndex=(stageSelectIndex+getStageSelectCount()-1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(down||right){stageSelectIndex=(stageSelectIndex+1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
-        if(accept){if(stageSelectIsClub()){window.clubReplayPlayers=stageSelectPlayers;startClubWithLoading();}else if(stageSelectIsBusBonus()){startBonusWithLoading('bus',stageSelectPlayers);}else if(stageSelectIsChicoBonus()){startBonusWithLoading('fishing',stageSelectPlayers);}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
+        if(accept){if(stageSelectIsClub()){startClubWithLoading(true,stageSelectPlayers);}else if(stageSelectIsBusBonus()){startBonusWithLoading('bus',stageSelectPlayers);}else if(stageSelectIsChicoBonus()){startBonusWithLoading('fishing',stageSelectPlayers);}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
@@ -3201,7 +3231,8 @@ function drawFatalGameOverlay(fatal) {
         ctx.fillStyle='#fff0df';ctx.font='bold 17px Righteous';ctx.fillText('O save foi preservado.',500,247);
         ctx.font='14px monospace';ctx.fillStyle='#ddd';
         const state=fatal?.details?.state||'desconhecido', level=fatal?.details?.level||'?';
-        ctx.fillText(`Estado: ${state}  •  Fase: ${level}`,500,286);
+        const place=(state===GameState.CLUB||state===GameState.CLUB_COMBAT)?'Bônus: Noite na Boate':`Fase: ${level}`;
+        ctx.fillText(`Estado: ${state}  •  ${place}`,500,286);
         ctx.fillStyle='#ffd36c';ctx.font='bold 16px Righteous';ctx.fillText('PRESSIONE R PARA RECARREGAR A FASE  •  ESC PARA VOLTAR AO MENU',500,420);
         ctx.restore();
     } catch (_) {}
