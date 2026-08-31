@@ -309,13 +309,13 @@ function cleanupParticles() {
         const removed = particles.length - particleLimit;
         particles.splice(0, particles.length - particleLimit);
         if (debugMode) {
-            if(window.DEV) console.warn(`⚠️ Limite de partículas atingido! Removendo ${removed} antigas`);
+            if(window.DEV) window.GameLog?.warn(`⚠️ Limite de partículas atingido! Removendo ${removed} antigas`);
         }
     }
     
     const removed = before - particles.length;
     if (debugMode && removed > 10) {
-        if(window.DEV) console.log(`🧹 Limpou ${removed} partículas`);
+        if(window.DEV) window.GameLog?.debug(`🧹 Limpou ${removed} partículas`);
     }
 }
 
@@ -336,7 +336,7 @@ function cleanupProjectiles() {
     
     const removed = before - projectiles.length;
     if (debugMode && removed > 0) {
-        if(window.DEV) console.log(`🧹 Removidos ${removed} projéteis`);
+        if(window.DEV) window.GameLog?.debug(`🧹 Removidos ${removed} projéteis`);
     }
 }
 
@@ -349,7 +349,7 @@ function cleanupPowerUps() {
     
     const removed = before - powerUps.length;
     if (debugMode && removed > 0) {
-        if(window.DEV) console.log(`🧹 Removidos ${removed} power-ups`);
+        if(window.DEV) window.GameLog?.debug(`🧹 Removidos ${removed} power-ups`);
     }
 }
 
@@ -1433,7 +1433,8 @@ function startLevelMusic() {
     window.soundSystem.initAudioContext?.();
     window.soundSystem.stopMusic?.();
     const id=currentLevel?.id||1;
-    const tempo=id===8?'fast':id===7?'slow':id>=5?'vegas':id===3?'desert':id===4?'fast':'normal';
+    const themes={1:'farm',2:'city',3:'desert',4:'road',5:'vegas',6:'casino',7:'assassin',8:'god'};
+    const tempo=themes[id]||'normal';
     const start=()=>window.soundSystem?.startMusic?.(tempo);
     if(window.GameRuntime?.schedule) window.GameRuntime.schedule('level',40,start); else setTimeout(start,40);
 }
@@ -3514,7 +3515,7 @@ function gameLoop() {
                     const lifeAfter = Number.isFinite(enemy.life) ? enemy.life : null;
                     if (proj.owner?.name === 'João' || proj.owner?.constructor?.name?.toLowerCase().includes('joao')) {
                         const enemyName = enemy.type || enemy.name || enemy.constructor?.name || 'inimigo';
-                        if (window.DEBUG_GAME) if(window.DEV) console.log(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
+                        if (window.DEBUG_GAME) if(window.DEV) window.GameLog?.debug(`[TIRO JOAO] ACERTO id=${proj.shotId ?? '?'} alvo=${enemyName} dano=${proj.damage} vida=${lifeBefore ?? '?'}->${lifeAfter ?? '?'}`);
                     }
                     score += killed ? 30 : 8;
                     if (killed || (lifeAfter !== null && lifeAfter <= 0)) {
@@ -3917,7 +3918,7 @@ function gameLoop() {
         const allPlayersDead = players.every(p => p.life <= 0);
         
         if (allPlayersDead) {
-            if(window.DEV) console.log('🔴 GAME OVER - Score:', score, 'Fase:', currentLevelIndex + 1);
+            if(window.DEV) window.GameLog?.debug('🔴 GAME OVER - Score:', score, 'Fase:', currentLevelIndex + 1);
             
             // CORREÇÃO DO BUG: Limpar inimigos imediatamente quando o jogador morre
             enemies.length = 0;
@@ -4041,7 +4042,7 @@ function gameLoop() {
                             }
                         };
                         if (window.GameRuntime?.schedule) window.GameRuntime.schedule('boss', 2000, finishBossLevel);
-                        else setTimeout(finishBossLevel, 2000);
+                        else (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level',2000,finishBossLevel);
                     }
                 }
             } else {

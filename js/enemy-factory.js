@@ -92,32 +92,32 @@ class EnemyFactory {
                     : new Enemy(x, y, 'boss');
             
             default:
-                if(window.DEV) console.warn(`Tipo de inimigo desconhecido: ${type}, criando inimigo básico`);
+                if(window.DEV) window.GameLog?.warn(`Tipo de inimigo desconhecido: ${type}, criando inimigo básico`);
                 return new Enemy(x, y, type);
         }
     }
 
     // Método auxiliar para debug
     static logAvailableEnemies() {
-        if(window.DEV) console.log('=== ENEMY FACTORY DEBUG ===');
-        if(window.DEV) console.log('Classes disponíveis:');
-        if(window.DEV) console.log('  Enemy:', typeof Enemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  CiclistaEnemy:', typeof CiclistaEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  BasicEnemy:', typeof BasicEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  FastEnemy:', typeof FastEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  StrongEnemy:', typeof StrongEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  TankEnemy:', typeof TankEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  BerserkerEnemy:', typeof BerserkerEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  CowboyEnemy:', typeof CowboyEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  CockroachEnemy:', typeof CockroachEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  TuristaEnemy:', typeof window.TuristaEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  SegurancaEnemy:', typeof window.SegurancaEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  ElvisFanEnemy:', typeof window.ElvisFanEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  MulherFeiaEnemy:', typeof window.MulherFeiaEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  TravestiEnemy:', typeof window.TravestiEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  BossEnemy:', typeof BossEnemy !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('  FinalBoss:', typeof FinalBoss !== 'undefined' ? '✓' : '✗');
-        if(window.DEV) console.log('========================');
+        if(window.DEV) window.GameLog?.debug('=== ENEMY FACTORY DEBUG ===');
+        if(window.DEV) window.GameLog?.debug('Classes disponíveis:');
+        if(window.DEV) window.GameLog?.debug('  Enemy:', typeof Enemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  CiclistaEnemy:', typeof CiclistaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  BasicEnemy:', typeof BasicEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  FastEnemy:', typeof FastEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  StrongEnemy:', typeof StrongEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  TankEnemy:', typeof TankEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  BerserkerEnemy:', typeof BerserkerEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  CowboyEnemy:', typeof CowboyEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  CockroachEnemy:', typeof CockroachEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  TuristaEnemy:', typeof window.TuristaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  SegurancaEnemy:', typeof window.SegurancaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  ElvisFanEnemy:', typeof window.ElvisFanEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  MulherFeiaEnemy:', typeof window.MulherFeiaEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  TravestiEnemy:', typeof window.TravestiEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  BossEnemy:', typeof BossEnemy !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('  FinalBoss:', typeof FinalBoss !== 'undefined' ? '✓' : '✗');
+        if(window.DEV) window.GameLog?.debug('========================');
     }
 }
 

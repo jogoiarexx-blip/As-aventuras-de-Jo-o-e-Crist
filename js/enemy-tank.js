@@ -25,7 +25,7 @@ class TankEnemy {
         this.name = 'TANK';
         this.score = 300;
         
-        if(window.DEV) console.log('✅ TANK criado em:', this.x, this.y, 'Ground:', this.groundY);
+        if(window.DEV) window.GameLog?.debug('✅ TANK criado em:', this.x, this.y, 'Ground:', this.groundY);
         
         // Animação e estado
         this.attacking = false;
@@ -51,7 +51,7 @@ class TankEnemy {
             height: Math.floor(this.h * 0.65)        // 62px (65% de 95)
         };
         
-        if(window.DEV) console.log(`✅ Tank hitbox: ${this.hitbox.width}×${this.hitbox.height} (${Math.round((this.hitbox.width * this.hitbox.height) / (this.w * this.h) * 100)}% da área)`);
+        if(window.DEV) window.GameLog?.debug(`✅ Tank hitbox: ${this.hitbox.width}×${this.hitbox.height} (${Math.round((this.hitbox.width * this.hitbox.height) / (this.w * this.h) * 100)}% da área)`);
     }
 
     draw(ctx) {

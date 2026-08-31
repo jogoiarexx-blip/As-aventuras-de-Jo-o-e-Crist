@@ -102,7 +102,7 @@
       for(const src of set){const r=this.records.get(src);if(r){r.groups.delete(from);r.groups.add(to);this._group(to,src);}}
       this.groups.delete(from);
     }
-    preloadLevel(level){ try{return level?.preload?.();}catch(e){if(window.DEV) console.warn('[assets] preload',e);return null;} }
+    preloadLevel(level){ try{return level?.preload?.();}catch(e){if(window.DEV) window.GameLog?.warn('[assets] preload',e);return null;} }
     preloadNext(){ /* AssetManager 2.0: preload automático desativado por padrão para proteger memória em celular. */ }
     stats(){
       const byStatus={idle:0,loading:0,loaded:0,error:0};

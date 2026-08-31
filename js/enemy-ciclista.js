@@ -30,7 +30,7 @@ class CiclistaEnemy {
             height: Math.floor(this.h * 0.65)
         };
         
-        if(window.DEV) console.log('🚴 Ciclista criado em:', this.x, this.y, 'Ground:', this.groundY,
+        if(window.DEV) window.GameLog?.debug('🚴 Ciclista criado em:', this.x, this.y, 'Ground:', this.groundY,
                     'Hitbox:', `${this.hitbox.width}×${this.hitbox.height}`);
         
         // Cores variadas para diferentes ciclistas

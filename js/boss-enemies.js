@@ -57,7 +57,7 @@ class BossEnemy extends Enemy {
             height: Math.floor(this.h * 0.7)
         };
 
-        if(window.DEV) console.log('👹 BossEnemy criado - X:' + this.x + ' Y:' + this.y + ' ground:' + this.groundY + ' H:' + this.h);
+        if(window.DEV) window.GameLog?.debug('👹 BossEnemy criado - X:' + this.x + ' Y:' + this.y + ' ground:' + this.groundY + ' H:' + this.h);
     }
 
     update(players, allEnemies) {
@@ -388,7 +388,7 @@ class FinalBoss extends BossEnemy {
 
         this.crownAnim = 0;
 
-        if(window.DEV) console.log('👑 FinalBoss (REI DE VEGAS) criado - X:' + this.x + ' Y:' + this.y + ' H:' + this.h);
+        if(window.DEV) window.GameLog?.debug('👑 FinalBoss (REI DE VEGAS) criado - X:' + this.x + ' Y:' + this.y + ' H:' + this.h);
     }
 
     update(players, allEnemies) {

@@ -22,7 +22,7 @@ class BasicEnemy {
             height: Math.floor(this.h * 0.65)    // 65% da altura (torso+pernas)
         };
         
-        if(window.DEV) console.log('✅ Capanga criado em:', this.x, this.y, 'Ground:', this.groundY,
+        if(window.DEV) window.GameLog?.debug('✅ Capanga criado em:', this.x, this.y, 'Ground:', this.groundY,
                     'Hitbox:', `${this.hitbox.width}×${this.hitbox.height}`);
         
         // Atributos

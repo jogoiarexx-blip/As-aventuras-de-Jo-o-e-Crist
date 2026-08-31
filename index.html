@@ -65,6 +65,8 @@
         #game-container:fullscreen { width:100vw; height:100vh; aspect-ratio:auto; }
         #game-container:fullscreen #game { width:min(100vw, calc(100vh * 20 / 13)); height:min(100vh, calc(100vw * 13 / 20)); }
     </style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b7ddd">
 </head>
 <body>
     <div id="game-container">
@@ -138,5 +140,7 @@
     <script src='js/hud-v093.js'></script>
     <script src='js/regression-guards.js'></script> <!-- proteção contra regressões estruturais -->
     <script src='js/touch-controls.js'></script>
+<script>if('serviceWorker' in navigator && location.protocol.startsWith('http')){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>window.GameLog?.warn('SW',e)));}</script>
 </body>
-</html>
+</html><script src="js/game-log.js"></script>
+

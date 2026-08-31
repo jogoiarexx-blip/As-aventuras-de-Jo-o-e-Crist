@@ -10,7 +10,7 @@
     const controls = window.sistemControles;
     const host = document.getElementById('game-container');
     if (!controls || !host) {
-      if(window.DEV) console.warn('[TOUCH] Controles ou game-container indisponíveis');
+      if(window.DEV) window.GameLog?.warn('[TOUCH] Controles ou game-container indisponíveis');
       return;
     }
 
@@ -50,7 +50,7 @@
     const activeTouches = new Map();
     const setAction = (action, on) => {
       try { controls.definirTouch(1, action, !!on); }
-      catch (e) { if(window.DEV) console.warn('[TOUCH] definirTouch falhou', action, e); }
+      catch (e) { if(window.DEV) window.GameLog?.warn('[TOUCH] definirTouch falhou', action, e); }
     };
     const releaseAll = () => {
       activeTouches.clear();
@@ -111,7 +111,7 @@
           if (typeof window.enterTruePause === 'function') window.enterTruePause(window.gameState);
           else window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
         }
-      } catch (err) { if(window.DEV) console.warn('[TOUCH] pause falhou', err); }
+      } catch (err) { if(window.DEV) window.GameLog?.warn('[TOUCH] pause falhou', err); }
     };
     if (window.PointerEvent) pauseBtn?.addEventListener('pointerdown', pausePress, {passive:false});
     else pauseBtn?.addEventListener('touchstart', pausePress, {passive:false});
@@ -149,7 +149,7 @@
           }
         }
       } catch (err) {
-        if(window.DEV) console.warn('[TOUCH] sincronização falhou', err);
+        if(window.DEV) window.GameLog?.warn('[TOUCH] sincronização falhou', err);
       }
       window.requestAnimationFrame(sync);
     };
@@ -162,7 +162,7 @@
     });
 
     window.TouchControls = { layer, releaseAll, ready:true };
-    console.info('[TOUCH] Controles móveis carregados com compatibilidade iOS/Android');
+    window.GameLog?.info('[TOUCH] Controles móveis carregados com compatibilidade iOS/Android');
     window.GameDebugConsole?.log?.('[TOUCH] Controles móveis carregados');
     sync();
   } catch (error) {

@@ -25,7 +25,7 @@ class CockroachEnemy extends Enemy {
             height: Math.floor(this.h * 0.65)
         };
         
-        if(window.DEV) console.log('🪳 Homem-Barata criado em:', this.x, this.y);
+        if(window.DEV) window.GameLog?.debug('🪳 Homem-Barata criado em:', this.x, this.y);
         
         // Cores da fantasia
         this.shellColor = '#3d2817'; // Marrom escuro (carapaça)

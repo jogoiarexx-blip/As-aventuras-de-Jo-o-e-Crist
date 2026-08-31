@@ -11,13 +11,13 @@
   const packs={
     colonel:pack('colonel',['idle','walk1','walk2','attack1','attack2','attack3','attack4','hurt','dead']),
     vegas:pack('vegas',['idle','walk1','walk2','attack','hurt','dead']),
-    engineer:pack('engineer',['idle','walk1','walk2','attack','hurt','dead']),
-    shadow:pack('shadow',['idle','walk1','walk2','attack','hurt','dead']),
-    god:pack('god',['idle','walk1','walk2','attack','hurt','dead']),
-    elite:pack('elite',['idle','walk1','walk2','attack','hurt','dead']),
-    ghost:pack('ghost',['idle','walk1','walk2','attack','hurt','dead']),
-    assassin:pack('assassin',['idle','walk1','walk2','attack','hurt','dead']),
-    drone:pack('drone',['idle','walk1','walk2','attack','hurt','dead'])
+    engineer:pack('engineer',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
+    shadow:pack('shadow',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
+    god:pack('god',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
+    elite:pack('elite',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
+    ghost:pack('ghost',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
+    assassin:pack('assassin',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
+    drone:pack('drone',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2'])
   };
   const tips=[
     'DASH também serve para escapar de cercos.',
@@ -69,8 +69,9 @@
   function fishingManifest(playerNames=[]){
     const images=['assets/backgrounds/fishing-bonus-lake.webp','assets/npc/chico-fumaca/chico-fumaca-idle.webp','assets/ui/dialog-hud-joao.webp','assets/ui/dialog-hud-crist.webp','assets/ui/hud-chico-frame.webp'];
     for(const k of ['idle','walk1','walk2','walk3','attack1','attack2','attack3','special','hurt','dead','roar']) images.push(`assets/bosses/shark/${k}.webp`);
+    for(const f of ['idle1','idle2','idle3','idle4','walk1','walk2','walk3','walk4','walk5','walk6','attack1','attack2','attack3']) images.push(`assets/players/chico/frames/${f}.webp`);
     images.push(...characterAssets(playerNames));
-    return {id:'fishing',name:'Pescaria do Chico Fumaça',images:uniq(images),sounds:['punch','hit','enemyHit','enemyDeath','explosion']};
+    return {id:'fishing',name:'Pescaria do Chico Fumaça',images:uniq(images),sounds:['punch','hit','enemyHit','enemyDeath','explosion','fishingCast','fishingReel','fishingSplash','sharkRoar','sharkCharge','sharkBite','sharkWave']};
   }
   function busManifest(){
     const images=['assets/backgrounds/bus-bonus-vegas.webp'];
@@ -92,6 +93,7 @@
       this.currentSounds=[];
       this.bonusSounds=new Map();
       this.mobile=(navigator.deviceMemory&&navigator.deviceMemory<=4)||window.matchMedia?.('(pointer:coarse)')?.matches||false;
+      this.transitionHistory=[];
     }
     _state(partial){
       window.LevelLoadState=Object.assign({active:false,progress:0,title:'',subtitle:'',tip:tips[0],error:null,failures:[],canRetry:false,type:'level'},window.LevelLoadState||{},partial);
@@ -131,6 +133,7 @@
         this._state({progress:1});
         await afterLoad?.({manifest,group:nextGroup});
         if(token===this.serial) this._state({active:false,progress:1});
+        this.recordMemory(`level:${manifest.id}`);
         return true;
       }catch(error){
         const failures=error?.failures||[];
@@ -155,6 +158,7 @@
         this._state({progress:1});
         await afterLoad?.({manifest,group});
         if(token===this.serial)this._state({active:false,progress:1});
+        this.recordMemory(`bonus:${kind}`);
         return true;
       }catch(error){this._state({active:true,error,failures:error?.failures||[],canRetry:true});onError?.(error);return false;}
     }
@@ -164,7 +168,8 @@
       if(p.kind==='level')return this.transitionLevel(p.index,p.opts);
       return this.loadBonus(p.bonus,p.opts);
     }
-    memoryStats(){return Object.assign({mobile:this.mobile,currentGroup:this.currentGroup},this.assets.stats());}
+    memoryStats(){const pm=performance.memory;return Object.assign({mobile:this.mobile,currentGroup:this.currentGroup,heapUsed:pm?.usedJSHeapSize||null,heapLimit:pm?.jsHeapSizeLimit||null,transitions:this.transitionHistory.slice(-12)},this.assets.stats());}
+    recordMemory(label){const stat=this.memoryStats();this.transitionHistory.push({label,at:Date.now(),heapUsed:stat.heapUsed,group:this.currentGroup});if(this.transitionHistory.length>24)this.transitionHistory.shift();return stat;}
   }
 
   window.LevelAssetManifests={level:levelManifest,bus:busManifest,fishing:fishingManifest};

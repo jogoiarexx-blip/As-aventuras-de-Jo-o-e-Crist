@@ -86,8 +86,8 @@ class BerserkerEnemy extends Enemy {
             height: Math.floor(this.h * 0.70)        // 56px (70% de 80)
         };
         
-        if(window.DEV) console.log('💀 BERSERKER MELHORADO criado!');
-        if(window.DEV) console.log(`✅ Berserker hitbox: ${this.hitbox.width}×${this.hitbox.height} (${Math.round((this.hitbox.width * this.hitbox.height) / (this.w * this.h) * 100)}% da área)`);
+        if(window.DEV) window.GameLog?.debug('💀 BERSERKER MELHORADO criado!');
+        if(window.DEV) window.GameLog?.debug(`✅ Berserker hitbox: ${this.hitbox.width}×${this.hitbox.height} (${Math.round((this.hitbox.width * this.hitbox.height) / (this.w * this.h) * 100)}% da área)`);
         
         // ✅ VALIDAÇÃO: Re-calcular Y se mudou altura (depois de super e alterações)
         if (this.groundY) {
@@ -126,7 +126,7 @@ class BerserkerEnemy extends Enemy {
      * NOVO: Transformação visual quando aumenta fúria
      */
     triggerRageTransformation(level) {
-        if(window.DEV) console.log(`🔥 BERSERKER → RAGE LEVEL ${level}!`);
+        if(window.DEV) window.GameLog?.debug(`🔥 BERSERKER → RAGE LEVEL ${level}!`);
         
         // Explosão de partículas
         if (window.particles) {
@@ -393,7 +393,7 @@ class BerserkerEnemy extends Enemy {
         const mult = this.rageMultipliers[this.rageLevel];
         const comboDamage = Math.floor(this.damage * mult.damage * (1 + this.comboCounter * 0.2));
         
-        setTimeout(() => {
+        (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level', 150, () => {
             if (window.gameState && window.gameState !== 'playing') return;
             if (this.life > 0 && this.distanceTo(player) < 90) {
                 player.takeDamage(comboDamage);
@@ -415,7 +415,7 @@ class BerserkerEnemy extends Enemy {
                 
                 window.screenShake = Math.max(window.screenShake || 0, 2 + this.comboCounter * 1);
             }
-        }, 150);
+        });
     }
     
     /**
@@ -427,7 +427,7 @@ class BerserkerEnemy extends Enemy {
         this.dashDirection = this.facingRight ? 1 : -1;
         this.dashCooldown = 180; // 3 segundos
         
-        if(window.DEV) console.log('⚡ BERSERKER DASH!');
+        if(window.DEV) window.GameLog?.debug('⚡ BERSERKER DASH!');
     }
     
     executeDash() {
@@ -461,7 +461,7 @@ class BerserkerEnemy extends Enemy {
         this.roarDuration = 40;
         this.roarCooldown = 300; // 5 segundos
         
-        if(window.DEV) console.log('🦁 BERSERKER ROAR!');
+        if(window.DEV) window.GameLog?.debug('🦁 BERSERKER ROAR!');
     }
     
     executeRoar(player) {
@@ -517,7 +517,7 @@ class BerserkerEnemy extends Enemy {
         this.groundPoundCooldown = 400; // 6.6 segundos
         this.jumpHeight = 0;
         
-        if(window.DEV) console.log('💥 BERSERKER GROUND POUND!');
+        if(window.DEV) window.GameLog?.debug('💥 BERSERKER GROUND POUND!');
     }
     
     executeGroundPound(player) {
@@ -538,10 +538,10 @@ class BerserkerEnemy extends Enemy {
                 break;
                 
             case 2: // Impact recovery
-                setTimeout(() => {
+                (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level', 200, () => {
                     this.isGroundPounding = false;
                     this.groundPoundPhase = 0;
-                }, 200);
+                });
                 this.groundPoundPhase = 3; // Prevent repeat
                 break;
         }
@@ -598,7 +598,7 @@ class BerserkerEnemy extends Enemy {
         this.attackTimer = 10;
         this.attackCooldown = 20; // Cooldown curto
         
-        setTimeout(() => {
+        (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level', 100, () => {
             if (window.gameState && window.gameState !== 'playing') return;
             if (this.life > 0 && this.distanceTo(player) < 100) {
                 const counterDamage = Math.floor(this.damage * 2);
@@ -620,7 +620,7 @@ class BerserkerEnemy extends Enemy {
                 
                 window.screenShake = Math.max(window.screenShake || 0, 6);
             }
-        }, 100);
+        });
     }
     
     /**

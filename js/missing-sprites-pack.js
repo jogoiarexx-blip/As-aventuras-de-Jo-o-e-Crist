@@ -18,15 +18,15 @@
   window.__extraSpriteEffect = effectGet;
 
   const PACK = {
-    elite:    { frames:{ idle:['elite_idle.webp'], walk:['elite_walk1.webp','elite_walk2.webp'], attack:['elite_attack.webp'], hurt:['elite_hurt.webp'], dead:['elite_dead.webp'] }, w:72, h:92, shadow:16, glow:'#74a9d9', deathFrames:30 },
-    ghost:    { frames:{ idle:['ghost_idle.webp'], walk:['ghost_walk1.webp','ghost_walk2.webp'], attack:['ghost_attack.webp'], hurt:['ghost_hurt.webp'], dead:['ghost_dead.webp'] }, w:76, h:90, shadow:0, glow:'#a84cff', alpha:true, floaty:true, deathFrames:30 },
-    assassin: { frames:{ idle:['assassin_idle.webp'], walk:['assassin_walk1.webp','assassin_walk2.webp'], attack:['assassin_attack.webp'], hurt:['assassin_hurt.webp'], dead:['assassin_dead.webp'] }, w:68, h:92, shadow:15, glow:'#ff0066', deathFrames:30 },
-    drone:    { frames:{ idle:['drone_idle.webp'], walk:['drone_walk1.webp','drone_walk2.webp'], attack:['drone_attack.webp'], hurt:['drone_hurt.webp'], dead:['drone_dead.webp'] }, w:52, h:52, shadow:14, glow:'#00d7ff', deathFrames:30 },
+    elite:    { frames:{ idle:['elite_idle.webp'], walk:['elite_walk1.webp','elite_walk2.webp'], attack:['elite_attack.webp','elite_attack2.webp','elite_special.webp'], hurt:['elite_hurt.webp'], dead:['elite_dead.webp','elite_dead2.webp'] }, w:72, h:92, shadow:16, glow:'#74a9d9', deathFrames:30 },
+    ghost:    { frames:{ idle:['ghost_idle.webp'], walk:['ghost_walk1.webp','ghost_walk2.webp'], attack:['ghost_attack.webp','ghost_attack2.webp','ghost_special.webp'], hurt:['ghost_hurt.webp'], dead:['ghost_dead.webp','ghost_dead2.webp'] }, w:76, h:90, shadow:0, glow:'#a84cff', alpha:true, floaty:true, deathFrames:30 },
+    assassin: { frames:{ idle:['assassin_idle.webp'], walk:['assassin_walk1.webp','assassin_walk2.webp'], attack:['assassin_attack.webp','assassin_attack2.webp','assassin_special.webp'], hurt:['assassin_hurt.webp'], dead:['assassin_dead.webp','assassin_dead2.webp'] }, w:68, h:92, shadow:15, glow:'#ff0066', deathFrames:30 },
+    drone:    { frames:{ idle:['drone_idle.webp'], walk:['drone_walk1.webp','drone_walk2.webp'], attack:['drone_attack.webp','drone_attack2.webp','drone_special.webp'], hurt:['drone_hurt.webp'], dead:['drone_dead.webp','drone_dead2.webp'] }, w:52, h:52, shadow:14, glow:'#00d7ff', deathFrames:30 },
     colonel:  { frames:{ idle:['colonel_idle.webp'], walk:['colonel_walk1.webp','colonel_walk2.webp'], attack:['colonel_attack1.webp','colonel_attack2.webp','colonel_attack3.webp','colonel_attack4.webp'], hurt:['colonel_hurt.webp'], dead:['colonel_dead.webp'] }, w:186, h:198, shadow:34, glow:'#7d3c98', boss:true, deathFrames:30, barColor:'#e74c3c' },
     vegas:    { frames:{ idle:['vegas_idle.webp'], walk:['vegas_walk1.webp','vegas_walk2.webp'], attack:['vegas_attack.webp'], hurt:['vegas_hurt.webp'], dead:['vegas_dead.webp'] }, w:132, h:132, shadow:28, glow:'#ffd700', boss:true, deathFrames:30, barColor:'#ff00aa' },
-    engineer: { frames:{ idle:['engineer_idle.webp'], walk:['engineer_walk1.webp','engineer_walk2.webp'], attack:['engineer_attack.webp'], hurt:['engineer_hurt.webp'], dead:['engineer_dead.webp'] }, w:118, h:126, shadow:24, glow:'#00d7ff', boss:true, deathFrames:40, barColor:'#00d7ff' },
-    shadow:   { frames:{ idle:['shadow_idle.webp'], walk:['shadow_walk1.webp','shadow_walk2.webp'], attack:['shadow_attack.webp'], hurt:['shadow_hurt.webp'], dead:['shadow_dead.webp'] }, w:108, h:124, shadow:18, glow:'#a84cff', boss:true, deathFrames:40, alpha:true, barColor:'#a84cff' },
-    god:      { frames:{ idle:['god_idle.webp'], walk:['god_walk1.webp','god_walk2.webp'], attack:['god_attack.webp'], hurt:['god_hurt.webp'], dead:['god_dead.webp'] }, w:142, h:142, shadow:32, glow:'#ffd700', boss:true, deathFrames:60, barColor:'#ffd700' }
+    engineer: { frames:{ idle:['engineer_idle.webp'], walk:['engineer_walk1.webp','engineer_walk2.webp'], attack:['engineer_attack.webp','engineer_attack2.webp','engineer_special.webp'], hurt:['engineer_hurt.webp'], dead:['engineer_dead.webp','engineer_dead2.webp'] }, w:118, h:126, shadow:24, glow:'#00d7ff', boss:true, deathFrames:40, barColor:'#00d7ff' },
+    shadow:   { frames:{ idle:['shadow_idle.webp'], walk:['shadow_walk1.webp','shadow_walk2.webp'], attack:['shadow_attack.webp','shadow_attack2.webp','shadow_special.webp'], hurt:['shadow_hurt.webp'], dead:['shadow_dead.webp','shadow_dead2.webp'] }, w:108, h:124, shadow:18, glow:'#a84cff', boss:true, deathFrames:40, alpha:true, barColor:'#a84cff' },
+    god:      { frames:{ idle:['god_idle.webp'], walk:['god_walk1.webp','god_walk2.webp'], attack:['god_attack.webp','god_attack2.webp','god_special.webp'], hurt:['god_hurt.webp'], dead:['god_dead.webp','god_dead2.webp'] }, w:142, h:142, shadow:32, glow:'#ffd700', boss:true, deathFrames:60, barColor:'#ffd700' }
   };
 
   function stateFor(entity){
@@ -160,5 +160,5 @@
     };
   }
 
-  if(window.DEV) console.log('✅ Sprite pack extra carregado: Elite/Ghost/Assassin/Bosses/Drone');
+  if(window.DEV) window.GameLog?.debug('✅ Sprite pack extra carregado: Elite/Ghost/Assassin/Bosses/Drone');
 })();

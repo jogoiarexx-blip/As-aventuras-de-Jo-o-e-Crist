@@ -46,7 +46,7 @@ class Level {
         }
         const img = new Image();
         img.onload = () => { this._backgroundFailed = false; };
-        img.onerror = () => { this._backgroundFailed = true; if(window.DEV) if(window.DEV) console.warn('[background] Falha ao carregar:', this.backgroundImage); };
+        img.onerror = () => { this._backgroundFailed = true; if(window.DEV) if(window.DEV) window.GameLog?.warn('[background] Falha ao carregar:', this.backgroundImage); };
         img.src = this.backgroundImage;
         this._backgroundImg = img;
         return img;

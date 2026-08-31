@@ -144,16 +144,16 @@ class CombatSystem {
         state.comboTimer = this.comboWindow;
         
         // Resetar após timeout
-        setTimeout(() => {
+        (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level', currentCombo.frames * (1000/60), () => {
             state.canAttack = true;
-        }, currentCombo.frames * (1000/60));
+        });
         
         // Processar hit após wind-up
         const windUpFrames = Math.floor(currentCombo.frames * 0.3);
-        setTimeout(() => {
+        (window.GameRuntime?.schedule || ((owner,ms,fn)=>setTimeout(fn,ms)))('level', windUpFrames * (1000/60), () => {
             if (window.gameState && window.gameState !== 'playing') return;
             this.processHit(player, enemies, currentCombo, finalDamage, isCritical);
-        }, windUpFrames * (1000/60));
+        });
         
         // Efeitos visuais de ataque
         this.createAttackEffects(player, currentCombo, isPerfectTiming);
@@ -606,7 +606,7 @@ class DodgeSystem {
      * Ativar perfect dodge
      */
     triggerPerfectDodge(player, state) {
-        if(window.DEV) console.log('💫 PERFECT DODGE!');
+        if(window.DEV) window.GameLog?.debug('💫 PERFECT DODGE!');
         
         // Slow motion
         if (window.gameSpeed !== undefined) {

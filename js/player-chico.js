@@ -6,8 +6,10 @@ const CHICO_FRAME_FILES = {
   run: ['assets/players/chico/frames/run1.webp','assets/players/chico/frames/run2.webp','assets/players/chico/frames/run3.webp','assets/players/chico/frames/run4.webp','assets/players/chico/frames/run5.webp','assets/players/chico/frames/run6.webp'],
   jump: ['assets/players/chico/frames/jump1.webp','assets/players/chico/frames/jump2.webp','assets/players/chico/frames/jump3.webp'],
   attack: ['assets/players/chico/frames/attack1.webp','assets/players/chico/frames/attack2.webp','assets/players/chico/frames/attack3.webp'],
-  hurt: ['assets/players/chico/frames/hurt1.webp'],
-  dead: ['assets/players/chico/frames/dead1.webp'],
+  hurt: ['assets/players/chico/frames/hurt1.webp','assets/players/chico/frames/hurt2.webp','assets/players/chico/frames/hurt3.webp'],
+  dead: ['assets/players/chico/frames/dead1.webp','assets/players/chico/frames/dead2.webp','assets/players/chico/frames/dead3.webp','assets/players/chico/frames/dead4.webp'],
+  victory: ['assets/players/chico/frames/victory1.webp','assets/players/chico/frames/victory2.webp','assets/players/chico/frames/victory3.webp'],
+  fishing: ['assets/players/chico/frames/fishing1.webp','assets/players/chico/frames/fishing2.webp','assets/players/chico/frames/fishing3.webp'],
   dash: ['assets/players/chico/frames/dash1.webp','assets/players/chico/frames/dash2.webp','assets/players/chico/frames/dash3.webp']
 };
 const CHICO_FRAMES = Object.fromEntries(
@@ -69,8 +71,11 @@ class PlayerChico extends PlayerCrist {
             else frame=frames.length-1;
         } else if(state==='dash'){
             frame=Math.floor((this.dashDuration-Math.max(0,this.dashTimer))/2)%frames.length;
-        } else if(state==='hurt'||state==='dead'){
-            frame=0;
+        } else if(state==='hurt'){
+            frame=Math.min(frames.length-1,Math.floor(performance.now()/85)%frames.length);
+        } else if(state==='dead'){
+            const deathProgress=Math.max(0,Math.min(1,(this.deathAnim||0)/30));
+            frame=Math.min(frames.length-1,Math.floor(deathProgress*frames.length));
         } else {
             const speed=state==='run'?78:state==='walk'?100:190;
             frame=Math.floor(performance.now()/speed)%frames.length;

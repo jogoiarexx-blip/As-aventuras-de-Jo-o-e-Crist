@@ -2,15 +2,7 @@
    Não substitui sistemas existentes: adiciona guardas, diagnóstico e utilidades. */
 (() => {
   if (window.GameHardening) return;
-
   window.DEBUG_GAME = false;
-  const rawConsoleLog = console.log.bind(console);
-  console.log = (...args) => {
-    const first = String(args[0] ?? '');
-    const noisy = /criado|spawnado|hitbox|Sistema .* carregado|Sprite pack extra carregado|BERSERKER|TIRO JOAO/i.test(first);
-    if (!window.DEBUG_GAME && noisy) return;
-    rawConsoleLog(...args);
-  };
 
   const timers = new Map();
   let timerSeq = 0;

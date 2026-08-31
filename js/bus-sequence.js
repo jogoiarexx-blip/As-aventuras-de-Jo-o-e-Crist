@@ -78,7 +78,7 @@
         }
 
         log(msg) {
-            if(window.DEV) console.log(msg);
+            if(window.DEV) window.GameLog?.debug(msg);
             if (window.GameDebugConsole) window.GameDebugConsole.log(msg);
         }
 

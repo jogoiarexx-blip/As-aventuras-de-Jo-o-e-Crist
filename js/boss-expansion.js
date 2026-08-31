@@ -56,7 +56,7 @@ class TechBoss extends Enemy {
             height: Math.floor(this.h * 0.75)
         };
 
-        if(window.DEV) console.log('👹 ENGENHEIRO spawnado!');
+        if(window.DEV) window.GameLog?.debug('👹 ENGENHEIRO spawnado!');
     }
 
     update(players, allEnemies) {
@@ -334,7 +334,7 @@ class ShadowBoss extends Enemy {
             height: Math.floor(this.h * 0.8)
         };
 
-        if(window.DEV) console.log('👹 SOMBRA spawnada!');
+        if(window.DEV) window.GameLog?.debug('👹 SOMBRA spawnada!');
     }
 
     update(players, allEnemies) {
@@ -586,7 +586,7 @@ class GodBoss extends Enemy {
             height: Math.floor(this.h * 0.75)
         };
 
-        if(window.DEV) console.log('👹👑 DEUS DAS APOSTAS spawnado!');
+        if(window.DEV) window.GameLog?.debug('👹👑 DEUS DAS APOSTAS spawnado!');
     }
 
     update(players, allEnemies) {
@@ -927,4 +927,4 @@ class GodBoss extends Enemy {
     }
 }
 
-if(window.DEV) console.log('✅ Bosses TechBoss, ShadowBoss e GodBoss carregados!');
+if(window.DEV) window.GameLog?.debug('✅ Bosses TechBoss, ShadowBoss e GodBoss carregados!');

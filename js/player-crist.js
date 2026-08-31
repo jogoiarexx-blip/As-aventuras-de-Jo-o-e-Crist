@@ -596,7 +596,7 @@ class PlayerCrist {
         this.comboTimer = 0;
         if (this.life < 0) this.life = 0;
         if (this.life === 0 && this.evolution?.tryRevive?.()) return true;
-        if (this.life === 0) if(window.DEV) console.log(`💀 ${this.name} MORREU!`);
+        if (this.life === 0) if(window.DEV) window.GameLog?.debug(`💀 ${this.name} MORREU!`);
         return true;
     }
 

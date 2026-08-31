@@ -6,7 +6,7 @@
       const desc = Object.getOwnPropertyDescriptor(window, name);
       if (desc && desc.configurable === false) return;
       Object.defineProperty(window, name, { configurable:true, enumerable:false, get:getter, set:setter });
-    } catch (e) { if(window.DEV) console.warn('[bridge]', name, e); }
+    } catch (e) { if(window.DEV) window.GameLog?.warn('[bridge]', name, e); }
   }
   bridge('players', () => players, v => { if (Array.isArray(v)) { players.length=0; players.push(...v); } });
   bridge('enemies', () => enemies, v => { if (Array.isArray(v)) { enemies.length=0; enemies.push(...v); } });

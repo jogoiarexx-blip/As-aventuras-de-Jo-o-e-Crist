@@ -263,7 +263,7 @@ class PlayerJoao {
             hitEnemies: new Set(), color: charged ? '#ffd23f' : '#f4f1df'
         };
         window.projectiles.push(window.acquireProjectile ? window.acquireProjectile(projectileData) : projectileData);
-        if(window.DEV) console.log(`[TIRO JOAO] CRIADO id=${shotId} carregado=${charged ? 'sim' : 'nao'} x=${Math.round(muzzleX)} y=${Math.round(muzzleY)} dir=${direction > 0 ? 'direita' : 'esquerda'} dano=${damage}`);
+        if(window.DEV) window.GameLog?.debug(`[TIRO JOAO] CRIADO id=${shotId} carregado=${charged ? 'sim' : 'nao'} x=${Math.round(muzzleX)} y=${Math.round(muzzleY)} dir=${direction > 0 ? 'direita' : 'esquerda'} dano=${damage}`);
         if (window.soundSystem?.playSound) window.soundSystem.playSound('hit');
         if (window.gamepadSystem?.rumble) window.gamepadSystem.rumble(this.controlPlayer || 1, charged ? 110 : 60, charged ? .45 : .2, charged ? .2 : .08);
         return true;
@@ -667,7 +667,7 @@ class PlayerJoao {
         this.comboTimer = 0;
         if (this.life < 0) this.life = 0;
         if (this.life === 0 && this.evolution?.tryRevive?.()) return true;
-        if (this.life === 0) if(window.DEV) console.log(`💀 ${this.name} MORREU!`);
+        if (this.life === 0) if(window.DEV) window.GameLog?.debug(`💀 ${this.name} MORREU!`);
         return true;
     }
 
