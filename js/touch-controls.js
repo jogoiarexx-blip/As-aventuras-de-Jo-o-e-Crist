@@ -107,7 +107,7 @@
     const pausePress = e => {
       e.preventDefault();
       try {
-        if (window.gameState === 'playing' || window.gameState === 'bus_minigame' || window.gameState === 'fishing_bonus') {
+        if (window.gameState === 'playing' || window.gameState === 'bus_minigame' || window.gameState === 'fishing_bonus' || window.gameState === 'club' || window.gameState === 'club_combat') {
           if (typeof window.enterTruePause === 'function') window.enterTruePause(window.gameState);
           else window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
         }
@@ -126,22 +126,27 @@
       try {
         const state = window.gameState;
         const bus = state === 'bus_minigame';
-        const gameplay = state === 'playing';
+        const gameplay = state === 'playing' || state === 'club_combat';
         const fishing = state === 'fishing_bonus';
-        const visible = gameplay || bus || fishing;
+        const clubDance = state === 'club';
+        const visible = gameplay || bus || fishing || clubDance;
         layer.style.display = visible ? 'block' : 'none';
         if (!visible) releaseAll();
 
-        const mode = bus ? 'bus' : 'fight';
+        const mode = clubDance ? 'club' : (bus ? 'bus' : 'fight');
         if (mode !== lastMode) {
           releaseAll();
           lastMode = mode;
-          if (bus) {
+          if (mode === 'club') {
+            const l=layer.querySelector('.touch-left'), r=layer.querySelector('.touch-right'); if(l)l.style.display='none'; if(r)r.style.display='none';
+          } else if (bus) {
+            const l=layer.querySelector('.touch-left'), r=layer.querySelector('.touch-right'); if(l)l.style.display='flex'; if(r)r.style.display='grid';
             if (jumpBtn) jumpBtn.textContent = '↑';
             if (dashBtn) dashBtn.textContent = '↓';
             if (rangedBtn) rangedBtn.style.display = 'none';
             if (attackBtn) attackBtn.textContent = 'BUZINA';
           } else {
+            const l=layer.querySelector('.touch-left'), r=layer.querySelector('.touch-right'); if(l)l.style.display='flex'; if(r)r.style.display='grid';
             if (jumpBtn) jumpBtn.textContent = 'PULO';
             if (dashBtn) dashBtn.textContent = 'DASH';
             if (rangedBtn) { rangedBtn.style.display = ''; rangedBtn.textContent = 'TIRO'; }

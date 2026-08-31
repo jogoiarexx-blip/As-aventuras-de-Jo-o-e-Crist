@@ -83,6 +83,21 @@
     return {id:'bus',name:'Estrada para Vegas',images:uniq(images),sounds:['busEngine','busAccelerate','busBrake','busHorn','busCollision','busRepair','busMoney','busStar','busTurbo','busCheckpoint','busDoorOpen','busDoorClose','busBroken','busArrival','busLaneChange','busNearMiss','busRoad','busWarning']};
   }
 
+
+  function clubManifest(playerNames=[]){
+    const base='assets/bonus/boate';
+    const images=[
+      ...['idle','walk1','walk2','attack','hurt','dead'].map(st=>`${base}/enemies/seguranca/${st}.webp`),
+      `${base}/ui/portrait-joao.webp`,`${base}/ui/portrait-crist.webp`,
+      `${base}/players/joao/dance-sheet.png`,
+      `${base}/backgrounds/noite-na-boate.png`,
+      ...Array.from({length:5},(_,i)=>`${base}/npcs/muscular/dance-${i+1}.webp`),
+      ...Array.from({length:6},(_,i)=>`${base}/npcs/neon/dance-${i+1}.webp`),
+      ...characterAssets(playerNames)
+    ];
+    return {id:'club',name:'Noite na Boate',images:uniq(images),sounds:['clubPerfect','clubCombo','clubHit','clubEnemyHit','clubLevelComplete','clubMenuMove','clubMenuSelect']};
+  }
+
   class LevelManager {
     constructor(assetManager){
       this.assets=assetManager;
@@ -145,10 +160,10 @@
     }
     async loadBonus(kind,{playerNames=[],beforeLoad,afterLoad,onError}={}){
       const token=++this.serial;
-      const manifest=kind==='bus'?busManifest():fishingManifest(playerNames);
+      const manifest=kind==='bus'?busManifest():(kind==='club'?clubManifest(playerNames):fishingManifest(playerNames));
       const group=`bonus:${kind}`;
       this.pending={kind:'bonus',bonus:kind,manifest,opts:{playerNames,beforeLoad,afterLoad,onError}};
-      this._state({active:true,type:'bonus',progress:0,title:'BÔNUS',subtitle:manifest.name,tip:tips[(kind==='bus'?1:2)],error:null,failures:[],canRetry:false});
+      this._state({active:true,type:'bonus',progress:0,title:'BÔNUS',subtitle:manifest.name,tip:tips[(kind==='bus'?1:(kind==='club'?4:2))],error:null,failures:[],canRetry:false});
       try{
         await beforeLoad?.({previousGroup:this.currentGroup,nextGroup:group,manifest});
         if(token!==this.serial)return false;
@@ -172,6 +187,6 @@
     recordMemory(label){const stat=this.memoryStats();this.transitionHistory.push({label,at:Date.now(),heapUsed:stat.heapUsed,group:this.currentGroup});if(this.transitionHistory.length>24)this.transitionHistory.shift();return stat;}
   }
 
-  window.LevelAssetManifests={level:levelManifest,bus:busManifest,fishing:fishingManifest};
+  window.LevelAssetManifests={level:levelManifest,bus:busManifest,fishing:fishingManifest,club:clubManifest};
   window.levelManager=new LevelManager(window.assetManager);
 })();

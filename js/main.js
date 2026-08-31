@@ -25,7 +25,9 @@ const GameState = {
     BUS_MINIGAME: 'bus_minigame',
     FISHING_BONUS: 'fishing_bonus',
     BUS_ARRIVAL: 'bus_arrival',
-    CUTSCENE: 'cutscene'
+    CUTSCENE: 'cutscene',
+    CLUB: 'club',
+    CLUB_COMBAT: 'club_combat'
 };
 
 let gameState = GameState.LOADING; // Melhoria #19: Começar em loading
@@ -63,9 +65,11 @@ let stageSelectIndex = 0;
 let pendingStartLevel = 0;
 let stageSelectPlayers = 1;
 let pendingResumeCheckpoint = null;
-function getStageSelectCount(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0) + 1; }
-function stageSelectBusIndex(){ return saveSystem?.load?.().busMinigameUnlocked ? LEVELS.length : -1; }
-function stageSelectChicoIndex(){ return LEVELS.length + (saveSystem?.load?.().busMinigameUnlocked ? 1 : 0); }
+function stageSelectClubIndex(){ return LEVELS.length; }
+function stageSelectBusIndex(){ return saveSystem?.load?.().busMinigameUnlocked ? LEVELS.length + 1 : -1; }
+function stageSelectChicoIndex(){ return LEVELS.length + 1 + (saveSystem?.load?.().busMinigameUnlocked?1:0); }
+function getStageSelectCount(){ return stageSelectChicoIndex()+1; }
+function stageSelectIsClub(){ return stageSelectIndex === stageSelectClubIndex(); }
 function stageSelectIsBusBonus(){ return stageSelectIndex === stageSelectBusIndex(); }
 function stageSelectIsChicoBonus(){ return stageSelectIndex === stageSelectChicoIndex(); }
 
@@ -75,6 +79,8 @@ function refreshMenuOptions() {
     const checkpoint = saveSystem?.loadCampaignCheckpoint?.();
     if (checkpoint && !completed) menuOptions.push('CONTINUAR CAMPANHA');
     if (completed) menuOptions.push('SELECIONAR FASE');
+    // A Noite na Boate é um bônus independente e deve ficar acessível no menu principal.
+    menuOptions.push('BÔNUS — NOITE NA BOATE');
     if (saveSystem?.load?.().busMinigameUnlocked) menuOptions.push('BÔNUS — ESTRADA PARA VEGAS');
     // v0.9.4: bônus da pescaria é independente da campanha e fica sempre disponível.
     menuOptions.push('BÔNUS — PESCARIA DO CHICO FUMAÇA');
@@ -166,6 +172,11 @@ function resumeTruePause() {
     if (window.storyCutscenes?.active) {
         if (window.storyCutscenes.startedAt) window.storyCutscenes.startedAt += pausedMs;
         if (window.storyCutscenes.lineStartedAt) window.storyCutscenes.lineStartedAt += pausedMs;
+    }
+    if (window.clubSequence?.active) {
+        if (window.clubSequence.startedAt) window.clubSequence.startedAt += pausedMs;
+        if (window.clubSequence.spawnAt) window.clubSequence.spawnAt += pausedMs;
+        if (window.clubSequence.last) window.clubSequence.last += pausedMs;
     }
     gameState = pauseReturnState || GameState.PLAYING;
     pauseStartedAt = 0;
@@ -518,7 +529,8 @@ document.addEventListener('keydown', e => {
             e.preventDefault(); stageSelectPlayers = stageSelectPlayers === 1 ? 2 : 1; soundSystem.playSound('menuMove');
         }
         if (e.key === 'Enter') {
-            if (stageSelectIsBusBonus()) { startBonusWithLoading('bus', stageSelectPlayers); }
+            if (stageSelectIsClub()) { window.clubReplayPlayers=stageSelectPlayers; startClubWithLoading(); }
+            else if (stageSelectIsBusBonus()) { startBonusWithLoading('bus', stageSelectPlayers); }
             else if (stageSelectIsChicoBonus()) { startBonusWithLoading('fishing', stageSelectPlayers); }
             else { pendingStartLevel = stageSelectIndex; playerCount = stageSelectPlayers; selectedCharacters=[null,null]; characterSelectCursor=0; characterSelectReady=false; gameState=GameState.CHARACTER_SELECT; setTimeout(()=>characterSelectReady=true,300); soundSystem.playSound('menuSelect'); }
         }
@@ -671,7 +683,7 @@ document.addEventListener('keydown', e => {
     }
     
     // Pause real: congela simulação, animações e áudio.
-    const canPauseNow = [GameState.PLAYING, GameState.BUS_MINIGAME, GameState.FISHING_BONUS].includes(gameState);
+    const canPauseNow = [GameState.PLAYING, GameState.BUS_MINIGAME, GameState.FISHING_BONUS, GameState.CLUB, GameState.CLUB_COMBAT].includes(gameState);
     if (canPauseNow && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
         enterTruePause(gameState);
     } else if (gameState === GameState.PAUSED && (e.key === 'Escape' || sistemControles.teclaParaAcao(normalizedKey, 'pause'))) {
@@ -926,6 +938,14 @@ function startBonusWithLoading(kind, count=1) {
         onError: () => { gameState = GameState.LOADING; }
     });
 }
+
+function startClubWithLoading() {
+    loadingProgress=0; gameState=GameState.LOADING; soundSystem?.stopMusic?.();
+    return window.levelManager.loadBonus('club',{playerNames:selectedCharacterNamesForLoad(),beforeLoad:()=>{cleanupCurrentLevelForTransition();clearKeys?.();},afterLoad:()=>{loadingProgress=1;gameState=GameState.CLUB;window.clubSequence?.start?.();},onError:()=>{gameState=GameState.LOADING;}});
+}
+window.setClubCombatState=()=>{ gameState=GameState.CLUB_COMBAT; enemySpawnDirector={allSpawned:false,total:0,spawnedCount:0,groups:[]}; waveSystem=null; bossSpawned=false; bossDefeated=false; };
+window.setClubSequenceState=()=>{ gameState=GameState.CLUB; enemySpawnDirector=null; };
+window.continueAfterClub=()=>{ window.levelManager?.releaseBonus?.('club'); transitionToLevel(5,()=>{if(gameState!==GameState.GAME_OVER){gameState=GameState.STORY_LEVEL;levelIntroTimer=180;}}); };
 
 function startGameWithCharacters() {
     clearKeys();
@@ -1540,6 +1560,8 @@ function nextLevel() {
         startStoryScene(postScene, () => nextLevel());
         return;
     }
+
+    if (currentLevelIndex === 4 && !saveSystem?.load?.().clubCompleted) { startClubWithLoading(); return; }
 
     const nextIndex = currentLevelIndex + 1;
     if (nextIndex >= LEVELS.length) {
@@ -2167,6 +2189,12 @@ function activateMenuSelection() {
         } else { refreshMenuOptions(); menuSelection=0; soundSystem.playSound('menuBack'); }
     }
     else if(option==='SELECIONAR FASE' && saveSystem.load().gameCompleted){stageSelectIndex=0;stageSelectPlayers=1;gameState=GameState.STAGE_SELECT;soundSystem.playSound('menuSelect');}
+    else if(option==='BÔNUS — NOITE NA BOATE'){
+        soundSystem?.stopMusic?.();
+        stageSelectPlayers = Math.max(1, Math.min(2, playerCount || 1));
+        window.clubReplayPlayers=stageSelectPlayers;
+        startClubWithLoading();
+    }
     else if(option==='BÔNUS — ESTRADA PARA VEGAS' && saveSystem.load().busMinigameUnlocked){startBonusWithLoading('bus',1);}
     else if(option==='BÔNUS — PESCARIA DO CHICO FUMAÇA'){
         soundSystem?.stopMusic?.();
@@ -2198,7 +2226,7 @@ function handleGamepadInput() {
         if(up||left){stageSelectIndex=(stageSelectIndex+getStageSelectCount()-1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(down||right){stageSelectIndex=(stageSelectIndex+1)%getStageSelectCount();soundSystem.playSound('menuMove');}
         if(gamepadSystem.wasPressed(p,2)){stageSelectPlayers=stageSelectPlayers===1?2:1;soundSystem.playSound('menuMove');}
-        if(accept){if(stageSelectIsBusBonus()){startBonusWithLoading('bus',stageSelectPlayers);}else if(stageSelectIsChicoBonus()){startBonusWithLoading('fishing',stageSelectPlayers);}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
+        if(accept){if(stageSelectIsClub()){window.clubReplayPlayers=stageSelectPlayers;startClubWithLoading();}else if(stageSelectIsBusBonus()){startBonusWithLoading('bus',stageSelectPlayers);}else if(stageSelectIsChicoBonus()){startBonusWithLoading('fishing',stageSelectPlayers);}else{pendingStartLevel=stageSelectIndex;playerCount=stageSelectPlayers;selectedCharacters=[null,null];characterSelectCursor=0;characterSelectReady=false;gameState=GameState.CHARACTER_SELECT;setTimeout(()=>characterSelectReady=true,300);soundSystem.playSound('menuSelect');}}
         if(back){gameState=GameState.MENU;menuSelection=6;soundSystem.playSound('menuBack');}
     }
     else if(gameState===GameState.TUTORIAL){if(accept||back){gameState=GameState.MENU;soundSystem.playSound('menuBack');}}
@@ -2241,7 +2269,7 @@ function handleGamepadInput() {
     }
     else if(gameState===GameState.VICTORY){ if(accept||back){ gameState=GameState.MENU;refreshMenuOptions?.();menuSelection=0;soundSystem.playSound('menuSelect'); } }
     else if((gameState===GameState.STORY_INTRO||gameState===GameState.STORY_LEVEL||gameState===GameState.LEVEL_INTRO||gameState===GameState.LEVEL_COMPLETE)&&accept){if(gameState===GameState.STORY_INTRO)gameState=GameState.STORY_LEVEL;else if(gameState===GameState.STORY_LEVEL)gameState=GameState.LEVEL_INTRO;else if(gameState===GameState.LEVEL_INTRO){gameState=GameState.PLAYING;levelStartTime=Date.now();levelDamageTaken=0;startLevelMusic();}else nextLevel();soundSystem.playSound('menuSelect');}
-    else if([GameState.PLAYING,GameState.BUS_MINIGAME,GameState.FISHING_BONUS].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
+    else if([GameState.PLAYING,GameState.BUS_MINIGAME,GameState.FISHING_BONUS,GameState.CLUB,GameState.CLUB_COMBAT].includes(gameState)&&[0,1].some(i=>pads[i]&&gamepadSystem.wasPressed(i,gamepadSystem.config[i+1]?.pause??9))){enterTruePause(gameState);}
     else if(gameState===GameState.PAUSED){
         if(showModal){
             if(accept){showModal=false;const cb=modalCallback;modalCallback=null;cb?.();}
@@ -2264,6 +2292,7 @@ function drawStageSelect() {
     ctx.fillStyle='#f5c04a';ctx.font='13px Righteous';ctx.fillText('Campanha concluída • conteúdos extras e desafios',500,76);
 
     const entries=LEVELS.map((level,i)=>({title:`${i+1}. ${level.name}`,desc:level.description||'Rumo a Vegas',bonus:false,playable:true}));
+    entries.push({title:'BÔNUS — NOITE NA BOATE',desc:'3 duelos de dança + luta contra a segurança',bonus:true,club:true,playable:true});
     if(saveSystem.load().busMinigameUnlocked)entries.push({title:'BÔNUS — ESTRADA PARA VEGAS',desc:'Rejogue o minigame do ônibus sem repetir a Fase 2',bonus:true,playable:true});
     entries.push({title:'BÔNUS — PESCARIA DO CHICO FUMAÇA',desc:'Pesque no açude do Chico Fumaça e enfrente o monstro que morder o anzol.',bonus:true,chico:true,playable:true});
 
@@ -3226,12 +3255,12 @@ function gameLoop() {
     let shakeX = 0;
     let shakeY = 0;
     // Aplicar shake apenas durante o jogo, não em menus/game over
-    if (screenShake > 0 && gameState === GameState.PLAYING) {
+    if (screenShake > 0 && (gameState === GameState.PLAYING || gameState === GameState.CLUB_COMBAT)) {
         shakeX = (Math.random() - 0.5) * screenShake;
         shakeY = (Math.random() - 0.5) * screenShake * 0.6; // Y menor que X
         screenShake *= 0.75; // Decay mais rápido (era 0.9)
         if (screenShake < 0.3) screenShake = 0;
-    } else if (gameState !== GameState.PLAYING) {
+    } else if (gameState !== GameState.PLAYING && gameState !== GameState.CLUB_COMBAT) {
         screenShake = 0; // Zerar fora do jogo
     }
     
@@ -3285,7 +3314,8 @@ function gameLoop() {
     else if (gameState === GameState.LEVEL_INTRO) {
         drawLevelIntro();
     }
-    else if (gameState === GameState.PLAYING) {
+    else if (gameState === GameState.PLAYING || gameState === GameState.CLUB_COMBAT) {
+        if (gameState === GameState.CLUB_COMBAT) window.clubSequence?.postCombatFrame?.();
         // Atualizar jogadores
         players.forEach(player => {
             if (player.life > 0) {
@@ -4085,6 +4115,10 @@ function gameLoop() {
                 }
             }
         }
+    }
+    else if (gameState === GameState.CLUB) {
+        window.clubSequence?.updateDraw?.(ctx);
+        if (window.trophySystem) { window.trophySystem.updateNotifications(); window.trophySystem.drawNotifications(ctx); }
     }
     else if (gameState === GameState.FISHING_BONUS) {
         const fishingResult = window.fishingBonus?.updateDraw?.(ctx, keys, gamepadSystem, sistemControles);

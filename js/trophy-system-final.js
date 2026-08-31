@@ -286,6 +286,10 @@ class TrophySystem {
                 tier: 'gold', icon: '⚡', color: '#FFD700', requirement: { type: 'bus_time', value: 72 }, reward: { xp: 1800, points: 3600 }
             },
             // ==================== PLATINA 🏆 ====================
+            { id:'club_dance_king', name:'REI DA PISTA', description:'Vença os 3 duelos da Noite na Boate', tier:'gold', icon:'♫', color:'#FFD700', requirement:{type:'special',value:999999} },
+            { id:'club_perfect_steps', name:'PASSOS PERFEITOS', description:'Faça uma sequência de 20 PERFEITOS', tier:'silver', icon:'★', color:'#C0C0C0', requirement:{type:'special',value:999999} },
+            { id:'club_no_miss', name:'SEM ERRAR O PASSO', description:'Conclua um duelo sem MISS', tier:'silver', icon:'✓', color:'#C0C0C0', requirement:{type:'special',value:999999} },
+            { id:'club_security_max', name:'SEGURANÇA MÁXIMA', description:'Derrote o Chefe da Segurança', tier:'gold', icon:'◆', color:'#FFD700', requirement:{type:'special',value:999999} },
             {
                 id: 'the_legend',
                 name: 'A LENDA',

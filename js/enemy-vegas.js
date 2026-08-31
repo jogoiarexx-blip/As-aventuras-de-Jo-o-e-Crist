@@ -4,6 +4,7 @@
   const CONFIG = {
     turista: { cls:'TuristaEnemy', name:'Turista de Vegas', life:65, speed:2.25, damage:10, score:180, w:48, h:72, visualH:92 },
     seguranca: { cls:'SegurancaEnemy', name:'Segurança do Cassino', life:115, speed:2.35, damage:17, score:260, w:52, h:76, visualH:98 },
+    club_security: { cls:'ClubSecurityEnemy', name:'Segurança da Boate', life:115, speed:2.35, damage:17, score:260, w:52, h:76, visualH:98 },
     elvis_fan: { cls:'ElvisFanEnemy', name:'Fã do Elvis', life:80, speed:3.25, damage:13, score:230, w:48, h:72, visualH:94, glow:'#7d54ff' },
     mulher_feia: { cls:'MulherFeiaEnemy', name:'Brigona de Vegas', life:145, speed:1.75, damage:21, score:300, w:62, h:84, visualH:108 },
     travesti: { cls:'TravestiEnemy', name:'Diva de Vegas', life:90, speed:2.75, damage:15, score:250, w:50, h:78, visualH:104, glow:'#ff3fbe' }
@@ -14,6 +15,7 @@
   const ASSET_FOLDER={
     turista:'turista',
     seguranca:'seguranca',
+    club_security:'__club_security__',
     elvis_fan:'elvis-fan',
     mulher_feia:'mulher-feia',
     travesti:'travesti'
@@ -23,7 +25,7 @@
     images[type]={};
     const folder=ASSET_FOLDER[type]||type;
     for(const state of STATES){
-      const src=`assets/enemies/vegas-frames/${folder}/${state}.webp`;
+      const src=type==='club_security'?`assets/bonus/boate/enemies/seguranca/${state}.webp`:`assets/enemies/vegas-frames/${folder}/${state}.webp`;
       images[type][state]=window.assetManager.placeholder(src);
     }
   }
@@ -70,6 +72,7 @@
   }
   window.TuristaEnemy=class TuristaEnemy extends VegasEnemy{constructor(x,y){super(x,y,'turista');}};
   window.SegurancaEnemy=class SegurancaEnemy extends VegasEnemy{constructor(x,y){super(x,y,'seguranca');}};
+  window.ClubSecurityEnemy=class ClubSecurityEnemy extends VegasEnemy{constructor(x,y){super(x,y,'club_security');}};
   window.ElvisFanEnemy=class ElvisFanEnemy extends VegasEnemy{constructor(x,y){super(x,y,'elvis_fan');}};
   window.MulherFeiaEnemy=class MulherFeiaEnemy extends VegasEnemy{constructor(x,y){super(x,y,'mulher_feia');}};
   window.TravestiEnemy=class TravestiEnemy extends VegasEnemy{constructor(x,y){super(x,y,'travesti');}};

@@ -54,6 +54,8 @@ class EnemyFactory {
 
             case 'seguranca':
                 return typeof window.SegurancaEnemy !== 'undefined' ? new window.SegurancaEnemy(x, y) : new Enemy(x, y, 'strong');
+            case 'club_security':
+                return typeof window.ClubSecurityEnemy !== 'undefined' ? new window.ClubSecurityEnemy(x, y) : new Enemy(x, y, 'strong');
 
             case 'elvis_fan':
                 return typeof window.ElvisFanEnemy !== 'undefined' ? new window.ElvisFanEnemy(x, y) : new Enemy(x, y, 'fast');

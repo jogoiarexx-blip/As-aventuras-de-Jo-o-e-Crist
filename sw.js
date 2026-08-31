@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v094-final-2';
+const VERSION='joao-crist-v095-club-assets-2';
 const CORE=[
   './',
   './index.html',
@@ -6,9 +6,15 @@ const CORE=[
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
+  './icon-maskable-512.png',
+  './apple-touch-icon.png',
+  './favicon-32.png',
+  './favicon-64.png',
+  './favicon.ico',
   './js/boss-enemies.js',
   './js/boss-expansion.js',
   './js/bus-sequence.js',
+  './js/club-sequence.js',
   './js/combat-system-advanced.js',
   './js/controles.js',
   './js/enemy-basic.js',

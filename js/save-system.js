@@ -17,6 +17,8 @@ class SaveSystem {
             busTrophies: [],
             chicoUnlocked: false,
             fishingBonusCompleted: false,
+            clubCompleted: false,
+            clubBestHype: [0,0,0], clubBestCombo: 0, clubBestScore: [0,0,0], clubBossDefeated: false,
             playerProgress: {
                 João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
                 Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
@@ -131,6 +133,17 @@ class SaveSystem {
     }
 
 
+    recordClubDuel(index, result = {}) {
+        const i=Math.max(0,Math.min(2,Number(index)||0));
+        if(!Array.isArray(this.data.clubBestHype)) this.data.clubBestHype=[0,0,0];
+        if(!Array.isArray(this.data.clubBestScore)) this.data.clubBestScore=[0,0,0];
+        this.data.clubBestHype[i]=Math.max(Number(this.data.clubBestHype[i])||0, Number(result.hype)||0);
+        this.data.clubBestScore[i]=Math.max(Number(this.data.clubBestScore[i])||0, Number(result.score)||0);
+        this.data.clubBestCombo=Math.max(Number(this.data.clubBestCombo)||0, Number(result.combo)||0);
+        this.saveSave();
+    }
+    recordClubComplete(result = {}) { this.data.clubCompleted=true; if(result.boss)this.data.clubBossDefeated=true; this.saveSave(); }
+
     beginGame() {
         this.data.gamesPlayed = (Number(this.data.gamesPlayed) || 0) + 1;
         this.data.lastSessionStartedAt = Date.now();
@@ -206,6 +219,8 @@ class SaveSystem {
                 if (!Array.isArray(this.data.busTrophies)) this.data.busTrophies = [];
                 this.data.chicoUnlocked = !!this.data.chicoUnlocked;
                 this.data.fishingBonusCompleted = !!this.data.fishingBonusCompleted;
+                this.data.clubCompleted=!!this.data.clubCompleted; this.data.clubBossDefeated=!!this.data.clubBossDefeated;
+                if(!Array.isArray(this.data.clubBestHype))this.data.clubBestHype=[0,0,0]; if(!Array.isArray(this.data.clubBestScore))this.data.clubBestScore=[0,0,0]; this.data.clubBestCombo=Number(this.data.clubBestCombo)||0;
                 if (!this.data.playerProgress['Chico Fumaça']) this.data.playerProgress['Chico Fumaça'] = { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] };
                 // Migração de saves antigos: quem já alcançou/zerou a última fase também recebe o seletor.
                 if (typeof this.data.gameCompleted !== 'boolean') {
@@ -237,6 +252,8 @@ class SaveSystem {
                 busTrophies: [],
                 chicoUnlocked: false,
                 fishingBonusCompleted: false,
+            clubCompleted: false,
+            clubBestHype: [0,0,0], clubBestCombo: 0, clubBestScore: [0,0,0], clubBossDefeated: false,
                 playerProgress: {
                     João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
                     Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
