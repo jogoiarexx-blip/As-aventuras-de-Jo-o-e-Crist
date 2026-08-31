@@ -16,7 +16,7 @@
   bridge('gameState', () => gameState, v => { if (v != null) gameState=v; });
   bridge('currentLevelIndex', () => currentLevelIndex, v => { if (Number.isInteger(v)) currentLevelIndex=v; });
   bridge('currentLevel', () => currentLevel, v => { currentLevel=v; });
-  bridge('particles', () => particles, v => { if (Array.isArray(v)) { particles.length=0; particles.push(...v); } });
+  bridge('particles', () => window.particlesAPI || particles, v => { if (Array.isArray(v)) { particles.length=0; particles.push(...v); } });
   bridge('saveSystem', () => saveSystem, v => {});
   bridge('powerUps', () => powerUps, v => { if (Array.isArray(v)) { powerUps.length=0; powerUps.push(...v); } });
   bridge('destructibles', () => destructibles, v => { if (Array.isArray(v)) { destructibles.length=0; destructibles.push(...v); } });

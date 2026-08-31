@@ -1,0 +1,17 @@
+JOAO & CRIST v0.9.5 - CORRECAO DE ESTABILIDADE
+
+Corrigido:
+1) Service Worker: Cache.put nao tenta mais armazenar respostas HTTP 206 (Partial Content).
+   - requisicoes Range seguem pela rede;
+   - apenas respostas completas status 200 entram no cache dinamico;
+   - falha ao gravar cache nao interrompe o jogo;
+   - cache versionado para forcar atualizacao segura.
+
+2) Sistema de particulas:
+   - window.particles continua aceitando push e length como os sistemas antigos esperam;
+   - createText, explosion e jet permanecem disponiveis;
+   - game-global-bridge nao substitui mais a API pelo array puro;
+   - corrige o crash em PlayerEvolution.tryShield / PlayerJoao.takeDamage.
+
+Assets:
+- nenhum arquivo dentro de assets/ foi removido ou alterado nesta correcao.

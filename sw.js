@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v095-club-assets-2';
+const VERSION='joao-crist-v095-club-assets-3';
 const CORE=[
   './',
   './index.html',
@@ -76,8 +76,26 @@ self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   const u=new URL(e.request.url); if(u.origin!==location.origin)return;
+
+  // Requisições Range (áudio/vídeo e alguns assets grandes) podem responder 206.
+  // Cache Storage não aceita respostas parciais, então elas seguem direto pela rede.
+  if(e.request.headers.has('range')){
+    e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+    return;
+  }
+
   e.respondWith(caches.match(e.request).then(hit=>{
-    const network=fetch(e.request).then(r=>{if(r&&r.ok){const copy=r.clone();caches.open(VERSION).then(c=>c.put(e.request,copy));}return r;}).catch(()=>hit||caches.match('./index.html'));
+    const network=fetch(e.request).then(r=>{
+      // Só armazena respostas completas. Nunca tenta cache.put() com status 206.
+      if(r && r.status===200){
+        const copy=r.clone();
+        const cacheWrite=caches.open(VERSION)
+          .then(c=>c.put(e.request,copy))
+          .catch(()=>{}); // falha de cache não pode derrubar o jogo
+        e.waitUntil(cacheWrite);
+      }
+      return r;
+    }).catch(()=>hit||caches.match('./index.html'));
     return hit||network;
   }));
 });

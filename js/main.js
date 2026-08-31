@@ -1643,7 +1643,7 @@ window.particlesAPI = {
             const speed = options.speed || 5;
             const vx = Math.cos(angle) * speed;
             const vy = Math.sin(angle) * speed;
-            particles.push({
+            particles.push(acquireParticle({
                 x: x,
                 y: y,
                 vx: vx + (Math.random() - 0.5),
@@ -1652,19 +1652,33 @@ window.particlesAPI = {
                 size: options.size || 3,
                 life: options.maxLife || 30,
                 type: options.type || 'spark'
-            });
+            }));
         }
     },
-    // Método push para compatibilidade com código antigo
-    push: function(particle) {
-        particles.push(particle);
+    // Compatibilidade com sistemas antigos que tratavam window.particles como array.
+    push: function(...items) {
+        return particles.push(...items);
+    },
+    splice: function(...args) {
+        return particles.splice(...args);
+    },
+    forEach: function(callback, thisArg) {
+        return particles.forEach(callback, thisArg);
+    },
+    get length() {
+        return particles.length;
+    },
+    set length(value) {
+        const nextLength = Math.max(0, Math.floor(Number(value) || 0));
+        particles.length = nextLength;
+    },
+    get raw() {
+        return particles;
     }
 };
 
-// Alias para compatibilidade
-if (!window.particles.createText) {
-    window.particles = window.particlesAPI;
-}
+// Alias estável: a API mantém os métodos novos e a compatibilidade de array.
+window.particles = window.particlesAPI;
 
 // Melhoria #19: Splash screen com loading
 // Imagem oficial da tela de carregamento
