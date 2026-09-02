@@ -2352,6 +2352,16 @@ function drawStageSelect() {
         ctx.textAlign='right';ctx.fillStyle=entry.playable?(sel?'#fff':'#8d8273'):'#f5c04a';ctx.font='bold 14px Bebas Neue';ctx.fillText(sel?(entry.playable?'▶ JOGAR':'EM BREVE'):'',listX+listW-16,y+24);
     });
 
+    if(stageSelectIsClub()){
+        const px=758,py=132,pw=205,ph=345,records=saveSystem.load().clubRecords||{},jr=records.joao||{},cr=records.crist||{};
+        ctx.fillStyle='rgba(12,16,24,.92)';ctx.strokeStyle='#45e9ff';ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(px,py,pw,ph,16);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#ffe85a';ctx.font='bold 22px Bebas Neue';ctx.textAlign='center';ctx.fillText('NOITE NA BOATE',px+pw/2,py+34);
+        ctx.fillStyle='#ff8ce6';ctx.font='12px Righteous';ctx.fillText('RECORDES DE DANÇA',px+pw/2,py+58);
+        const drawRec=(label,r,y)=>{ctx.fillStyle='#fff1c8';ctx.font='bold 17px Bebas Neue';ctx.fillText(label,px+pw/2,y);ctx.fillStyle='#55f4ff';ctx.font='bold 32px Bebas Neue';ctx.fillText(`RANK ${r.rank||'D'}`,px+pw/2,y+34);ctx.fillStyle='#ddd';ctx.font='11px Righteous';ctx.fillText(`Score ${Number(r.score)||0}`,px+pw/2,y+55);ctx.fillText(`Combo ${Number(r.combo)||0} • Hype ${Math.round(Number(r.hype)||0)}%`,px+pw/2,y+73);};
+        drawRec('JOÃO',jr,py+95);drawRec('CRIST',cr,py+205);
+        ctx.fillStyle='#79ef9a';ctx.font='bold 15px Bebas Neue';ctx.fillText(saveSystem.load().clubBossDefeated?'SEGURANÇA DERROTADA':'DESAFIO DISPONÍVEL',px+pw/2,py+326);
+    }
+
     // Preview do novo bônus do Chico Fumaça, apenas no seletor por enquanto.
     if(stageSelectIsChicoBonus()){
         const px=758,py=150,pw=205,ph=310;

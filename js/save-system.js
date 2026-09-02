@@ -19,6 +19,7 @@ class SaveSystem {
             fishingBonusCompleted: false,
             clubCompleted: false,
             clubBestHype: [0,0,0], clubBestCombo: 0, clubBestScore: [0,0,0], clubBossDefeated: false,
+            clubRecords: {joao:{score:0,rank:'D',combo:0,hype:0},crist:{score:0,rank:'D',combo:0,hype:0}},
             playerProgress: {
                 João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
                 Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
@@ -142,6 +143,16 @@ class SaveSystem {
         this.data.clubBestCombo=Math.max(Number(this.data.clubBestCombo)||0, Number(result.combo)||0);
         this.saveSave();
     }
+    recordClubRun(character='joao', result = {}) {
+        const key=String(character).toLowerCase().includes('crist')?'crist':'joao';
+        if(!this.data.clubRecords||typeof this.data.clubRecords!=='object')this.data.clubRecords={joao:{score:0,rank:'D',combo:0,hype:0},crist:{score:0,rank:'D',combo:0,hype:0}};
+        const prev=this.data.clubRecords[key]||{score:0,rank:'D',combo:0,hype:0};
+        const score=Math.max(0,Number(result.score)||0), combo=Math.max(0,Number(result.maxCombo)||0), hype=Math.max(0,Number(result.maxHype)||0);
+        const rank=String(result.rank||'D'); const rankValue={D:0,C:1,B:2,A:3,S:4};
+        const isRecord=score>(Number(prev.score)||0) || (score===(Number(prev.score)||0) && (rankValue[rank]||0)>(rankValue[prev.rank]||0));
+        this.data.clubRecords[key]={score:Math.max(Number(prev.score)||0,score),rank:isRecord?rank:(prev.rank||'D'),combo:Math.max(Number(prev.combo)||0,combo),hype:Math.max(Number(prev.hype)||0,hype)};
+        this.saveSave(); return isRecord;
+    }
     recordClubComplete(result = {}) { this.data.clubCompleted=true; if(result.boss)this.data.clubBossDefeated=true; this.saveSave(); }
 
     beginGame() {
@@ -220,7 +231,7 @@ class SaveSystem {
                 this.data.chicoUnlocked = !!this.data.chicoUnlocked;
                 this.data.fishingBonusCompleted = !!this.data.fishingBonusCompleted;
                 this.data.clubCompleted=!!this.data.clubCompleted; this.data.clubBossDefeated=!!this.data.clubBossDefeated;
-                if(!Array.isArray(this.data.clubBestHype))this.data.clubBestHype=[0,0,0]; if(!Array.isArray(this.data.clubBestScore))this.data.clubBestScore=[0,0,0]; this.data.clubBestCombo=Number(this.data.clubBestCombo)||0;
+                if(!Array.isArray(this.data.clubBestHype))this.data.clubBestHype=[0,0,0]; if(!Array.isArray(this.data.clubBestScore))this.data.clubBestScore=[0,0,0]; this.data.clubBestCombo=Number(this.data.clubBestCombo)||0; if(!this.data.clubRecords||typeof this.data.clubRecords!=='object')this.data.clubRecords={joao:{score:0,rank:'D',combo:0,hype:0},crist:{score:0,rank:'D',combo:0,hype:0}};
                 if (!this.data.playerProgress['Chico Fumaça']) this.data.playerProgress['Chico Fumaça'] = { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] };
                 // Migração de saves antigos: quem já alcançou/zerou a última fase também recebe o seletor.
                 if (typeof this.data.gameCompleted !== 'boolean') {
@@ -254,6 +265,7 @@ class SaveSystem {
                 fishingBonusCompleted: false,
             clubCompleted: false,
             clubBestHype: [0,0,0], clubBestCombo: 0, clubBestScore: [0,0,0], clubBossDefeated: false,
+            clubRecords: {joao:{score:0,rank:'D',combo:0,hype:0},crist:{score:0,rank:'D',combo:0,hype:0}},
                 playerProgress: {
                     João: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },
                     Crist: { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] },

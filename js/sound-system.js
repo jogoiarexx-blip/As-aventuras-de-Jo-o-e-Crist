@@ -34,7 +34,7 @@ class SoundSystem {
             dogPet:'assets/sounds/dogPet.wav', dogBark:'assets/sounds/dogBark.wav', levelUp:'assets/sounds/levelUp.wav', pause:'assets/sounds/pause.wav', unpause:'assets/sounds/unpause.wav',
             busHorn1:'assets/sounds/busHorn.wav', busHorn2:'assets/sounds/busHorn2.wav', busCollision1:'assets/sounds/busCollision.wav', busCollision2:'assets/sounds/busCollision2.wav',
             clubPerfect:'assets/bonus/boate/sounds/perfect.wav', clubCombo:'assets/bonus/boate/sounds/combo.wav', clubHit:'assets/bonus/boate/sounds/hit.wav',
-            clubEnemyHit:'assets/bonus/boate/sounds/enemyHit.wav', clubLevelComplete:'assets/bonus/boate/sounds/levelComplete.wav',
+            clubEnemyHit:'assets/sounds/enemyHit.wav', clubLevelComplete:'assets/bonus/boate/sounds/levelComplete.wav',
             clubMenuMove:'assets/bonus/boate/sounds/menuMove.wav', clubMenuSelect:'assets/bonus/boate/sounds/menuSelect.wav'
         };
         this.soundVariants = {

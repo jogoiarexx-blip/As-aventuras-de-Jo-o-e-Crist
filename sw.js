@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v095-club-crist-npc-sheet-8';
+const VERSION='joao-crist-v095-boate-selected-fighter-13';
 const CORE=[
   './',
   './index.html',

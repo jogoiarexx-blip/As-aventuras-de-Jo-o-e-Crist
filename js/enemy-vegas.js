@@ -3,8 +3,8 @@
   const fallbackEnemyDraw = (typeof Enemy !== 'undefined' && Enemy.prototype.draw) ? Enemy.prototype.draw : null;
   const CONFIG = {
     turista: { cls:'TuristaEnemy', name:'Turista de Vegas', life:65, speed:2.25, damage:10, score:180, w:48, h:72, visualH:92 },
-    seguranca: { cls:'SegurancaEnemy', name:'Segurança do Cassino', life:115, speed:2.35, damage:17, score:260, w:52, h:76, visualH:98 },
-    club_security: { cls:'ClubSecurityEnemy', name:'Segurança da Boate', life:115, speed:2.35, damage:17, score:260, w:52, h:76, visualH:98 },
+    seguranca: { cls:'SegurancaEnemy', name:'Segurança de Vegas', life:115, speed:2.35, damage:17, score:260, w:52, h:76, visualH:98 },
+    club_security: { cls:'ClubSecurityEnemy', name:'Segurança de Vegas', life:115, speed:2.35, damage:17, score:260, w:52, h:76, visualH:98 },
     elvis_fan: { cls:'ElvisFanEnemy', name:'Fã do Elvis', life:80, speed:3.25, damage:13, score:230, w:48, h:72, visualH:94, glow:'#7d54ff' },
     mulher_feia: { cls:'MulherFeiaEnemy', name:'Brigona de Vegas', life:145, speed:1.75, damage:21, score:300, w:62, h:84, visualH:108 },
     travesti: { cls:'TravestiEnemy', name:'Diva de Vegas', life:90, speed:2.75, damage:15, score:250, w:50, h:78, visualH:104, glow:'#ff3fbe' }
@@ -25,7 +25,8 @@
     images[type]={};
     const folder=ASSET_FOLDER[type]||type;
     for(const state of STATES){
-      const src=type==='club_security'?`assets/bonus/boate/enemies/seguranca/${state}.webp`:`assets/enemies/vegas-frames/${folder}/${state}.webp`;
+      // O segurança da boate reaproveita exatamente o mesmo sprite do segurança de Vegas.
+      const src=`assets/enemies/vegas-frames/${type==='club_security'?'seguranca':folder}/${state}.webp`;
       images[type][state]=window.assetManager.placeholder(src);
     }
   }
@@ -45,6 +46,7 @@
       super(x,y,'basic');applyStats(this,type);this.__vegasType=type;this.__vegasFace=-1;this.__vegasMove=0;this.__vegasAnimStart=performance.now();this.__vegasLastState='idle';
     }
     update(players,otherEnemies=[]){
+      if(this.__clubBoss&&this.life>0){const ratio=this.life/Math.max(1,this.maxLife);if(ratio<.30&&!this.__clubRage){this.__clubRage=true;this.speed=(this.__clubBossBaseSpeed||this.speed)*1.34;this.damage=Math.round((this.__clubBossBaseDamage||this.damage)*1.28);this.__vegasAnimStart=performance.now();} }
       const ox=this.x;const result=super.update(players,otherEnemies);this.__vegasMove=this.x-ox;
       if(Math.abs(this.__vegasMove)>.02)this.__vegasFace=this.__vegasMove>0?1:-1;
       return result;
@@ -55,19 +57,20 @@
       if(coarse!==this.__vegasLastState){this.__vegasLastState=coarse;this.__vegasAnimStart=performance.now();if(coarse==='walk')state='walk1';}
       const img=images[this.__vegasType][state]||images[this.__vegasType].idle;
       if(!img?.complete||!img.naturalWidth){if(fallbackEnemyDraw)fallbackEnemyDraw.call(this,ctx);return;}
-      const baseH=state==='dead'?c.visualH*.68:c.visualH;
+      const bossScale=this.__clubBoss?1.30:1;const baseH=(state==='dead'?c.visualH*.68:c.visualH)*bossScale;
       const aspect=img.naturalWidth/Math.max(1,img.naturalHeight);
       let visualH=baseH,visualW=visualH*aspect;
       const maxW=c.visualH*1.7;if(visualW>maxW){visualW=maxW;visualH=visualW/aspect;}
       const cx=this.x+this.w/2;const bottom=Number.isFinite(this.groundY)?this.groundY:this.y+this.h;
       ctx.save();ctx.imageSmoothingEnabled=false;
-      if(c.glow&&this.life>0){ctx.shadowBlur=6;ctx.shadowColor=c.glow;}
+      if((c.glow||this.__clubBoss)&&this.life>0){ctx.shadowBlur=this.__clubBoss?14:6;ctx.shadowColor=this.__clubRage?'#ff263f':(c.glow||'#ff596d');}
       ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(cx,bottom+2,Math.max(13,this.w*.38),4,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
       // Os sprites-base olham para a direita. Flip apenas quando o inimigo anda para a esquerda.
       if((this.__vegasFace||-1)<0){ctx.translate(cx,0);ctx.scale(-1,1);ctx.translate(-cx,0);}
       if((this.hitFlash||0)>0)ctx.globalAlpha=.88;
       ctx.drawImage(img,cx-visualW/2,bottom-visualH,visualW,visualH);ctx.restore();
-      if(this.life>0&&this.life<this.maxLife){const bw=48,p=Math.max(0,Math.min(1,this.life/this.maxLife));ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(cx-bw/2-2,bottom-c.visualH-10,bw+4,7);ctx.fillStyle=p>.5?'#55d85a':p>.25?'#f1c34e':'#e55245';ctx.fillRect(cx-bw/2,bottom-c.visualH-8,bw*p,3);}
+      if(this.__clubBoss&&this.life>0){const bw=170,p=Math.max(0,Math.min(1,this.life/this.maxLife));ctx.fillStyle='rgba(0,0,0,.78)';ctx.fillRect(cx-bw/2-3,bottom-visualH-30,bw+6,18);ctx.fillStyle=this.__clubRage?'#ff263f':'#d53b57';ctx.fillRect(cx-bw/2,bottom-visualH-27,bw*p,10);ctx.strokeStyle='#fff';ctx.strokeRect(cx-bw/2,bottom-visualH-27,bw,10);ctx.fillStyle='#fff';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.fillText(this.__clubRage?'CHEFE DA SEGURANÇA • FÚRIA':'CHEFE DA SEGURANÇA',cx,bottom-visualH-34);}
+      if(!this.__clubBoss&&this.life>0&&this.life<this.maxLife){const bw=48,p=Math.max(0,Math.min(1,this.life/this.maxLife));ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(cx-bw/2-2,bottom-c.visualH-10,bw+4,7);ctx.fillStyle=p>.5?'#55d85a':p>.25?'#f1c34e':'#e55245';ctx.fillRect(cx-bw/2,bottom-c.visualH-8,bw*p,3);}
     }
   }
   window.TuristaEnemy=class TuristaEnemy extends VegasEnemy{constructor(x,y){super(x,y,'turista');}};

@@ -87,7 +87,7 @@
   function clubManifest(playerNames=[]){
     const base='assets/bonus/boate';
     const images=[
-      ...['idle','walk1','walk2','attack','hurt','dead'].map(st=>`${base}/enemies/seguranca/${st}.webp`),
+      ...['idle','walk1','walk2','attack','hurt','dead'].map(st=>`assets/enemies/vegas-frames/seguranca/${st}.webp`),
       `${base}/ui/portrait-joao.webp`,`${base}/ui/portrait-crist.webp`,
       `${base}/players/joao/dance-sheet-transparent.png`,
       `${base}/players/crist/dance-sheet-transparent.png`,
@@ -99,7 +99,7 @@
       `${base}/npcs/crowd/crowd-girl-pink.png`,
       ...characterAssets(playerNames)
     ];
-    return {id:'club',name:'Noite na Boate',images:uniq(images),sounds:['clubPerfect','clubCombo','clubHit','clubEnemyHit','clubLevelComplete','clubMenuMove','clubMenuSelect']};
+    return {id:'club',name:'Noite na Boate',images:uniq(images),sounds:['clubPerfect','clubCombo','clubHit','hit','enemyHit','enemyDeath','ko','clubLevelComplete','clubMenuMove','clubMenuSelect']};
   }
 
   class LevelManager {
