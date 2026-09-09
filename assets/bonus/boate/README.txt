@@ -14,8 +14,10 @@ players/joao/
 - dance-sheet.png — sprite sheet exclusivo do João para as animações de dança da fase da boate.
 
 backgrounds/
-- noite-na-boate.png — background principal da fase bônus Noite na Boate.
+- noite-na-boate.webp — background principal da fase bônus Noite na Boate.
 
 npcs/
 - muscular/dance-1..5.webp — NPC musculoso dançando em loop.
 - neon/dance-1..6.webp — NPC de camisa roxa e óculos neon dançando em loop.
+
+- ui/notes/*.webp — set novo de receptores e notas neon da boate.
