@@ -10,7 +10,8 @@ players/         Assets dos personagens jogáveis
   joao/          João
   crist/         Crist (preview, frames separados e fontes)
 powerups/        Power-ups
-sounds/          Efeitos e músicas WAV
+sounds/          Efeitos sonoros
+music/           Trilhas OGG leves por tema (fallback procedural mantido)
 ui/              HUD, menus, portraits, capas e loading
 sprite-pack/     Pacote legado de bosses/inimigos especiais; mantido para evitar regressões
 
