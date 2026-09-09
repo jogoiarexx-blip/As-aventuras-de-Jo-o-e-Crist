@@ -1715,6 +1715,8 @@ window.particles = window.particlesAPI;
 // Imagem oficial da tela de carregamento
 const loadingScreenImage = window.assetManager.image('assets/ui/loading-screen.webp','shared');
 const mainMenuBackgroundImage = window.assetManager.image('assets/ui/menu-principal-vegas.webp','shared');
+const mainMenuPortraitJoao = window.assetManager.image('assets/ui/portrait-joao.webp','shared');
+const mainMenuPortraitCrist = window.assetManager.image('assets/ui/portrait-crist.webp','shared');
 const chicoFumacaSelectImage = window.assetManager.image('assets/npc/chico-fumaca/chico-fumaca-idle.webp','shared');
 
 
@@ -1789,6 +1791,54 @@ function drawMenuBackgroundCover(img) {
     return false;
 }
 
+function getMenuOptionDescription(option) {
+    const descriptions = {
+        'NOVO JOGO':'Comece a campanha completa desde a fazenda até o confronto final em Vegas.',
+        'CONTINUAR':'Retome a campanha do último checkpoint salvo.',
+        'SELEÇÃO DE FASES':'Revisite fases desbloqueadas e busque melhores resultados.',
+        'BÔNUS — ESTRADA PARA VEGAS':'Minigame do ônibus: desvie do trânsito, pegue bônus e chegue inteiro a Vegas.',
+        'BÔNUS — NOITE NA BOATE':'Duelo de dança, HYPE, FEVER e combate contra os Seguranças de Vegas.',
+        'BÔNUS — PESCARIA':'Enfrente o desafio especial de Chico Fumaça e o tubarão.',
+        'TROFÉUS':'Veja conquistas, desafios e objetivos já completados.',
+        'OPÇÕES':'Ajuste gráficos, resolução, áudio e desempenho.',
+        'CONFIGURAR CONTROLES':'Configure teclado e gamepad do seu jeito.',
+        'COMO JOGAR':'Veja os comandos e dicas principais do combate.',
+        'SAIR':'Sair do jogo.'
+    };
+    return descriptions[option] || 'Selecione uma opção para continuar.';
+}
+
+function drawPremiumMenuAmbient() {
+    const now=performance.now();
+    // escurecimento cinematográfico do background
+    const grad=ctx.createLinearGradient(0,0,1000,650);
+    grad.addColorStop(0,'rgba(2,5,16,.62)');
+    grad.addColorStop(.48,'rgba(5,4,12,.28)');
+    grad.addColorStop(1,'rgba(6,2,10,.64)');
+    ctx.fillStyle=grad;ctx.fillRect(0,0,1000,650);
+    // linhas neon discretas
+    ctx.save();
+    for(let i=0;i<8;i++){
+        const yy=100+((i*81 + now*.018)%540);
+        const alpha=.055+.03*Math.sin(now*.0015+i);
+        ctx.strokeStyle=`rgba(62,205,255,${Math.max(.02,alpha)})`;
+        ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(1000,yy-42);ctx.stroke();
+    }
+    // partículas / luzes estilo Vegas
+    for(let i=0;i<24;i++){
+        const x=(i*137 + now*.025*(1+(i%3)*.25))%1040-20;
+        const y=80+((i*71)%470)+Math.sin(now*.0018+i)*8;
+        const a=.22+.18*Math.sin(now*.002+i*1.7);
+        ctx.fillStyle=i%3===0?`rgba(255,198,74,${a})`:`rgba(65,203,255,${a*.7})`;
+        ctx.fillRect(Math.round(x),Math.round(y),i%4===0?3:2,i%4===0?3:2);
+    }
+    ctx.restore();
+    // vinheta
+    const vignette=ctx.createRadialGradient(500,315,180,500,315,610);
+    vignette.addColorStop(0,'rgba(0,0,0,0)');vignette.addColorStop(.72,'rgba(0,0,0,.12)');vignette.addColorStop(1,'rgba(0,0,0,.64)');
+    ctx.fillStyle=vignette;ctx.fillRect(0,0,1000,650);
+}
+
 function drawMenu() {
     refreshMenuOptions();
     menuButtonRects = [];
@@ -1796,111 +1846,94 @@ function drawMenu() {
     const drewBg = drawMenuBackgroundCover(mainMenuBackgroundImage);
     if (!drewBg) {
         const sky = ctx.createLinearGradient(0, 0, 0, 650);
-        sky.addColorStop(0, '#0c1026');
-        sky.addColorStop(0.58, '#321247');
-        sky.addColorStop(0.76, '#d25a38');
-        sky.addColorStop(1, '#1b1114');
-        ctx.fillStyle = sky;
-        ctx.fillRect(0, 0, 1000, 650);
+        sky.addColorStop(0, '#080d24'); sky.addColorStop(.56, '#28103d'); sky.addColorStop(.8, '#9f3c2f'); sky.addColorStop(1, '#100c14');
+        ctx.fillStyle=sky;ctx.fillRect(0,0,1000,650);
     }
+    drawPremiumMenuAmbient();
 
     const savedData = saveSystem.load();
     const highestPhase = Math.max(1, savedData.highestLevel || 1);
-    const recordText = `RECORDE ${savedData.highScore || 0}  •  FASE ${highestPhase}`;
-
-    // Linha de status abaixo do letreiro principal.
-    ctx.save();
-    ctx.fillStyle = 'rgba(8, 10, 16, 0.96)';
-    ctx.strokeStyle = '#8c5a2b';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(330, 165, 340, 36, 10);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#f0b44c';
-    ctx.font = 'bold 16px Righteous';
-    ctx.textAlign = 'center';
-    ctx.fillText(recordText, 500, 188);
-    ctx.restore();
-
-    // Painel central redesenhado para refletir opções desbloqueadas e seleção atual.
-    const panelX = 318;
-    const panelY = 204;
-    const panelW = 364;
-    const compactMenu = menuOptions.length >= 8;
-    const ultraCompactMenu = menuOptions.length >= 9;
-    const topPad = ultraCompactMenu ? 9 : (compactMenu ? 12 : 18);
-    const bottomPad = ultraCompactMenu ? 9 : (compactMenu ? 12 : 18);
-    const optionH = ultraCompactMenu ? 25 : (compactMenu ? 28 : 34);
-    const spacing = ultraCompactMenu ? 3 : (compactMenu ? 5 : 8);
-    const panelH = Math.max(356, topPad + bottomPad + menuOptions.length * optionH + Math.max(0, menuOptions.length - 1) * spacing);
+    const progressPct=Math.round(Math.min(1,highestPhase/Math.max(1,LEVELS.length))*100);
+    const selectedOption=menuOptions[menuSelection]||menuOptions[0]||'';
 
     ctx.save();
-    ctx.fillStyle = 'rgba(8, 10, 16, 0.96)';
-    ctx.strokeStyle = '#b07b3a';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(panelX, panelY, panelW, panelH, 18);
-    ctx.fill();
-    ctx.stroke();
+    // cabeçalho premium
+    ctx.textAlign='center';
+    ctx.shadowBlur=20;ctx.shadowColor='#22bff5';ctx.fillStyle='#eaf9ff';ctx.font='bold 52px Bebas Neue';ctx.fillText('JOÃO & CRIST',500,66);
+    ctx.shadowBlur=12;ctx.shadowColor='#f1ad31';ctx.fillStyle='#ffd36c';ctx.font='bold 20px Righteous';ctx.fillText('LAS VEGAS LEGENDS',500,91);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(7,12,24,.76)';ctx.strokeStyle='rgba(84,193,255,.65)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(323,103,354,28,14);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#d9f5ff';ctx.font='bold 11px Righteous';ctx.fillText(`v1.0.0  •  RECORDE ${savedData.highScore||0}  •  CAMPANHA ${progressPct}%`,500,122);
 
-    menuOptions.forEach((option, i) => {
-        const y = panelY + topPad + i * (optionH + spacing);
-        const isSelected = i === menuSelection;
-        const buttonRect = { x: panelX + 24, y, w: panelW - 48, h: optionH };
-        menuButtonRects.push(buttonRect);
+    // painel esquerdo — navegação
+    const panelX=54,panelY=154,panelW=432,panelH=414;
+    ctx.fillStyle='rgba(4,9,20,.91)';ctx.strokeStyle='#3ba8e8';ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(panelX,panelY,panelW,panelH,18);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='rgba(255,203,83,.38)';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(panelX+8,panelY+8,panelW-16,panelH-16,13);ctx.stroke();
+    ctx.textAlign='left';ctx.fillStyle='#ffd76a';ctx.font='bold 14px Righteous';ctx.fillText('MENU PRINCIPAL',panelX+25,panelY+31);
+    ctx.fillStyle='#8edfff';ctx.font='10px Righteous';ctx.fillText('SELECIONE UMA OPÇÃO',panelX+25,panelY+49);
 
-        if (isSelected) {
-            const grad = ctx.createLinearGradient(buttonRect.x, y, buttonRect.x, y + optionH);
-            grad.addColorStop(0, '#c94d20');
-            grad.addColorStop(1, '#982819');
-            ctx.fillStyle = grad;
-            ctx.strokeStyle = '#ffcf5d';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, 8);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = '#f9d152';
-            ctx.font = 'bold 18px Bebas Neue';
-            ctx.textAlign = 'center';
-            ctx.fillText('◀', buttonRect.x + 18, buttonRect.y + Math.round(optionH*0.72));
-            ctx.fillText('▶', buttonRect.x + buttonRect.w - 18, buttonRect.y + Math.round(optionH*0.72));
-            ctx.fillStyle = '#fff9df';
-            ctx.font = ultraCompactMenu ? 'bold 18px Bebas Neue' : (compactMenu ? 'bold 20px Bebas Neue' : 'bold 24px Bebas Neue');
-            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + Math.round(optionH*0.72));
-        } else {
-            ctx.fillStyle = '#e9dcc6';
-            ctx.font = ultraCompactMenu ? 'bold 16px Bebas Neue' : (compactMenu ? 'bold 18px Bebas Neue' : 'bold 21px Bebas Neue');
-            ctx.textAlign = 'center';
-            ctx.fillText(option, panelX + panelW / 2, buttonRect.y + Math.round(optionH*0.72));
+    const availableH=panelH-80;
+    const optionH=Math.max(25,Math.min(34,(availableH-(menuOptions.length-1)*5)/Math.max(1,menuOptions.length)));
+    const spacing=menuOptions.length>=9?3:5;
+    const listY=panelY+64;
+    menuOptions.forEach((option,i)=>{
+        const y=listY+i*(optionH+spacing);
+        const selected=i===menuSelection;
+        const r={x:panelX+20,y,w:panelW-40,h:optionH};menuButtonRects.push(r);
+        if(selected){
+            const pulse=.84+.16*Math.sin(performance.now()/140);
+            const g=ctx.createLinearGradient(r.x,y,r.x+r.w,y);
+            g.addColorStop(0,'rgba(202,56,28,.96)');g.addColorStop(.55,'rgba(154,35,36,.98)');g.addColorStop(1,'rgba(85,23,50,.96)');
+            ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(r.x,r.y,r.w,r.h,8);ctx.fill();
+            ctx.globalAlpha=pulse;ctx.strokeStyle='#ffd86a';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;
+            ctx.fillStyle='#ffd86a';ctx.font='bold 15px Bebas Neue';ctx.textAlign='left';ctx.fillText('▶',r.x+14,r.y+r.h*.7);
+            ctx.fillStyle='#fff9e9';ctx.font=`bold ${optionH>=31?20:17}px Bebas Neue`;ctx.fillText(option,r.x+39,r.y+r.h*.71);
+        }else{
+            ctx.fillStyle=i%2===0?'rgba(16,31,52,.52)':'rgba(10,22,41,.42)';ctx.beginPath();ctx.roundRect(r.x,r.y,r.w,r.h,7);ctx.fill();
+            ctx.fillStyle='#c8d9e7';ctx.font=`bold ${optionH>=31?18:16}px Bebas Neue`;ctx.textAlign='left';ctx.fillText(option,r.x+39,r.y+r.h*.7);
         }
     });
-    ctx.restore();
 
-    // Faixa inferior com ajuda dinâmica.
-    const pads = gamepadSystem.connected.length;
-    ctx.save();
-    ctx.fillStyle = 'rgba(8, 10, 16, 0.96)';
-    ctx.strokeStyle = '#8c5a2b';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(188, 580, 623, 54, 12);
-    ctx.fill();
-    ctx.stroke();
+    // painel direito — status e contexto
+    const infoX=514,infoY=154,infoW=432,infoH=414;
+    ctx.fillStyle='rgba(4,9,20,.88)';ctx.strokeStyle='#aa7840';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(infoX,infoY,infoW,infoH,18);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='rgba(75,191,255,.24)';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(infoX+8,infoY+8,infoW-16,infoH-16,13);ctx.stroke();
 
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 14px Righteous';
-    ctx.fillStyle = '#f0e6d2';
-    ctx.fillText(pads ? `Gamepad compatível  •  ${pads} controle${pads > 1 ? 's' : ''} conectado${pads > 1 ? 's' : ''}` : 'Gamepad compatível  •  Conecte e pressione um botão', 500, 606);
-    ctx.font = 'bold 12px Righteous';
-    ctx.fillStyle = '#8ff56f';
-    ctx.fillText('ENTER / A para selecionar', 608, 626);
-    ctx.fillStyle = '#f0e6d2';
-    ctx.fillText('↑ ↓ / W S / Analógico para navegar', 343, 626);
-    ctx.fillStyle = '#ff6d5f';
-    ctx.fillText('ESC / B para voltar', 731, 626);
+    // retratos da dupla
+    const portraitY=infoY+24;
+    const drawPortrait=(img,x,label)=>{
+        ctx.fillStyle='rgba(11,31,57,.92)';ctx.strokeStyle='#55c5ff';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,portraitY,82,96,10);ctx.fill();ctx.stroke();
+        if(img?.complete&&img.naturalWidth){ctx.imageSmoothingEnabled=false;const s=Math.min(72/img.naturalWidth,78/img.naturalHeight);const w=img.naturalWidth*s,h=img.naturalHeight*s;ctx.drawImage(img,x+(82-w)/2,portraitY+6+(78-h)/2,w,h);}
+        ctx.textAlign='center';ctx.fillStyle='#fff3c7';ctx.font='bold 12px Bebas Neue';ctx.fillText(label,x+41,portraitY+91);
+    };
+    drawPortrait(mainMenuPortraitJoao,infoX+30,'JOÃO');drawPortrait(mainMenuPortraitCrist,infoX+126,'CRIST');
+
+    ctx.textAlign='left';ctx.fillStyle='#ffd76a';ctx.font='bold 15px Righteous';ctx.fillText('PROGRESSO',infoX+238,portraitY+20);
+    ctx.fillStyle='#e7f6ff';ctx.font='bold 11px Righteous';ctx.fillText(`FASE ${highestPhase}/${LEVELS.length}`,infoX+238,portraitY+43);
+    ctx.fillText(`RECORDE ${savedData.highScore||0}`,infoX+238,portraitY+62);
+    ctx.fillStyle='#081529';ctx.fillRect(infoX+238,portraitY+75,160,10);ctx.fillStyle='#36c8f4';ctx.fillRect(infoX+240,portraitY+77,156*(progressPct/100),6);ctx.strokeStyle='#5bcfff';ctx.strokeRect(infoX+238.5,portraitY+75.5,159,9);
+
+    ctx.fillStyle='rgba(10,22,41,.82)';ctx.strokeStyle='rgba(255,209,92,.45)';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(infoX+24,infoY+140,infoW-48,112,12);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#ffd76a';ctx.font='bold 19px Bebas Neue';ctx.fillText(selectedOption,infoX+43,infoY+169);
+    ctx.fillStyle='#dceaf3';ctx.font='12px Righteous';
+    const desc=getMenuOptionDescription(selectedOption);const words=desc.split(/\s+/);let line='',yy=infoY+194;const max=infoW-86;
+    for(const word of words){const t=line?line+' '+word:word;if(ctx.measureText(t).width>max&&line){ctx.fillText(line,infoX+43,yy);line=word;yy+=20;}else line=t;}if(line)ctx.fillText(line,infoX+43,yy);
+
+    // highlights de recursos
+    const tags=['2 JOGADORES','GAMEPAD','PWA / OFFLINE','GRÁFICOS AJUSTÁVEIS'];
+    let tx=infoX+25,ty=infoY+276;
+    ctx.font='bold 9px Righteous';
+    tags.forEach((tag,i)=>{const tw=ctx.measureText(tag).width+20;if(tx+tw>infoX+infoW-25){tx=infoX+25;ty+=28;}ctx.fillStyle='rgba(12,40,64,.9)';ctx.strokeStyle=i%2?'#d5a544':'#3bb7ee';ctx.beginPath();ctx.roundRect(tx,ty,tw,20,10);ctx.fill();ctx.stroke();ctx.fillStyle='#f0f7fa';ctx.textAlign='center';ctx.fillText(tag,tx+tw/2,ty+14);tx+=tw+8;});
+
+    const pads=gamepadSystem.connected.length;
+    ctx.textAlign='left';ctx.fillStyle='#9bdfff';ctx.font='10px Righteous';ctx.fillText(pads?`${pads} GAMEPAD${pads>1?'S':''} CONECTADO${pads>1?'S':''}`:'GAMEPAD PRONTO PARA CONECTAR',infoX+25,infoY+368);
+    ctx.fillStyle='#c5d7e1';ctx.fillText('Navegue com ↑ ↓ / W S / Analógico',infoX+25,infoY+389);
+
+    // rodapé
+    ctx.fillStyle='rgba(3,8,18,.94)';ctx.strokeStyle='#6f5434';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(155,589,690,42,12);ctx.fill();ctx.stroke();
+    ctx.textAlign='center';ctx.font='bold 11px Righteous';ctx.fillStyle='#f0f4f8';ctx.fillText('↑ ↓  NAVEGAR',290,615);ctx.fillStyle='#7ef57a';ctx.fillText('ENTER / A  SELECIONAR',500,615);ctx.fillStyle='#ff8b7e';ctx.fillText('ESC / B  VOLTAR',710,615);
     ctx.restore();
 }
 
@@ -3958,17 +3991,21 @@ function gameLoop() {
                     ctx.fillStyle = p.color;
                     ctx.globalAlpha = p.life / 40;
                     
-                    if (p.type === 'spark') {
-                        // Partículas de faísca (linhas)
+                    const q=getEffectiveGraphicsQuality();
+                    let spriteDrawn=false;
+                    if(q!=='low' && window.drawGameFxSprite){
+                        if(p.type==='spark') spriteDrawn=window.drawGameFxSprite(ctx,'spark',p.x,p.y,Math.max(28,p.size*8),p.life/40,Math.atan2(p.vy,p.vx));
+                        else if(p.type==='explosion') spriteDrawn=window.drawGameFxSprite(ctx,'explosion',p.x,p.y,Math.max(42,p.size*7),p.life/40,0);
+                        else if(p.type==='dust') spriteDrawn=window.drawGameFxSprite(ctx,'dust',p.x,p.y,Math.max(38,p.size*6),p.life/40,0);
+                    }
+                    if(!spriteDrawn && p.type === 'spark') {
                         ctx.strokeStyle = p.color;
                         ctx.lineWidth = p.size;
                         ctx.beginPath();
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(p.x - p.vx, p.y - p.vy);
                         ctx.stroke();
-                    } else {
-                        // Partículas normais e explosões
-                        const q=getEffectiveGraphicsQuality();
+                    } else if(!spriteDrawn) {
                         ctx.shadowBlur = q==='low' ? 0 : (p.type === 'explosion' ? (q==='medium'?8:15) : (q==='medium'?2:5));
                         if(ctx.shadowBlur>0) ctx.shadowColor = p.color;
                         ctx.beginPath();

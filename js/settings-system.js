@@ -47,6 +47,7 @@ class SettingsSystem {
         if (soundSystem.musicGain && soundSystem.audioContext) {
             soundSystem.musicGain.gain.setValueAtTime(soundSystem.musicVolume, soundSystem.audioContext.currentTime);
         }
+        soundSystem.updateVolumes?.();
     }
 }
 window.SettingsSystem = SettingsSystem;

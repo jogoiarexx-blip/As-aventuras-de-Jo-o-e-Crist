@@ -7,12 +7,13 @@ const DIALOG_PORTRAITS = {
   'JOÃO':'assets/ui/portrait-joao.webp',
   'CRIST':'assets/ui/portrait-crist.webp',
   'CHICO FUMAÇA':'assets/ui/portrait-chico.webp',
-  'O CORONEL':'assets/sprite-pack/colonel_idle.webp',
-  'VICTOR':'assets/sprite-pack/vegas_idle.webp',
-  'REI DE VEGAS':'assets/sprite-pack/vegas_idle.webp',
-  'A SOMBRA':'assets/sprite-pack/shadow_idle.webp',
-  'DEUS DAS APOSTAS':'assets/sprite-pack/god_idle.webp',
-  'BANDIDO':'assets/enemies/cowboy-16bit.webp'
+  'O CORONEL':'assets/ui/portrait-colonel.webp',
+  'VICTOR':'assets/ui/portrait-victor.webp',
+  'V. BLACKJACK':'assets/ui/portrait-victor.webp',
+  'REI DE VEGAS':'assets/ui/portrait-victor.webp',
+  'A SOMBRA':'assets/ui/portrait-shadow.webp',
+  'DEUS DAS APOSTAS':'assets/ui/portrait-god.webp',
+  'BANDIDO':'assets/ui/portrait-bandido.webp'
 };
 
 const SCENES = {
@@ -161,21 +162,24 @@ function drawSceneSprite(ctx, src, x, y, w, h, flip=false){
 }
 
 class StoryCutsceneManager {
-  constructor(){ this.active=null; this.index=0; this.startedAt=0; this.lineStartedAt=0; this.onComplete=null; this.seen=new Set(); this.flash=0; }
+  constructor(){ this.active=null; this.index=0; this.startedAt=0; this.lineStartedAt=0; this.onComplete=null; this.seen=new Set(); this.flash=0; this.lineFade=1; this.forceFullLine=false; }
   hasSeen(id){ return this.seen.has(id); }
   start(id,onComplete){
     const scene=SCENES[id]; if(!scene){ onComplete?.(); return false; }
-    this.active={id,...scene}; this.index=0; this.startedAt=performance.now(); this.lineStartedAt=this.startedAt; this.onComplete=onComplete||null; this.flash=20; this.seen.add(id);
+    this.active={id,...scene}; this.index=0; this.startedAt=performance.now(); this.lineStartedAt=this.startedAt; this.onComplete=onComplete||null; this.flash=20; this.lineFade=1; this.forceFullLine=false; this.seen.add(id);
     window.soundSystem?.playSound?.('menuSelect');
     return true;
   }
   finish(){
     const cb=this.onComplete; const id=this.active?.id; this.active=null; this.onComplete=null; this.index=0; window.soundSystem?.playSound?.('menuSelect'); cb?.();
   }
-  advance(){ if(!this.active)return; if(this.index < this.active.lines.length-1){this.index++;this.lineStartedAt=performance.now();window.soundSystem?.playSound?.('menuMove');} else this.finish(); }
+  advance(){ if(!this.active)return; if(this.index < this.active.lines.length-1){this.index++;this.lineStartedAt=performance.now();this.lineFade=1;this.forceFullLine=false;window.soundSystem?.playSound?.('menuMove');} else this.finish(); }
   skip(){ if(!this.active)return; this.finish(); }
-  handleKey(key){ if(!this.active)return false; if(key==='Escape'){this.skip();return true;} if(key==='Enter'||key===' '){this.advance();return true;} return false; }
-  update(){ if(!this.active)return; if(this.flash>0)this.flash--; if(performance.now()-this.lineStartedAt>4600)this.advance(); }
+  handleKey(key){ if(!this.active)return false; if(key==='Escape'){this.skip();return true;} if(key==='Enter'||key===' '){const full=String(this.active.lines?.[this.index]?.[1]||'');const shown=this.getVisibleText(full);if(shown.length<full.length&&!this.forceFullLine){this.forceFullLine=true;return true;}this.advance();return true;} return false; }
+  update(){ if(!this.active)return; if(this.flash>0)this.flash--; if(this.lineFade>0)this.lineFade=Math.max(0,this.lineFade-.08); if(performance.now()-this.lineStartedAt>5200)this.advance(); }
+  getVisibleText(full){ if(this.forceFullLine)return String(full||''); const age=Math.max(0,performance.now()-this.lineStartedAt); const chars=Math.max(1,Math.floor(age/22)); return String(full||'').slice(0,chars); }
+  getCamera(){ const age=Math.max(0,performance.now()-this.startedAt); const kind=this.active?.actors||''; const slow=Math.sin(age*.00035); const zoom=1.025+Math.min(.045,age/24000)+slow*.006; let panX=0,panY=0; if(kind==='colonelDesert')panX=22; else if(kind==='screen'||kind==='shadow'||kind==='god')panX=-18; else if(kind==='vegas')panX=-8; panY=Math.sin(age*.00022)*4; return {zoom,panX,panY}; }
+  drawCinematicOverlay(ctx){ const age=Math.max(0,performance.now()-this.startedAt); const intro=Math.min(1,age/500); ctx.save(); const bar=42; ctx.fillStyle='rgba(0,0,0,.98)';ctx.fillRect(0,0,1000,bar);ctx.fillRect(0,650-bar,1000,bar); const vignette=ctx.createRadialGradient(500,310,190,500,310,590);vignette.addColorStop(0,'rgba(0,0,0,0)');vignette.addColorStop(1,'rgba(0,0,0,.45)');ctx.fillStyle=vignette;ctx.fillRect(0,bar,1000,650-bar*2); if(intro<1){ctx.globalAlpha=1-intro;ctx.fillStyle='#000';ctx.fillRect(0,0,1000,650);} ctx.restore(); }
   drawActor(ctx,player,x,y,facingRight=true){
     if(!player?.draw)return; const old={x:player.x,y:player.y,fr:player.facingRight,att:player.attacking,dash:player.dashing};
     player.x=x;player.y=y;player.facingRight=facingRight;player.attacking=false;player.dashing=false; try{player.draw(ctx);}catch(_){ }
@@ -203,10 +207,10 @@ class StoryCutsceneManager {
     } else if(kind==='vegas'||kind==='screen'||kind==='door'||kind==='shadow'||kind==='god'){
       this.drawActor(ctx,p1,300,445,true); if(p2)this.drawActor(ctx,p2,390,445,true);
       ctx.save();
-      if(kind==='screen'){ctx.fillStyle='#181818';ctx.fillRect(620,160,240,155);ctx.strokeStyle='#ffcc55';ctx.lineWidth=4;ctx.strokeRect(620,160,240,155);ctx.fillStyle='#d94444';ctx.font='bold 30px Bebas Neue';ctx.textAlign='center';ctx.fillText('V. BLACKJACK',740,245);}
+      if(kind==='screen'){ctx.fillStyle='#11151e';ctx.fillRect(610,145,260,185);ctx.strokeStyle='#ffcc55';ctx.lineWidth=4;ctx.strokeRect(610,145,260,185);drawSceneSprite(ctx,'assets/ui/portrait-victor.webp',684,158,112,130,false);ctx.fillStyle='#ffcc55';ctx.font='bold 19px Bebas Neue';ctx.textAlign='center';ctx.fillText('V. BLACKJACK',740,317);}
       if(kind==='door'){ctx.fillStyle='#241b18';ctx.fillRect(650,300,145,245);ctx.strokeStyle='#8d6b3b';ctx.lineWidth=5;ctx.strokeRect(650,300,145,245);ctx.fillStyle='#a01818';ctx.beginPath();ctx.arc(723,390,25,0,Math.PI*2);ctx.fill();}
-      if(kind==='shadow'){ctx.fillStyle='rgba(0,0,0,.78)';ctx.beginPath();ctx.ellipse(720,420,58,110,0,0,Math.PI*2);ctx.fill();}
-      if(kind==='god'){ctx.fillStyle='#e8b833';ctx.shadowBlur=28;ctx.shadowColor='#ffd76b';ctx.beginPath();ctx.arc(735,365,65,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#17131c';ctx.fillRect(690,420,90,125);}
+      if(kind==='shadow'){drawSceneSprite(ctx,'assets/sprite-pack/shadow_idle.webp',655,310,130,155,false);window.drawGameFxSprite?.(ctx,'bossAura',720,390,155,.42,performance.now()*.0003);}
+      if(kind==='god'){window.drawGameFxSprite?.(ctx,'bossAura',735,385,190,.6,-performance.now()*.00025);drawSceneSprite(ctx,'assets/sprite-pack/god_idle.webp',665,300,145,170,false);}
       ctx.restore();
     }
   }
@@ -215,8 +219,10 @@ class StoryCutsceneManager {
     const key=String(speaker||'NARRADOR').toUpperCase();
     const portraitSrc=DIALOG_PORTRAITS[key];
     const portrait=portraitSrc?getSceneImage(portraitSrc):null;
+    const lineAge=Math.max(0,performance.now()-this.lineStartedAt); const fade=Math.min(1,lineAge/220);
     const x=42,y=474,w=916,h=158;
     ctx.save();
+    ctx.globalAlpha*=fade; const slide=(1-fade)*18; ctx.translate(0,slide);
     ctx.fillStyle='rgba(3,10,25,.95)';
     ctx.strokeStyle=key==='NARRADOR'?'#d7a84a':'#29a8ff';
     ctx.lineWidth=4;
@@ -231,27 +237,33 @@ class StoryCutsceneManager {
       ctx.strokeStyle='#55c5ff';ctx.lineWidth=2;ctx.strokeRect(boxX+.5,boxY+.5,boxW-1,boxH-1);
       const scale=Math.min((boxW-10)/portrait.naturalWidth,(boxH-10)/portrait.naturalHeight);
       const pw=portrait.naturalWidth*scale,ph=portrait.naturalHeight*scale;
-      ctx.imageSmoothingEnabled=false;ctx.drawImage(portrait,boxX+(boxW-pw)/2,boxY+(boxH-ph)/2,pw,ph);
+      ctx.imageSmoothingEnabled=false; const pp=.98+Math.sin(performance.now()/260)*.012; const dw=pw*pp,dh=ph*pp;ctx.shadowBlur=10;ctx.shadowColor='#55c5ff';ctx.drawImage(portrait,boxX+(boxW-dw)/2,boxY+(boxH-dh)/2,dw,dh);ctx.shadowBlur=0;
       textX=x+154;
     }
     ctx.textAlign='left';ctx.fillStyle='#ffd76a';ctx.font='bold 23px Bebas Neue';ctx.fillText(speaker,textX,y+38);
     ctx.fillStyle='#f4f8ff';ctx.font='16px Righteous';
-    const maxWidth=x+w-textX-30;const words=String(text||'').split(/\s+/);let line='',yy=y+72;
+    const visibleText=this.getVisibleText(text); const maxWidth=x+w-textX-30;const words=String(visibleText||'').split(/\s+/);let line='',yy=y+72;
     for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,textX,yy);line=word;yy+=25;}else line=test;}if(line)ctx.fillText(line,textX,yy);
     ctx.fillStyle='#8fdcff';ctx.font='10px Righteous';ctx.textAlign='right';ctx.fillText(`ENTER/ATAQUE: avançar   ESC: pular   ${this.index+1}/${scene.lines.length}`,x+w-22,y+h-18);
     ctx.restore();
   }
   draw(ctx,currentLevel,players,levels){
     if(!this.active)return;
-    const scene=this.active; const bg=levels?.[scene.bg]||currentLevel;
-    ctx.save(); if(bg?.drawBackground)bg.drawBackground(ctx,0); else {ctx.fillStyle='#111';ctx.fillRect(0,0,1000,650);} ctx.restore();
-    ctx.save();ctx.fillStyle='rgba(0,0,0,.22)';ctx.fillRect(0,0,1000,650);ctx.restore();
+    const scene=this.active; const bg=levels?.[scene.bg]||currentLevel; const cam=this.getCamera();
+    ctx.save();
+    ctx.translate(500+cam.panX,325+cam.panY);ctx.scale(cam.zoom,cam.zoom);ctx.translate(-500,-325);
+    if(bg?.drawBackground)bg.drawBackground(ctx,0); else {ctx.fillStyle='#111';ctx.fillRect(0,0,1000,650);}
+    ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(0,0,1000,650);
     this.drawSceneActors(ctx,players,scene.actors);
+    ctx.restore();
+    this.drawCinematicOverlay(ctx);
     const [speaker,text]=scene.lines[Math.min(this.index,scene.lines.length-1)];
     this.drawDialogueHud(ctx,speaker,text,scene);
     ctx.save();
-    ctx.fillStyle='#ffe58a';ctx.font='bold 25px Bebas Neue';ctx.textAlign='center';ctx.fillText(scene.title,500,48);
-    if(this.flash>0){ctx.globalAlpha=this.flash/20*.35;ctx.fillStyle='#fff';ctx.fillRect(0,0,1000,650);}ctx.restore();
+    const titleAge=Math.max(0,performance.now()-this.startedAt); const ta=Math.min(1,titleAge/420)*Math.max(0,1-Math.max(0,titleAge-2600)/700);
+    ctx.globalAlpha=ta;ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(300,45,400,38);ctx.strokeStyle='rgba(255,221,122,.6)';ctx.strokeRect(300.5,45.5,399,37);
+    ctx.fillStyle='#ffe58a';ctx.font='bold 25px Bebas Neue';ctx.textAlign='center';ctx.fillText(scene.title,500,72);
+    if(this.flash>0){ctx.globalAlpha=this.flash/20*.24;ctx.fillStyle='#fff';ctx.fillRect(0,0,1000,650);}ctx.restore();
   }
 }
 window.storyCutscenes=new StoryCutsceneManager();

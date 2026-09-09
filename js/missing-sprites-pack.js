@@ -23,7 +23,7 @@
     assassin: { frames:{ idle:['assassin_idle.webp'], walk:['assassin_walk1.webp','assassin_walk2.webp'], attack:['assassin_attack.webp','assassin_attack2.webp','assassin_special.webp'], hurt:['assassin_hurt.webp'], dead:['assassin_dead.webp','assassin_dead2.webp'] }, w:68, h:92, shadow:15, glow:'#ff0066', deathFrames:30 },
     drone:    { frames:{ idle:['drone_idle.webp'], walk:['drone_walk1.webp','drone_walk2.webp'], attack:['drone_attack.webp','drone_attack2.webp','drone_special.webp'], hurt:['drone_hurt.webp'], dead:['drone_dead.webp','drone_dead2.webp'] }, w:52, h:52, shadow:14, glow:'#00d7ff', deathFrames:30 },
     colonel:  { frames:{ idle:['colonel_idle.webp'], walk:['colonel_walk1.webp','colonel_walk2.webp'], attack:['colonel_attack1.webp','colonel_attack2.webp','colonel_attack3.webp','colonel_attack4.webp'], hurt:['colonel_hurt.webp'], dead:['colonel_dead.webp'] }, w:186, h:198, shadow:34, glow:'#7d3c98', boss:true, deathFrames:30, barColor:'#e74c3c' },
-    vegas:    { frames:{ idle:['vegas_idle.webp'], walk:['vegas_walk1.webp','vegas_walk2.webp'], attack:['vegas_attack.webp'], hurt:['vegas_hurt.webp'], dead:['vegas_dead.webp'] }, w:132, h:132, shadow:28, glow:'#ffd700', boss:true, deathFrames:30, barColor:'#ff00aa' },
+    vegas:    { frames:{ idle:['vegas_idle.webp'], walk:['vegas_walk1.webp','vegas_walk2.webp'], attack:['vegas_attack.webp','vegas_attack2.webp','vegas_special.webp'], hurt:['vegas_hurt.webp'], dead:['vegas_dead.webp'] }, w:132, h:132, shadow:28, glow:'#ffd700', boss:true, deathFrames:30, barColor:'#ff00aa' },
     engineer: { frames:{ idle:['engineer_idle.webp'], walk:['engineer_walk1.webp','engineer_walk2.webp'], attack:['engineer_attack.webp','engineer_attack2.webp','engineer_special.webp'], hurt:['engineer_hurt.webp'], dead:['engineer_dead.webp','engineer_dead2.webp'] }, w:118, h:126, shadow:24, glow:'#00d7ff', boss:true, deathFrames:40, barColor:'#00d7ff' },
     shadow:   { frames:{ idle:['shadow_idle.webp'], walk:['shadow_walk1.webp','shadow_walk2.webp'], attack:['shadow_attack.webp','shadow_attack2.webp','shadow_special.webp'], hurt:['shadow_hurt.webp'], dead:['shadow_dead.webp','shadow_dead2.webp'] }, w:108, h:124, shadow:18, glow:'#a84cff', boss:true, deathFrames:40, alpha:true, barColor:'#a84cff' },
     god:      { frames:{ idle:['god_idle.webp'], walk:['god_walk1.webp','god_walk2.webp'], attack:['god_attack.webp','god_attack2.webp','god_special.webp'], hurt:['god_hurt.webp'], dead:['god_dead.webp','god_dead2.webp'] }, w:142, h:142, shadow:32, glow:'#ffd700', boss:true, deathFrames:60, barColor:'#ffd700' }
@@ -80,6 +80,13 @@
         }
       }
     }
+    if(key === 'vegas' && (entity.attacking || (entity.attackTimer || 0) > 0)){
+      const dir = entity.facingRight ? 1 : -1;
+      const fxX = entity.x + entity.w/2 + dir*34;
+      const fxY = entity.y + entity.h*0.42;
+      window.drawGameFxSprite?.(ctx,'slash',fxX,fxY,58,0.92,dir>0?0:Math.PI);
+      window.drawGameFxSprite?.(ctx,'spark',fxX + dir*10,fxY - 6,30,0.95,0);
+    }
   }
 
   function renderEntity(ctx, entity, key){
@@ -105,6 +112,13 @@
     if (cfg.alpha && Number.isFinite(entity.alpha)) alpha *= entity.alpha;
     if (entity.life <= 0) alpha *= Math.max(0, 1 - (entity.deathAnim || 0) / (cfg.deathFrames || 30));
     ctx.globalAlpha *= alpha;
+
+    if(cfg.boss && window.GameFxSprites?.bossAura?.complete && window.GameFxSprites.bossAura.naturalWidth){
+      const aura=window.GameFxSprites.bossAura;
+      const pulse=1+Math.sin(performance.now()*0.004)*0.05;
+      const aw=Math.max(drawW,drawH)*1.45*pulse;
+      ctx.save();ctx.globalAlpha*=0.55;ctx.translate(centerX,ground-drawH*0.52);ctx.rotate(performance.now()*0.0005);ctx.imageSmoothingEnabled=false;ctx.drawImage(aura,-aw/2,-aw/2,aw,aw);ctx.restore();
+    }
 
     if (cfg.shadow > 0) {
       ctx.fillStyle = 'rgba(0,0,0,0.28)';

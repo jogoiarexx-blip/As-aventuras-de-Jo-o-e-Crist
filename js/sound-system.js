@@ -57,110 +57,105 @@ class SoundSystem {
         this.musicOscillators = [];
         this.musicGain = null;
         this.musicSessionId = 0;
+        this.musicTrack = null;
+        this.musicManifest = {
+            normal:'assets/music/normal-theme.ogg', slow:'assets/music/farm-theme.ogg', fast:'assets/music/boss-theme.ogg',
+            farm:'assets/music/farm-theme.ogg', city:'assets/music/city-theme.ogg', desert:'assets/music/desert-theme.ogg', road:'assets/music/desert-theme.ogg',
+            vegas:'assets/music/vegas-theme.ogg', casino:'assets/music/vegas-theme.ogg', assassin:'assets/music/boss-theme.ogg',
+            fishing:'assets/music/fishing-theme.ogg', shark:'assets/music/boss-theme.ogg', god:'assets/music/final-theme.ogg'
+        };
         
         // Não inicializar AudioContext aqui - aguardar interação do usuário
     }
     
-    // Melhoria #53: Música de fundo procedural
+    // Melhoria #53: Música de fundo híbrida — arquivos de trilha + fallback procedural
     startMusic(tempo = 'normal') {
+        if (!this.enabled || this.musicPlaying) return;
+        const trackSrc = this.musicManifest?.[tempo] || this.musicManifest?.normal;
+        if (trackSrc) {
+            const audio = new Audio();
+            audio.preload = 'auto';
+            audio.src = trackSrc;
+            audio.loop = true;
+            audio.volume = Math.max(0, Math.min(1, this.musicVolume));
+            this.musicTrack = audio;
+            this.musicPlaying = true;
+            this.musicTempo = tempo;
+            const resumeCtx = () => { if (!this.initialized) this.initAudioContext(); else if (this.audioContext?.state === 'suspended') this.audioContext.resume().catch(()=>{}); };
+            try { resumeCtx(); } catch (_) {}
+            const p = audio.play();
+            if (p?.catch) {
+                p.catch(() => {
+                    if (this.musicTrack === audio) this.musicTrack = null;
+                    this.musicPlaying = false;
+                    this.startProceduralMusic(tempo);
+                });
+            }
+            return;
+        }
+        this.startProceduralMusic(tempo);
+    }
+
+    startProceduralMusic(tempo = 'normal') {
         if (!this.enabled || !this.audioContext || this.musicPlaying) return;
-        
         const ctx = this.audioContext;
         const now = ctx.currentTime;
         const session = ++this.musicSessionId;
-        
-        // Ganho principal da música
         this.musicGain = ctx.createGain();
         this.musicGain.gain.setValueAtTime(this.musicVolume, now);
         this.musicGain.connect(ctx.destination);
-        
-        // Marcar antes de agendar os loops; a versão anterior marcava depois e
-        // o primeiro ciclo não era reprogramado.
         this.musicPlaying = true;
         this.musicTempo = tempo;
-        // Batida base (kick)
         const kickMap={farm:.56,city:.44,desert:.58,road:.38,vegas:.34,casino:.32,assassin:.46,god:.28,fishing:.64,shark:.30,fast:.30,slow:.62,normal:.50};
         const kickInterval=kickMap[tempo]||.50;
         this.playKick(now, kickInterval, session);
-        
-        // Linha de baixo
         this.playBassline(now, tempo, session);
-        
     }
-    
+
     playKick(startTime, interval, session=this.musicSessionId) {
         if (!this.musicGain || session !== this.musicSessionId) return;
-        
         const ctx = this.audioContext;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        
         osc.type = 'sine';
         osc.frequency.setValueAtTime(150, startTime);
         osc.frequency.exponentialRampToValueAtTime(40, startTime + 0.1);
-        
         gain.gain.setValueAtTime(this.musicVolume * 0.5, startTime);
         gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
-        
-        osc.connect(gain);
-        gain.connect(this.musicGain);
-        
-        osc.start(startTime);
-        osc.stop(startTime + 0.1);
-        
-        // Repetir kick
-        if (this.musicPlaying) {
-            setTimeout(() => { if(this.musicPlaying && session===this.musicSessionId) this.playKick(ctx.currentTime, interval, session); }, interval * 1000);
-        }
+        osc.connect(gain); gain.connect(this.musicGain);
+        osc.start(startTime); osc.stop(startTime + 0.1);
+        if (this.musicPlaying && !this.musicTrack) setTimeout(() => { if(this.musicPlaying && session===this.musicSessionId) this.playKick(ctx.currentTime, interval, session); }, interval * 1000);
     }
     
     playBassline(startTime, tempo, session=this.musicSessionId) {
         if (!this.musicGain || session !== this.musicSessionId) return;
-        
         const ctx = this.audioContext;
-        const themes={
-            farm:[82.4,98,110,123.5,110,98], city:[98,110,130.8,146.8,130.8,110], desert:[73.4,82.4,110,98,82.4],
-            road:[82.4,110,123.5,146.8,123.5,110], vegas:[98,123.5,146.8,196,174.6,146.8], casino:[110,138.6,164.8,220,185,164.8],
-            assassin:[65.4,77.8,92.5,116.5,92.5,77.8], god:[55,82.4,110,164.8,110,82.4], fishing:[73.4,98,123.5,98,82.4], shark:[55,65.4,82.4,110,65.4],
-            fast:[110,130,147,165], slow:[73.4,82.4,98,110], normal:[82.4,98,110,123.5]
-        };
+        const themes={farm:[82.4,98,110,123.5,110,98],city:[98,110,130.8,146.8,130.8,110],desert:[73.4,82.4,110,98,82.4],road:[82.4,110,123.5,146.8,123.5,110],vegas:[98,123.5,146.8,196,174.6,146.8],casino:[110,138.6,164.8,220,185,164.8],assassin:[65.4,77.8,92.5,116.5,92.5,77.8],god:[55,82.4,110,164.8,110,82.4],fishing:[73.4,98,123.5,98,82.4],shark:[55,65.4,82.4,110,65.4],fast:[110,130,147,165],slow:[73.4,82.4,98,110],normal:[82.4,98,110,123.5]};
         const notes=themes[tempo]||themes.normal;
         const lengths={farm:.56,city:.42,desert:.58,road:.32,vegas:.36,casino:.30,assassin:.44,god:.26,fishing:.62,shark:.28,fast:.40,slow:.62,normal:.60};
         const noteLength=lengths[tempo]||.60;
-        
         notes.forEach((freq, i) => {
             const noteTime = startTime + i * noteLength;
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             const filter = ctx.createBiquadFilter();
-            
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, noteTime);
-            
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(800, noteTime);
-            filter.Q.value = 1;
-            
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(freq, noteTime);
+            filter.type = 'lowpass'; filter.frequency.setValueAtTime(800, noteTime); filter.Q.value = 1;
             gain.gain.setValueAtTime(this.musicVolume * 0.3, noteTime);
             gain.gain.exponentialRampToValueAtTime(0.01, noteTime + noteLength);
-            
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(this.musicGain);
-            
-            osc.start(noteTime);
-            osc.stop(noteTime + noteLength);
+            osc.connect(filter); filter.connect(gain); gain.connect(this.musicGain);
+            osc.start(noteTime); osc.stop(noteTime + noteLength);
         });
-        
-        // Loop da bassline
-        if (this.musicPlaying) {
-            setTimeout(() => { if(this.musicPlaying && session===this.musicSessionId) this.playBassline(ctx.currentTime, tempo, session); }, notes.length * noteLength * 1000);
-        }
+        if (this.musicPlaying && !this.musicTrack) setTimeout(() => { if(this.musicPlaying && session===this.musicSessionId) this.playBassline(ctx.currentTime, tempo, session); }, notes.length * noteLength * 1000);
     }
     
     stopMusic() {
         this.musicPlaying = false;
         this.musicSessionId++;
+        if (this.musicTrack) {
+            try { this.musicTrack.pause(); this.musicTrack.currentTime = 0; this.musicTrack.removeAttribute('src'); this.musicTrack.load(); } catch (_) {}
+            this.musicTrack = null;
+        }
         if (this.musicGain) {
             this.musicGain.disconnect();
             this.musicGain = null;
@@ -168,6 +163,12 @@ class SoundSystem {
         this.musicOscillators = [];
     }
     
+    updateVolumes() {
+        if (this.musicTrack) { try { this.musicTrack.volume = Math.max(0, Math.min(1, this.musicVolume)); } catch (_) {} }
+        if (this.musicGain && this.audioContext) { try { this.musicGain.gain.setValueAtTime(this.musicVolume, this.audioContext.currentTime); } catch (_) {} }
+        Object.entries(this.loopingSounds || {}).forEach(([type,audio])=>{ try { if (audio && !audio.paused) audio.volume = Math.max(0, Math.min(1, this.sfxVolume * 0.65)); } catch (_) {} });
+    }
+
     initAudioContext() {
         if (this.initialized) return;
         
@@ -305,6 +306,7 @@ class SoundSystem {
         this._gamePaused = true;
         this._pausedPoolAudio = [];
         this._pausedLoops = [];
+        this._pausedMusicTime = 0;
         Object.entries(this.soundPools || {}).forEach(([type, entry]) => {
             (entry?.pool || []).forEach((audio, index) => {
                 try {
@@ -358,6 +360,7 @@ class SoundSystem {
         }
         this._pausedPoolAudio = [];
         this._pausedLoops = [];
+        this._pausedMusicTime = 0;
     }
 
     // Gerar sons proceduralmente usando Web Audio API

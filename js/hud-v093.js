@@ -7,6 +7,14 @@
     'Crist':load('assets/ui/hud-crist-frame.webp'),
     'Chico Fumaça':load('assets/ui/hud-chico-frame.webp')
   };
+  const bossPortraits={
+    colonel:load('assets/ui/portrait-colonel.webp'),
+    victor:load('assets/ui/portrait-victor.webp'),
+    vegas:load('assets/ui/portrait-victor.webp'),
+    shadow:load('assets/ui/portrait-shadow.webp'),
+    god:load('assets/ui/portrait-god.webp'),
+    cowboy:load('assets/ui/portrait-bandido.webp')
+  };
 
   function pixelPanel(x,y,w,h,fill='#071b42',stroke='#29a8ff'){
     ctx.fillStyle=fill;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));
@@ -41,6 +49,20 @@
     }
     return {label:'COMBO',value:clamp((p.combo||0)/10)};
   }
+
+  function bossPortraitFor(b){
+    const k=String(b?.type||b?.name||'').toLowerCase();
+    if(k.includes('colon'))return bossPortraits.colonel;
+    if(k.includes('victor')||k.includes('vegas')||k.includes('blackjack'))return bossPortraits.victor;
+    if(k.includes('shadow')||k.includes('sombra'))return bossPortraits.shadow;
+    if(k.includes('god')||k.includes('deus'))return bossPortraits.god;
+    if(k.includes('cowboy')||k.includes('bandido'))return bossPortraits.cowboy;
+    return null;
+  }
+  function tinyTag(x,y,text,fill='#0d274d',stroke='#55c5ff'){
+    const pad=6;ctx.font='bold 8px Righteous';const w=ctx.measureText(text).width+pad*2;pixelPanel(x,y,w,15,fill,stroke);ctx.fillStyle='#fff';ctx.fillText(text,x+pad,y+11);return w;
+  }
+
   function drawPlayer(p,index,total){
     if(!p)return;
     const w=326,h=109,y=6,x=(total>1&&index===1)?668:6;
@@ -70,7 +92,12 @@
 
     const sec=secondaryData(p);
     ctx.fillStyle='#fff1a3';ctx.font='bold 8px Righteous';ctx.fillText(sec.label,dataX+205,y+82);
-    bar(dataX+205,y+87,Math.max(34,w-299),8,sec.value,'special');
+    const secW=Math.max(34,w-299); bar(dataX+205,y+87,secW,8,sec.value,'special');
+    ctx.fillStyle='#c9f7ff';ctx.font='7px Righteous';
+    const secText = sec.label==='COMBO' ? `x${p.combo||0}` : (p.rangedCharging ? `${Math.round(sec.value*100)}%` : (sec.value>=.98?'PRONTO':'RECARGA'));
+    ctx.fillText(secText,dataX+205,y+99);
+    if((p.combo||0)>=5){ tinyTag(dataX+205,y+38,`COMBO ${p.combo}x`,'rgba(60,20,0,.92)','#ffd76a'); }
+    if((p.life||0)/(Math.max(1,p.maxLife||1))<=0.25){ tinyTag(right-58,y+39,'PERIGO','rgba(60,8,8,.94)','#ff7a6b'); }
     ctx.restore();
   }
 
@@ -81,19 +108,39 @@
     const total=players.length;players.forEach((p,i)=>drawPlayer(p,i,total));
 
     const alive=enemies.filter(e=>!e.dead&&e.life>0&&!e.isBossMinion);
+    const highestCombo = players.reduce((m,p)=>Math.max(m,Number(p?.combo)||0),0);
     const stage=`FASE ${currentLevelIndex+1}/${LEVELS.length}`;
     let center=stage+`  •  ${alive.filter(e=>!e.isBoss).length} INIMIGOS`;
     if(waveSystem&&!waveSystem.allWavesDone)center=`${stage}  •  ONDA ${Math.max(1,waveSystem.currentWave)}/${waveSystem.waves.length}`;
-    pixelPanel(340,8,320,38,'rgba(5,15,34,.90)','#2b9fe8');
-    ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 13px Righteous';ctx.fillText(center,500,31);
-    ctx.fillStyle='#ffd76a';ctx.font='bold 12px Bebas Neue';ctx.fillText(`SCORE ${score}`,500,58);
+    pixelPanel(320,8,360,40,'rgba(5,15,34,.92)','#2b9fe8');
+    ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 13px Righteous';ctx.fillText(center,500,24);
+    ctx.fillStyle='#ffd76a';ctx.font='bold 13px Bebas Neue';ctx.fillText(`SCORE ${score}`,500,41);
+    if(highestCombo>=3){
+      const pulse=.8+Math.sin(performance.now()/130)*.2;
+      ctx.save();ctx.globalAlpha=pulse;pixelPanel(418,49,164,20,'rgba(40,16,0,.88)','#ffd76a');ctx.restore();
+      ctx.fillStyle='#fff3b6';ctx.font='bold 11px Bebas Neue';ctx.fillText(`MAX COMBO ${highestCombo}x`,500,64);
+    }
 
     if(bossWarningTimer>0&&!bossSpawned){
       const pulse=.65+Math.sin(performance.now()/100)*.35;pixelPanel(280,118,440,48,'rgba(20,5,5,.88)','#ff5a4d');ctx.globalAlpha=pulse;ctx.fillStyle='#ff5a4d';ctx.font='bold 28px Bebas Neue';ctx.fillText('⚠ BOSS CHEGANDO ⚠',500,151);ctx.globalAlpha=1;
     }
     if(bossSpawned&&!bossDefeated){
       const b=alive.find(e=>e.isBoss||e.type==='boss'||e.type==='final_boss'||e.name==='REI DE VEGAS');
-      if(b){pixelPanel(220,572,560,52,'rgba(5,9,16,.88)','#d8a93f');ctx.fillStyle='#ffd76a';ctx.font='bold 15px Bebas Neue';ctx.fillText(b.name||'BOSS',500,592);bar(240,598,520,16,b.life/Math.max(1,b.maxLife),'life');}
+      if(b){
+        const px=bossPortraitFor(b), ratio=Math.max(0,Math.min(1,b.life/Math.max(1,b.maxLife)));
+        const warning = ratio<=0.25;
+        const stroke = warning ? '#ff7a6b' : '#d8a93f';
+        pixelPanel(170,562,660,62,'rgba(5,9,16,.90)',stroke);
+        if(px?.complete&&px.naturalWidth){
+          ctx.fillStyle='rgba(8,20,42,.95)';ctx.fillRect(182,570,46,46);
+          ctx.strokeStyle='#55c5ff';ctx.strokeRect(182.5,570.5,45,45);
+          ctx.drawImage(px,186,574,38,38);
+        }
+        ctx.textAlign='left';ctx.fillStyle='#ffd76a';ctx.font='bold 18px Bebas Neue';ctx.fillText(b.name||'BOSS',240,584);
+        ctx.fillStyle=warning?'#ffb6ab':'#fff3c8';ctx.font='bold 9px Righteous';ctx.fillText(warning?'FÚRIA MÁXIMA':'ALVO PRINCIPAL',240,598);
+        bar(240,602,520,14,ratio,'life');
+        ctx.textAlign='right';ctx.fillStyle='#ffffff';ctx.font='bold 12px Righteous';ctx.fillText(`${Math.max(0,Math.ceil(b.life))}/${Math.max(1,Math.ceil(b.maxLife))}`,760,586);
+      }
     }
     if(window.trophySystem?.updateNotifications)window.trophySystem.updateNotifications();
     if(window.trophySystem?.drawNotifications)window.trophySystem.drawNotifications(ctx);

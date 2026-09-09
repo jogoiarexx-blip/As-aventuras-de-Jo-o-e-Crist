@@ -9,22 +9,37 @@ const DUELS=[
  {name:'FÊNIX', bpm:116, speed:225, notes:45, threshold:0.62, rivalSkill:.72, pattern:['left','left','up','right','down','up','down','right','up','left','down','right']},
  {name:'REI DA PISTA', bpm:138, speed:270, notes:64, threshold:0.66, rivalSkill:.82, pattern:['left','up','left','down','right','up','down','right','left','right','up','down','left','up','right','down']}
 ];
-const JOAO_DANCE_SHEET='assets/bonus/boate/players/joao/dance-sheet-transparent.png';
-const CRIST_DANCE_SHEET='assets/bonus/boate/players/crist/dance-sheet-transparent.png';
-const CLUB_BG='assets/bonus/boate/backgrounds/noite-na-boate.png';
+const JOAO_DANCE_SHEET='assets/bonus/boate/players/joao/dance-sheet-transparent.webp';
+const CRIST_DANCE_SHEET='assets/bonus/boate/players/crist/dance-sheet-transparent.webp';
+const CLUB_BG='assets/bonus/boate/backgrounds/noite-na-boate.webp';
 const SECURITY_IDLE='assets/enemies/vegas-frames/seguranca/idle.webp';
 const NPC_MUSCULAR=Array.from({length:5},(_,i)=>`assets/bonus/boate/npcs/muscular/dance-${i+1}.webp`);
 const NPC_NEON=Array.from({length:6},(_,i)=>`assets/bonus/boate/npcs/neon/dance-${i+1}.webp`);
 const CROWD_SHEETS={
-  casual:{path:'assets/bonus/boate/npcs/crowd/crowd-girl-casual.png',frames:[[27,21,117,220],[178,21,108,222],[336,23,115,219],[473,23,117,219],[618,23,113,217],[759,23,119,219],[910,23,107,220],[1054,22,131,220],[26,269,114,208],[164,270,110,207],[310,270,108,207],[456,268,112,209],[606,269,101,207],[737,270,151,205],[896,269,112,208],[1038,269,119,208]],loop:[0,1,2,3,4,5,6,7,6,5,4,3,2,1]},
-  guy:{path:'assets/bonus/boate/npcs/crowd/crowd-guy-black.png',frames:[[27,28,112,208],[176,28,120,208],[331,28,121,209],[482,28,143,208],[658,28,171,208],[865,28,189,209],[24,265,123,197],[184,265,138,196],[358,266,124,196],[523,265,127,196],[693,266,108,195],[853,266,126,195],[23,485,116,184],[164,488,135,181],[327,485,143,184],[522,486,120,183]],loop:[0,1,2,3,4,3,2,1,6,7,8,9,10,11,12,13,14,13,12,11,10,9,8,7,6,1]},
-  pink:{path:'assets/bonus/boate/npcs/crowd/crowd-girl-pink.png',frames:[[29,25,103,206],[144,25,98,205],[253,25,98,205],[371,26,92,204],[484,28,98,202],[875,25,110,206],[997,27,106,204],[25,274,102,198],[148,273,146,199],[303,273,135,199],[457,271,102,201],[592,269,110,202],[731,274,98,198],[857,270,105,202],[990,274,131,198]],loop:[0,1,2,3,4,3,2,1,7,8,9,10,11,12,13,14,13,12,11,10,9,8]}
+  casual:{path:'assets/bonus/boate/npcs/crowd/crowd-girl-casual.webp',frames:[[27,21,117,220],[178,21,108,222],[336,23,115,219],[473,23,117,219],[618,23,113,217],[759,23,119,219],[910,23,107,220],[1054,22,131,220],[26,269,114,208],[164,270,110,207],[310,270,108,207],[456,268,112,209],[606,269,101,207],[737,270,151,205],[896,269,112,208],[1038,269,119,208]],loop:[0,1,2,3,4,5,6,7,6,5,4,3,2,1]},
+  guy:{path:'assets/bonus/boate/npcs/crowd/crowd-guy-black.webp',frames:[[27,28,112,208],[176,28,120,208],[331,28,121,209],[482,28,143,208],[658,28,171,208],[865,28,189,209],[24,265,123,197],[184,265,138,196],[358,266,124,196],[523,265,127,196],[693,266,108,195],[853,266,126,195],[23,485,116,184],[164,488,135,181],[327,485,143,184],[522,486,120,183]],loop:[0,1,2,3,4,3,2,1,6,7,8,9,10,11,12,13,14,13,12,11,10,9,8,7,6,1]},
+  pink:{path:'assets/bonus/boate/npcs/crowd/crowd-girl-pink.webp',frames:[[29,25,103,206],[144,25,98,205],[253,25,98,205],[371,26,92,204],[484,28,98,202],[875,25,110,206],[997,27,106,204],[25,274,102,198],[148,273,146,199],[303,273,135,199],[457,271,102,201],[592,269,110,202],[731,274,98,198],[857,270,105,202],[990,274,131,198]],loop:[0,1,2,3,4,3,2,1,7,8,9,10,11,12,13,14,13,12,11,10,9,8]}
 };
 const NPC_CROWD_LOOPS={
   muscular:[0,1,2,1,3,4,3,1],
   neon:[0,1,2,3,4,5,4,3,2,1],
   companion:['dance_idle','dance_left','dance_idle','dance_right','dance_idle','dance_combo']
 };
+const NOTE_SPRITE_PATHS={
+  receptor:{left:'assets/bonus/boate/ui/notes/receptor-left.webp',up:'assets/bonus/boate/ui/notes/receptor-up.webp',down:'assets/bonus/boate/ui/notes/receptor-down.webp',right:'assets/bonus/boate/ui/notes/receptor-right.webp'},
+  normal:{left:'assets/bonus/boate/ui/notes/normal-left.webp',up:'assets/bonus/boate/ui/notes/normal-up.webp',down:'assets/bonus/boate/ui/notes/normal-down.webp',right:'assets/bonus/boate/ui/notes/normal-right.webp'},
+  gold:{left:'assets/bonus/boate/ui/notes/gold-left.webp',up:'assets/bonus/boate/ui/notes/gold-up.webp',down:'assets/bonus/boate/ui/notes/gold-down.webp',right:'assets/bonus/boate/ui/notes/gold-right.webp'},
+  avoid:{left:'assets/bonus/boate/ui/notes/avoid-left.webp',up:'assets/bonus/boate/ui/notes/avoid-up.webp',down:'assets/bonus/boate/ui/notes/avoid-down.webp',right:'assets/bonus/boate/ui/notes/avoid-right.webp'}
+};
+function noteKindFor(note){return note?.type==='gold'?'gold':note?.type==='avoid'?'avoid':'normal';}
+function drawClubNoteIcon(ctx,img,x,y,size=54,glow=null){
+  if(!img?.complete||!img?.naturalWidth)return false;
+  ctx.save();ctx.imageSmoothingEnabled=false;
+  if(glow){ctx.shadowBlur=14;ctx.shadowColor=glow;}
+  ctx.drawImage(img,x-size/2,y-size/2,size,size);
+  ctx.restore();
+  return true;
+}
 const JOAO_DANCE_FRAMES={
   dance_idle:[[30,52,100,178],[140,57,116,173],[263,58,118,172],[384,56,124,174]],
   dance_left:[[576,52,104,180],[657,51,120,181],[756,51,124,181]],
@@ -57,6 +72,7 @@ class ClubSequence{
   this.npcMuscular=NPC_MUSCULAR.map(src=>window.assetManager?.image?.(src,'bonus:club',{defer:true})).filter(Boolean);
   this.npcNeon=NPC_NEON.map(src=>window.assetManager?.image?.(src,'bonus:club',{defer:true})).filter(Boolean);
   this.crowdSheets=Object.fromEntries(Object.entries(CROWD_SHEETS).map(([key,data])=>[key,window.assetManager?.image?.(data.path,'bonus:club',{defer:true})||null]));
+  this.noteSprites=Object.fromEntries(Object.entries(NOTE_SPRITE_PATHS).map(([kind,items])=>[kind,Object.fromEntries(LANES.map(l=>[l,window.assetManager?.image?.(items[l],'bonus:club',{defer:true})||null]))]));
   this.joaoDanceCanvas=null; this.joaoDancePrepared=false;
   this.currentDanceState='dance_idle';this.stateUntil=0;this.feedbackText='';this.feedbackUntil=0;this.lastInputLane='down';
   this.rivalScore=0;this.perfects=0;this.goods=0;this.maxHype=50;this.feverUntil=0;this.feverTriggered=false;this.duelHistory=[];this.grandResult=null;this.securityIntroAt=0;this.lastCrowdBurst=0;this.duelIntroAt=0;this.laneFlashUntil={left:0,up:0,down:0,right:0};this.lastPerfectAt=0;this.cameraKickUntil=0;this.cameraKickPower=0;this.newClubRecord=false;this.specialHits=0;
@@ -353,7 +369,7 @@ class ClubSequence{
 
   // Pista central. Os duelistas ficam fora deste painel para nunca serem encobertos.
   ctx.fillStyle='rgba(0,0,0,.64)';ctx.fillRect(205,62,590,448);
-  for(const l of LANES){const flashed=now<(this.laneFlashUntil[l]||0);ctx.fillStyle=flashed?'rgba(60,235,255,.32)':'rgba(20,20,35,.76)';ctx.fillRect(xs[l]-43,70,86,423);if(flashed){ctx.strokeStyle='#fff36a';ctx.lineWidth=4;ctx.strokeRect(xs[l]-39,432,78,50);}ctx.fillStyle=flashed?'#fff36a':'#fff';ctx.font='bold 40px sans-serif';ctx.textAlign='center';ctx.fillText(GLYPH[l],xs[l],476);}
+  for(const l of LANES){const flashed=now<(this.laneFlashUntil[l]||0);ctx.fillStyle=flashed?'rgba(60,235,255,.32)':'rgba(20,20,35,.76)';ctx.fillRect(xs[l]-43,70,86,423);if(flashed){ctx.strokeStyle='#fff36a';ctx.lineWidth=4;ctx.strokeRect(xs[l]-39,432,78,50);}const receptor=this.noteSprites?.receptor?.[l];const drew=drawClubNoteIcon(ctx,receptor,xs[l],462,58,flashed?'#fff36a':'#55f4ff');if(!drew){ctx.fillStyle=flashed?'#fff36a':'#fff';ctx.font='bold 40px sans-serif';ctx.textAlign='center';ctx.fillText(GLYPH[l],xs[l],476);}}
   ctx.strokeStyle='#ffe34f';ctx.lineWidth=5;ctx.strokeRect(230,428,540,60);
 
   // NPCs adicionais na boate continuam dançando ao redor do duelo.
@@ -370,7 +386,7 @@ class ClubSequence{
   if(rivalFrames?.length){const ri=this.getLoopValue(rivalLoop,Math.floor(now/(this.duel===2?90:125)),rivalFrames.length),im=rivalFrames[ri];if(im?.complete&&im.naturalWidth){const h=154,w=h*(im.naturalWidth/im.naturalHeight);ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(im,930-w/2,472-h+Math.sin(now/150)*3,w,h);ctx.restore();}}
   ctx.textAlign='center';ctx.font='bold 14px monospace';ctx.fillStyle='#55f4ff';ctx.fillText(activeName,105,505);ctx.fillStyle='#ff7ae7';ctx.fillText(d.name,905,505);
 
-  for(const n of this.notes){ctx.fillStyle=n.type==='gold'?'#ffe85a':n.type==='avoid'?'#ff4b62':(n.group?'#ffe85a':'#55f4ff');ctx.font='bold 42px sans-serif';ctx.fillText(GLYPH[n.lane],xs[n.lane],n.y);if(n.type==='gold'){ctx.strokeStyle='#fff4a8';ctx.lineWidth=2;ctx.beginPath();ctx.arc(xs[n.lane],n.y-13,27,0,Math.PI*2);ctx.stroke();}if(n.type==='avoid'){ctx.fillStyle='#fff';ctx.font='bold 9px monospace';ctx.fillText('NÃO APERTE',xs[n.lane],n.y-28);}if(n.group){ctx.font='bold 10px monospace';ctx.fillStyle='#fff';ctx.fillText('2X',xs[n.lane],n.y-31);}}
+  for(const n of this.notes){const kind=noteKindFor(n);const noteImg=this.noteSprites?.[kind]?.[n.lane]||this.noteSprites?.normal?.[n.lane];const glow=kind==='gold'?'#fff4a8':kind==='avoid'?'#ff6d8f':(n.group?'#ffe85a':'#55f4ff');const drew=drawClubNoteIcon(ctx,noteImg,xs[n.lane],n.y-10,56,glow);if(!drew){ctx.fillStyle=kind==='gold'?'#ffe85a':kind==='avoid'?'#ff4b62':(n.group?'#ffe85a':'#55f4ff');ctx.font='bold 42px sans-serif';ctx.fillText(GLYPH[n.lane],xs[n.lane],n.y);}if(n.type==='avoid'){ctx.fillStyle='#fff';ctx.font='bold 9px monospace';ctx.fillText('NÃO APERTE',xs[n.lane],n.y-40);}if(n.group){ctx.font='bold 10px monospace';ctx.fillStyle='#fff';ctx.fillText('2X',xs[n.lane],n.y-43);}}
 
   // Progresso do duelo: notas já lançadas/concluídas versus total.
   const completed=Math.max(0,Math.min(d.notes,(this.spawned||0)-this.notes.filter(n=>!n.hit).length));

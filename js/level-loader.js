@@ -10,7 +10,7 @@
   const pack=(name,files)=>files.map(f=>`assets/sprite-pack/${name}_${f}.webp`);
   const packs={
     colonel:pack('colonel',['idle','walk1','walk2','attack1','attack2','attack3','attack4','hurt','dead']),
-    vegas:pack('vegas',['idle','walk1','walk2','attack','hurt','dead']),
+    vegas:pack('vegas',['idle','walk1','walk2','attack','attack2','special','hurt','dead']),
     engineer:pack('engineer',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
     shadow:pack('shadow',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
     god:pack('god',['idle','walk1','walk2','attack','attack2','special','hurt','dead','dead2']),
@@ -89,14 +89,15 @@
     const images=[
       ...['idle','walk1','walk2','attack','hurt','dead'].map(st=>`assets/enemies/vegas-frames/seguranca/${st}.webp`),
       `${base}/ui/portrait-joao.webp`,`${base}/ui/portrait-crist.webp`,
-      `${base}/players/joao/dance-sheet-transparent.png`,
-      `${base}/players/crist/dance-sheet-transparent.png`,
-      `${base}/backgrounds/noite-na-boate.png`,
+      `${base}/players/joao/dance-sheet-transparent.webp`,
+      `${base}/players/crist/dance-sheet-transparent.webp`,
+      `${base}/backgrounds/noite-na-boate.webp`,
       ...Array.from({length:5},(_,i)=>`${base}/npcs/muscular/dance-${i+1}.webp`),
       ...Array.from({length:6},(_,i)=>`${base}/npcs/neon/dance-${i+1}.webp`),
-      `${base}/npcs/crowd/crowd-girl-casual.png`,
-      `${base}/npcs/crowd/crowd-guy-black.png`,
-      `${base}/npcs/crowd/crowd-girl-pink.png`,
+      `${base}/npcs/crowd/crowd-girl-casual.webp`,
+      `${base}/npcs/crowd/crowd-guy-black.webp`,
+      `${base}/npcs/crowd/crowd-girl-pink.webp`,
+      ...['left','up','down','right'].flatMap(l=>['receptor','normal','gold','avoid'].map(k=>`${base}/ui/notes/${k}-${l}.webp`)),
       ...characterAssets(playerNames)
     ];
     return {id:'club',name:'Noite na Boate',images:uniq(images),sounds:['clubPerfect','clubCombo','clubHit','hit','enemyHit','enemyDeath','ko','clubLevelComplete','clubMenuMove','clubMenuSelect']};
