@@ -60,17 +60,24 @@
 
     function pressButton(btn, id) {
       if (!btn) return;
+      if (id != null) activeTouches.set(id, btn);
       const action = btn.dataset.a;
       if (action) setAction(action, true);
-      if (id != null) activeTouches.set(id, btn);
       btn.classList.add('pressed');
     }
     function releaseButton(btn, id) {
+      // PointerCancel/lostpointercapture podem ocorrer em sequência. Ignora eventos
+      // duplicados e mantém a ação enquanto outro dedo ainda segura o botão.
+      if (id != null) {
+        if (!activeTouches.has(id)) return;
+        btn = activeTouches.get(id);
+        activeTouches.delete(id);
+      }
       if (!btn) return;
       const action = btn.dataset.a;
-      if (action) setAction(action, false);
-      if (id != null) activeTouches.delete(id);
-      btn.classList.remove('pressed');
+      const remaining = Array.from(activeTouches.values());
+      if (action && !remaining.some(held => held.dataset.a === action)) setAction(action, false);
+      if (!remaining.includes(btn)) btn.classList.remove('pressed');
     }
 
     // Pointer Events para Android/Chrome/Edge modernos.
