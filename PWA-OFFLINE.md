@@ -1,8 +1,8 @@
-# PWA / Offline — v0.9.8
+# PWA / Offline — v0.9.9
 
 - `manifest.webmanifest` mantém configuração de app instalável (landscape).
 - `index.html` registra `sw.js` em contexto HTTP(S), com funcionamento do service worker no HTTPS público.
-- Cache de versão `joao-crist-v098-20261030`, isolado por prefixo `joao-crist-`.
+- Cache de versão `joao-crist-v099-20261030`, isolado por prefixo `joao-crist-`.
 - Na atualização, somente versões antigas do cache deste jogo são excluídas; caches dos outros projetos hospedados no mesmo domínio não são afetados.
 - Instalação pré-carrega scripts essenciais, menu, efeitos, músicas e ícones. Assets exclusivos da boate são carregados e guardados quando usados, não na instalação inicial.
 - Navegação usa rede primeiro com fallback para página em cache. Requisições de imagens/scripts não retornam HTML como fallback.
