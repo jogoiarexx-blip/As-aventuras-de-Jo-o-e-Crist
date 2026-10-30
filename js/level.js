@@ -1154,7 +1154,7 @@ const LEVELS = [
     new Level({
         id: 1,
         name: 'A Fazenda',
-        description: 'Escape da fazenda e inicie sua jornada!',
+        description: 'Ganharam na loteria! Pegue o bilhete, prepare malas e documentos para realizar o sonho de conhecer Vegas.',
         bgColor1: '#87CEEB',
         bgColor2: '#E0F6FF',
         groundColor: '#4a7c2e',
@@ -1166,7 +1166,7 @@ const LEVELS = [
     new Level({
         id: 2,
         name: 'A Cidade',
-        description: 'Atravesse a cidade sem ser pego!',
+        description: 'A caminho da rodoviária, um ciclista quase atropela os dois. Entre na maior viagem da vida!',
         backgroundImage: 'assets/backgrounds/fase2-cidade.webp',
         bgColor1: '#34495e',
         bgColor2: '#5d6d7e',
