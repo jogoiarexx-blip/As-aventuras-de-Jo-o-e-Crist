@@ -1,85 +1,48 @@
 // ========== HISTÓRIA DO JOGO - VERSÃO ÉPICA ==========
 const gameStory = {
-    intro: `⚡ JOÃO E CRIST: RUMO A VEGAS ⚡
+    intro: `JOÃO & CRIST — RUMO A VEGAS
 
-Eram uma vez dois lendários guerreiros que marcaram época nos anos 80:
-JOÃO "O Trovão" Santos e CRIST "A Tempestade" Silva.
+Dois velhinhos do interior ganharam um grande prêmio da loteria.
+Depois de uma vida de trabalho na fazenda, finalmente poderão
+realizar o sonho de conhecer Las Vegas.
 
-Juntos, eles dominaram os ringues clandestinos de todo o país,
-formando uma dupla imbatível que ninguém ousava desafiar.
+Mas antes de viajar precisam encontrar o bilhete premiado,
+arrumar as malas e juntar os documentos.
+Pantera, a cachorra da fazenda, acompanha a despedida.
 
-Mas o tempo passou... Décadas se foram...
-E os dois se aposentaram em paz, vivendo vidas tranquilas.
+No caminho, ainda vão enfrentar um ciclista imprudente,
+confusões no ônibus, gente de todo tipo e uma noite
+inesquecível numa boate. E a aventura pode ficar
+mais absurda do que eles imaginavam.
 
-Até que um dia, um envelope dourado chega com um convite misterioso:
+Objetivo: chegar a Vegas e voltar para casa com uma boa história.
 
-╔══════════════════════════════════════════╗
-║   TORNEIO LENDÁRIO DE LAS VEGAS 2026    ║
-║                                          ║
-║   Só os VERDADEIROS campeões podem vir  ║
-║   Prêmio: $10.000.000                   ║
-║   Local: Cassino Estelar, Las Vegas     ║
-║                                          ║
-║   "PROVE QUE AINDA TEM O QUE PRECISA"   ║
-╚══════════════════════════════════════════╝
-
-João olha para Crist. Crist olha para João.
-Os dois sorriem... Aquele velho brilho nos olhos retorna.
-
-"Mais uma aventura, velho amigo?" - diz João
-"Só mais uma..." - responde Crist
-
-E assim começa a ÚLTIMA JORNADA da dupla lendária,
-atravessando o país, enfrentando gangues e perigos,
-provando que VERDADEIROS HERÓIS NUNCA ENVELHECEM!
-
-═══════════════════════════════════════════════
-🎮 PRESSIONE QUALQUER TECLA PARA COMEÇAR 🎮
-═══════════════════════════════════════════════`,
+PRESSIONE UMA TECLA PARA COMEÇAR.`,
 
     levels: [
-        `═══════════════════════════════════════════
-🌾 FASE 1: A FAZENDA DO JOÃO 🌾
-═══════════════════════════════════════════
+        `FASE 1 — A FAZENDA DO JOÃO
 
-Mal João e Crist terminam de arrumar as malas,
-uma gangue local descobre que João está deixando a fazenda.
+O bilhete da loteria foi premiado! João e Crist arrumam
+a viagem e enfrentam encrenqueiros antes de partir.
 
-"Velhos tolos! Essa terra agora é NOSSA!" - grita o líder.
+OBJETIVOS:
+- Aproxime-se do BILHETE PREMIADO.
+- Pegue as MALAS.
+- Reúna os DOCUMENTOS.
+- Resolva as confusões no caminho.
 
-Mas João e Crist não são pessoas comuns.
-Com um olhar sério, eles largam as malas...
+Pantera se despede. Próxima parada: a rodoviária!`,
 
-"Vocês escolheram o DIA ERRADO para tentar isso."
+        `FASE 2 — A CIDADE
 
-⚡ A lenda começa AGORA! ⚡
+Do interior para o movimento da cidade.
+Ao procurar o ônibus para Vegas, João e Crist quase
+são atropelados por uma bicicleta na contramão!
 
-OBJETIVO: Derrote todos os capangas
-INIMIGOS: 8 Capangas Básicos
-DICA: Use esquiva (SHIFT/↓) para desviar de ataques!`,
-
-        `═══════════════════════════════════════════
-🏙️ FASE 2: AS RUAS DA CIDADE 🏙️
-═══════════════════════════════════════════
-
-Chegando na cidade grande para pegar o ônibus para Vegas,
-a dupla se depara com uma cidade controlada pelo crime.
-
-"Estranhos não são bem-vindos aqui!" - dizem os gângsters urbanos.
-
-As ruas estão infestadas de criminosos de todos os tipos:
-corredores ágeis, brutamontes fortes, e até TANKS blindados!
-
-Mas João e Crist não vieram tão longe para desistir agora.
-
-"Lembra da técnica dupla que usávamos?" - sussurra João
-"Como se fosse ontem..." - Crist sorri
-
-💥 A CIDADE VAI TREMER! 💥
-
-OBJETIVO: Abra caminho pelas ruas
-INIMIGOS: 12 (Capangas, Corredores, Tanks)
-DICA: Foque nos Corredores primeiro - eles atacam rápido!`,
+OBJETIVO:
+- Cuidado ao atravessar a cidade.
+- Desvie da bicicleta e dos encrenqueiros.
+- Encontre o ônibus e embarque para a próxima confusão.`,
 
         `═══════════════════════════════════════════
 🏜️ FASE 3: O DESERTO IMPLACÁVEL 🏜️
