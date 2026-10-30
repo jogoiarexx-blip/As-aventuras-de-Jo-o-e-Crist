@@ -9,6 +9,12 @@
 // ═══════════════════════════════════════
 // BOSS FASE 6: O ENGENHEIRO
 // ═══════════════════════════════════════
+// Limite local por chefe: impede crescimento irrestrito de drones/clones
+// sem alterar a duração das ondas normais da campanha.
+function activeBossMinions(enemies) {
+    return Array.isArray(enemies) ? enemies.filter(e => e && e.isBossMinion && !e.dead && e.life > 0).length : 0;
+}
+
 class TechBoss extends Enemy {
     constructor(x, y) {
         super(x, y, 'boss');
@@ -86,7 +92,9 @@ class TechBoss extends Enemy {
         // Invoca drones (inimigos fast escalados)
         if (now - this.lastDrone > this.droneCooldown && allEnemies) {
             this.lastDrone = now;
-            for (let i = 0; i < 2; i++) {
+            const slots = Math.max(0, (this.phase === 3 ? 6 : 4) - activeBossMinions(allEnemies));
+            const count = Math.min(2, slots);
+            for (let i = 0; i < count; i++) {
                 const droneX = this.x + (i === 0 ? -80 : 80);
                 const drone = new FastEnemy(droneX, this.groundY);
                 drone.isBossMinion = true;
@@ -97,7 +105,7 @@ class TechBoss extends Enemy {
                 drone.color = '#00aaff';
                 allEnemies.push(drone);
             }
-            if (window.particles) {
+            if (count && window.particles) {
                 window.particles.createText(this.x + this.w / 2, this.y - 30, '⚡ DRONES!', '#00aaff', { size: 22 });
             }
         }
@@ -117,7 +125,7 @@ class TechBoss extends Enemy {
             // Dano em área no chão
             if (players && this.shockTimer % 15 === 0) {
                 players.forEach(player => {
-                    if (player.life > 0 && player.invulnerable <= 0 && Math.abs(player.y - this.groundY) < 80) {
+                    if (player.life > 0 && (player.invulnerable || 0) <= 0 && Math.abs((player.y + (player.h || 0)) - this.groundY) < 65) {
                         player.takeDamage(this.phase === 3 ? 18 : 10);
                         if (window.particles) {
                             window.particles.explosion(player.x + player.w / 2, player.y + player.h / 2, 10, { color: '#ffff00', speed: 4 });
@@ -361,7 +369,8 @@ class ShadowBoss extends Enemy {
         // Cria clones (GhostEnemy que seguem o jogador)
         if (now - this.lastClone > this.cloneCooldown && allEnemies) {
             this.lastClone = now;
-            const cloneCount = this.phase;
+            const slots = Math.max(0, (this.phase === 3 ? 7 : 5) - activeBossMinions(allEnemies));
+            const cloneCount = Math.min(this.phase, slots);
             for (let i = 0; i < cloneCount; i++) {
                 const cx = this.x + (i - 1) * 100;
                 const clone = new GhostEnemy(cx, this.groundY);
@@ -372,7 +381,7 @@ class ShadowBoss extends Enemy {
                 clone.damage = 15;
                 allEnemies.push(clone);
             }
-            if (window.particles) {
+            if (cloneCount && window.particles) {
                 window.particles.createText(this.x + this.w / 2, this.y - 40, '👥 CLONES!', '#9b59b6', { size: 26 });
             }
         }
@@ -561,6 +570,7 @@ class GodBoss extends Enemy {
         this.phase = 1;
 
         this.lastAbility = 0;
+        this.lastRain = 0; // um disparo por intervalo, independente do FPS
         this.abilityCooldown = 3500;
         this.abilityIndex = 0;
         this.abilities = ['rain', 'shield', 'summon', 'rage'];
@@ -613,7 +623,8 @@ class GodBoss extends Enemy {
         }
 
         // Chuva de projéteis em fase 3
-        if (this.phase === 3 && players && allEnemies && now % 4000 < 50) {
+        if (this.phase === 3 && players && allEnemies && now - this.lastRain >= 4000) {
+            this.lastRain = now;
             for (let i = 0; i < 5; i++) {
                 const px = this.x + Math.random() * this.w;
                 if (window.projectiles) {
@@ -671,10 +682,12 @@ class GodBoss extends Enemy {
                 break;
 
             case 'summon':
-                // Invoca 3 inimigos aleatórios
+                // Os servos continuam perigosos, mas não acumulam infinitamente.
                 if (allEnemies) {
                     const types = ['elite', 'ghost', 'assassin'];
-                    for (let i = 0; i < (this.phase + 1); i++) {
+                    const slots = Math.max(0, 8 - activeBossMinions(allEnemies));
+                    const count = Math.min(this.phase + 1, slots);
+                    for (let i = 0; i < count; i++) {
                         const type = types[i % types.length];
                         let enemy;
                         if (type === 'elite') enemy = new EliteEnemy(this.x + (i - 1) * 120, this.groundY);
@@ -683,7 +696,7 @@ class GodBoss extends Enemy {
                         enemy.isBossMinion = true;
                         allEnemies.push(enemy);
                     }
-                    if (window.particles) {
+                    if (count && window.particles) {
                         window.particles.createText(this.x + this.w / 2, this.y - 40, '👥 SERVOS!', '#ff00ff', { size: 22 });
                     }
                 }
