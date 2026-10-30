@@ -1,10 +1,10 @@
-JOÃO & CRIST: RUMO A VEGAS — v0.9.9
+JOÃO & CRIST: RUMO A VEGAS — v0.9.10
 BUILD PARA GITHUB PAGES
 
 Arquivo principal: index.html.
 Jogo: https://jogoiarexx-blip.github.io/As-aventuras-de-Jo-o-e-Crist/
-QA do navegador: https://jogoiarexx-blip.github.io/As-aventuras-de-Jo-o-e-Crist/tests/qa-v099.html
-Auditoria técnica: AUDITORIA-V099.md
+QA do navegador: https://jogoiarexx-blip.github.io/As-aventuras-de-Jo-o-e-Crist/tests/qa-v0910.html
+Auditoria técnica: AUDITORIA-V0910.md
 
 Publicação:
 1. Manter index.html, style.css, js/, assets/, sw.js e manifest.webmanifest na raiz.
@@ -21,3 +21,5 @@ NOTAS:
 
 Diagnóstico opcional: https://jogoiarexx-blip.github.io/As-aventuras-de-Jo-o-e-Crist/?perf=1
 Mostra FPS, tempo de quadro, qualidade e RAM JS (se suportada pelo navegador). Não altera o save.
+
+Teste de chefes/ondas v0.9.10: https://jogoiarexx-blip.github.io/As-aventuras-de-Jo-o-e-Crist/tests/qa-v0910.html
