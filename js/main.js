@@ -3332,6 +3332,27 @@ function drawFatalGameOverlay(fatal) {
         ctx.restore();
     } catch (_) {}
 }
+// v0.9.9: Falha de sprite não representa morte de inimigo/chefe.
+// Silhueta visível e atingível até que o desenho original volte a funcionar.
+function drawEnemyFallback(ctx, enemy) {
+    const x = Number(enemy?.x), y = Number(enemy?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const w = Math.max(20, Math.min(180, Number(enemy.w) || 55));
+    const h = Math.max(30, Math.min(220, Number(enemy.h) || 80));
+    ctx.save();
+    try {
+        ctx.fillStyle = enemy.isBoss ? '#8b2549' : '#79566c';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = enemy.isBoss ? '#ffb9cf' : '#dfc0d2';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(enemy.isBoss ? 'CHEFE' : 'INIMIGO', x + w/2, y + h/2);
+    } finally { ctx.restore(); }
+}
+
 function safeGameLoopFrame(timestamp=performance.now()) {
     const step=window.GameRuntime?.fixedStepMs || (1000/60);
     const frameStart=performance.now();
@@ -3798,7 +3819,10 @@ function gameLoop() {
                     enemy.update(players, enemies);
                 }
             } catch (enemyUpdateError) {
-                console.error('[enemy-update] Inimigo removido para evitar travamento:', enemy?.type || enemy?.name, enemyUpdateError);
+                // Não conceder vitória fictícia quando o AI de um chefe falha.
+                // O loop principal exibe recuperação e mantém o checkpoint.
+                if (enemy?.isBoss || enemy?.__clubBoss) throw enemyUpdateError;
+                console.error('[enemy-update] Inimigo comum removido após falha de IA:', enemy?.type || enemy?.name, enemyUpdateError);
                 enemy.life = 0;
                 enemy.dead = true;
             }
@@ -3809,23 +3833,26 @@ function gameLoop() {
                 const visible = window.gamePerformance?.isVisible?.(enemy.x, enemyW, cameraX, canvas.width)
                     ?? (enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180);
                 if (visible) {
-                    if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
-                    enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
-                    if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPost(ctx, enemy);
+                    if (enemy.__drawErrorRetryAt && performance.now() < enemy.__drawErrorRetryAt) {
+                        drawEnemyFallback(ctx, enemy);
+                    } else {
+                        if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
+                        enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
+                        if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPost(ctx, enemy);
+                        enemy.__drawErrorRetryAt = 0;
+                    }
                 }
             } catch (enemyDrawError) {
                 const enemyLabel = enemy?.type || enemy?.name || (enemy?.constructor && enemy.constructor.name) || 'desconhecido';
-                console.error('[enemy-draw] Falha ao desenhar inimigo:', enemyLabel,
-                    'x=' + Math.round(enemy?.x || 0), 'y=' + Math.round(enemy?.y || 0), enemyDrawError);
-                if (window.GameDebugConsole) {
-                    window.GameDebugConsole.error('INIMIGO COM ERRO DE SPRITE/DRAW: ' + enemyLabel +
-                        ' | fase=' + (currentLevelIndex + 1) +
-                        ' | x=' + Math.round(enemy?.x || 0) +
-                        ' | ' + (enemyDrawError?.stack || enemyDrawError?.message || enemyDrawError));
+                enemy.__drawErrorRetryAt = performance.now() + 1500;
+                if (!enemy.__drawErrorReported) {
+                    enemy.__drawErrorReported = true;
+                    console.error('[enemy-draw] Erro de sprite: usando silhueta temporária:', enemyLabel, enemyDrawError);
+                    window.GameDebugConsole?.error?.('SPRITE INIMIGO: ' + enemyLabel +
+                        ' | fase=' + (currentLevelIndex + 1) + ' | ' + (enemyDrawError?.message || enemyDrawError));
                 }
-                enemy.life = 0;
-                enemy.dead = true;
-                return;
+                // Mantém vida, colisões, drops e progressão corretos mesmo com sprite danificado.
+                drawEnemyFallback(ctx, enemy);
             }
             
             // Verificar colisão dos ataques dos jogadores
