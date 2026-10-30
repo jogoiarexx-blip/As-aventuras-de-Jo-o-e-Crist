@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v100-premium-cinematic';
+const VERSION='joao-crist-v096-20261030';
 const CORE=[
   './',
   './index.html',
@@ -11,28 +11,6 @@ const CORE=[
   './favicon-32.png',
   './favicon-64.png',
   './favicon.ico',
-  './assets/bonus/boate/players/joao/dance-sheet-transparent.webp',
-  './assets/bonus/boate/players/crist/dance-sheet-transparent.webp',
-  './assets/bonus/boate/npcs/crowd/crowd-girl-casual.webp',
-  './assets/bonus/boate/npcs/crowd/crowd-guy-black.webp',
-  './assets/bonus/boate/npcs/crowd/crowd-girl-pink.webp',
-  './assets/bonus/boate/backgrounds/noite-na-boate.webp',
-  './assets/bonus/boate/ui/notes/receptor-left.webp',
-  './assets/bonus/boate/ui/notes/receptor-up.webp',
-  './assets/bonus/boate/ui/notes/receptor-down.webp',
-  './assets/bonus/boate/ui/notes/receptor-right.webp',
-  './assets/bonus/boate/ui/notes/normal-left.webp',
-  './assets/bonus/boate/ui/notes/normal-up.webp',
-  './assets/bonus/boate/ui/notes/normal-down.webp',
-  './assets/bonus/boate/ui/notes/normal-right.webp',
-  './assets/bonus/boate/ui/notes/gold-left.webp',
-  './assets/bonus/boate/ui/notes/gold-up.webp',
-  './assets/bonus/boate/ui/notes/gold-down.webp',
-  './assets/bonus/boate/ui/notes/gold-right.webp',
-  './assets/bonus/boate/ui/notes/avoid-left.webp',
-  './assets/bonus/boate/ui/notes/avoid-up.webp',
-  './assets/bonus/boate/ui/notes/avoid-down.webp',
-  './assets/bonus/boate/ui/notes/avoid-right.webp',
   './assets/music/normal-theme.ogg',
   './assets/music/farm-theme.ogg',
   './assets/music/city-theme.ogg',
@@ -89,6 +67,7 @@ const CORE=[
   './js/runtime-stability.js',
   './js/save-system.js',
   './js/settings-system.js',
+  './js/performance-system.js',
   './js/sound-system.js',
   './js/story-cutscenes.js',
   './js/popup-polish.js',
@@ -114,31 +93,58 @@ const CORE=[
   './assets/players/crist/frames/idle1.webp',
   './assets/players/chico/frames/idle1.webp'
 ];
-self.addEventListener('install',e=>e.waitUntil(caches.open(VERSION).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',e=>{
-  if(e.request.method!=='GET')return;
-  const u=new URL(e.request.url); if(u.origin!==location.origin)return;
+// Cache separado por jogo: jamais apagar caches de outros projetos no GitHub Pages.
+const CACHE_PREFIX = 'joao-crist-';
+const SCOPE_PATH = new URL(self.registration.scope).pathname;
 
-  // Requisições Range (áudio/vídeo e alguns assets grandes) podem responder 206.
-  // Cache Storage não aceita respostas parciais, então elas seguem direto pela rede.
-  if(e.request.headers.has('range')){
-    e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(VERSION)
+      .then(cache => cache.addAll(CORE))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== VERSION)
+            .map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE_PATH)) return;
+
+  // Cache Storage não deve armazenar respostas parciais (HTTP 206).
+  if (request.headers.has('range')) return;
+
+  const saveValidResponse = response => {
+    if (!response || response.status !== 200) return response;
+    const copy = response.clone();
+    event.waitUntil(
+      caches.open(VERSION).then(cache => cache.put(request, copy)).catch(() => {})
+    );
+    return response;
+  };
+
+  if (request.mode === 'navigate') {
+    // HTML novo primeiro, menu antigo apenas quando realmente sem conexão.
+    event.respondWith(
+      fetch(request).then(saveValidResponse)
+        .catch(async () => (await caches.match(request)) || (await caches.match('./index.html')) || Response.error())
+    );
     return;
   }
 
-  e.respondWith(caches.match(e.request).then(hit=>{
-    const network=fetch(e.request).then(r=>{
-      // Só armazena respostas completas. Nunca tenta cache.put() com status 206.
-      if(r && r.status===200){
-        const copy=r.clone();
-        const cacheWrite=caches.open(VERSION)
-          .then(c=>c.put(e.request,copy))
-          .catch(()=>{}); // falha de cache não pode derrubar o jogo
-        e.waitUntil(cacheWrite);
-      }
-      return r;
-    }).catch(()=>hit||caches.match('./index.html'));
-    return hit||network;
-  }));
+  // Scripts, imagens e sons: nunca devolver HTML no lugar de um arquivo.
+  event.respondWith(
+    caches.match(request).then(hit => hit || fetch(request).then(saveValidResponse))
+  );
 });
