@@ -2921,14 +2921,16 @@ function drawVictory() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1000, 650);
     
-    // Efeito de brilho
-    for (let i = 0; i < 100; i++) {
-        const x = Math.random() * 1000;
-        const y = Math.random() * 650;
-        const size = Math.random() * 3;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    // Brilhos estáveis com pulsação suave: evitar 100 estrelas teletransportando
+    // a cada frame na tela de vitória e reduzir draws no celular.
+    const victoryTime = performance.now() * 0.001;
+    for (let i = 0; i < 48; i++) {
+        const x = ((i * 137.5 + 43) % 1000);
+        const y = ((i * 89.3 + 29) % 650);
+        const pulse = 0.4 + 0.45 * (0.5 + 0.5 * Math.sin(victoryTime * 1.4 + i));
+        ctx.fillStyle = `rgba(255, 255, 255, ${pulse.toFixed(2)})`;
         ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.arc(x, y, 0.8 + (i % 3) * 0.5, 0, Math.PI * 2);
         ctx.fill();
     }
     
@@ -2939,8 +2941,8 @@ function drawVictory() {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 96px Permanent Marker';
     ctx.textAlign = 'center';
-    ctx.fillText('VOCÊ CHEGOU', 500, 180);
-    ctx.fillText('EM VEGAS!', 500, 260);
+    ctx.fillText('JOÃO & CRIST', 500, 180);
+    ctx.fillText('VENCERAM VEGAS!', 500, 260);
     ctx.restore();
     
     // Score final
