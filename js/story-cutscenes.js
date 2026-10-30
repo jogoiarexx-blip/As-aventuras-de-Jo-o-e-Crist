@@ -166,12 +166,25 @@ class StoryCutsceneManager {
   hasSeen(id){ return this.seen.has(id); }
   start(id,onComplete){
     const scene=SCENES[id]; if(!scene){ onComplete?.(); return false; }
-    this.active={id,...scene}; this.index=0; this.startedAt=performance.now(); this.lineStartedAt=this.startedAt; this.onComplete=onComplete||null; this.flash=20; this.lineFade=1; this.forceFullLine=false; this.seen.add(id);
+    // A cena só é vista depois de terminar ou ser pulada. Interrupções não queimam cenas futuras.
+    this.active={id,...scene}; this.index=0; this.startedAt=performance.now(); this.lineStartedAt=this.startedAt; this.onComplete=onComplete||null; this.flash=20; this.lineFade=1; this.forceFullLine=false;
     window.soundSystem?.playSound?.('menuSelect');
     return true;
   }
   finish(){
-    const cb=this.onComplete; const id=this.active?.id; this.active=null; this.onComplete=null; this.index=0; window.soundSystem?.playSound?.('menuSelect'); cb?.();
+    if(!this.active) return false;
+    const cb=this.onComplete, id=this.active.id;
+    this.active=null; this.onComplete=null; this.index=0;
+    this.seen.add(id);
+    window.soundSystem?.playSound?.('menuSelect');
+    cb?.();
+    return true;
+  }
+  cancel(){
+    // Sair para o menu ou trocar de campanha não pode executar o callback da cena antiga.
+    if(!this.active) return false;
+    this.active=null; this.onComplete=null; this.index=0;
+    return true;
   }
   advance(){ if(!this.active)return; if(this.index < this.active.lines.length-1){this.index++;this.lineStartedAt=performance.now();this.lineFade=1;this.forceFullLine=false;window.soundSystem?.playSound?.('menuMove');} else this.finish(); }
   skip(){ if(!this.active)return; this.finish(); }
