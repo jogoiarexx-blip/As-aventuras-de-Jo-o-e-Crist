@@ -69,7 +69,12 @@
         }
 
         ensureAssets() {
-            if (this.assetsLoaded) return;
+            // O AssetManager conserva os objetos Image, mas remove o src ao liberar
+            // bonus:bus. Uma nova partida deve recarregá-los após voltar ao menu.
+            if (this.assetsLoaded &&
+                window.assetManager.isLoaded(spritePaths.idle) &&
+                window.assetManager.isLoaded(obstaclePaths.carRed) &&
+                window.assetManager.isLoaded('assets/backgrounds/bus-bonus-vegas.webp')) return;
             this.assetsLoaded = true;
             this.sprites = loadImages(spritePaths);
             this.obstacleSprites = loadImages(obstaclePaths);
@@ -89,6 +94,22 @@
             this.errorMessage = { title:'ERRO NO MINIGAME DO ÔNIBUS', where, stack };
             if (window.GameDebugConsole) window.GameDebugConsole.error(`ERRO NO MINIGAME DO ÔNIBUS | ${where}\n${stack}`);
             console.error('[BUS] ERRO NO MINIGAME DO ÔNIBUS', err);
+        }
+
+        reset() {
+            // Evita que o evento de embarque antigo bloqueie uma nova Fase 2.
+            this.phase2Waiting = false;
+            this.phase2ParkHornAt = 0;
+            this.phase2BusArrived = false;
+            this.boarding = null;
+            this.arrival = null;
+            this.run = null;
+            this.errorMessage = null;
+            this.hornWasDown = false;
+            this.bonusMode = false;
+            this.lastTime = performance.now();
+            window.soundSystem?.stopLoop?.('busEngine');
+            window.soundSystem?.stopLoop?.('busRoad');
         }
 
         isPhase2Waiting() { return this.phase2Waiting; }
