@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v0911-20261030';
+const VERSION='joao-crist-v0912-20261030';
 const CORE=[
   './',
   './index.html',
@@ -71,6 +71,7 @@ const CORE=[
   './js/performance-system.js',
   './js/sound-system.js',
   './js/story-cutscenes.js',
+  './js/early-adventure.js',
   './js/popup-polish.js',
   './js/story.js',
   './js/touch-controls.js',
