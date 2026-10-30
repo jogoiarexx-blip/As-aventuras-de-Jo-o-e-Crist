@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA de campanha e bônus — João & Crist v0.9.7</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0b1422;color:#f3f7ff;font:15px/1.55 system-ui,-apple-system,sans-serif}
+main{max-width:860px;margin:auto;padding:28px 18px 52px}
+h1{font-size:clamp(23px,4vw,31px);line-height:1.2}
+p,small{color:#b7c6da}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+article{border:1px solid #34465d;background:#17273b;padding:11px 14px;border-radius:8px;margin:5px 0}
+.ok{border-left:4px solid #23c69c}.fail{border-left:4px solid #ef6f73}
+button{background:#227fbd;color:#fff;border:0;padding:13px 18px;border-radius:8px;cursor:pointer;font:inherit}
+button:disabled{opacity:.5;cursor:wait}
+#summary{font-size:20px;font-weight:750;margin:18px 0}
+#networkProgress{white-space:pre-wrap}
+a{color:#7fd4ff}
+</style>
+<script>
+window.__qaLoads=[];
+window.__qaReleases=[];
+window.assetManager={
+ loadGroup:async function(group,images,onProgress){
+   window.__qaLoads.push({group:group,count:images.length});
+   if(onProgress) onProgress(1,{loaded:images.length,total:images.length});
+   return {loaded:images.length,total:images.length};
+ },
+ releaseGroup:function(group){window.__qaReleases.push(group);},
+ stats:function(){return {simulated:true,records:0,groups:0}}
+};
+window.soundSystem={preloadTypes:async function(keys,callback){if(callback)callback(keys.length,keys.length)},releaseTypes:function(){}};
+</script>
+<script src="../js/performance-system.js"></script>
+<script src="../js/level.js"></script>
+<script src="../js/level-loader.js"></script>
+</head>
+<body>
+<main>
+<h1>João & Crist — QA v0.9.7</h1>
+<p>Validação independente, sem alterar saves. Transições e carregamentos abaixo são simulados; a verificação opcional de arquivos consulta o site publicado. Esta página não substitui jogar as oito fases.</p>
+<div id="summary">Executando...</div>
+<div id="results" class="grid"></div>
+<h2>Verificação dos arquivos publicados</h2>
+<p>O botão abaixo checa, por requisições HTTP HEAD, todos os recursos únicos declarados pelos carregadores. Não baixa as imagens inteiras.</p>
+<button id="verifyAssets" type="button">Verificar recursos das 8 fases e dos bônus</button>
+<p id="networkProgress"></p>
+<div id="networkErrors"></div>
+<p><a href="../">Voltar ao jogo</a></p>
+</main>
+<script>
+(function(){
+ 'use strict';
+ const output=document.getElementById('results');
+ const status=document.getElementById('summary');
+ const rows=[];
+ const assert=(v,m)=>{if(!v)throw Error(m||'Verificação falhou');};
+ async function run(label,fn){
+   try{await fn();rows.push({label,ok:true});}
+   catch(e){rows.push({label,ok:false,detail:String(e?.message||e)});}
+   output.replaceChildren();
+   for(const row of rows){
+     const el=document.createElement('article');el.className=row.ok?'ok':'fail';
+     el.textContent=(row.ok?'✓ ':'✗ ')+row.label;
+     if(row.detail){const small=document.createElement('small');small.textContent=' — '+row.detail;el.appendChild(small);}
+     output.appendChild(el);
+   }
+   status.textContent=rows.filter(x=>x.ok).length+'/'+rows.length+' testes isolados passaram';
+ }
+ async function readFile(path){
+   const r=await fetch('../'+path,{cache:'no-store'});
+   assert(r.ok,'HTTP '+r.status+': '+path);
+   return r.text();
+ }
+ function manifests(){
+   const api=window.LevelAssetManifests;
+   assert(api&&window.LEVELS_REF?.length===8,'Carregadores das 8 fases indisponíveis');
+   return [...Array.from({length:8},(_,i)=>api.level(i,['João','Crist'])),api.bus(),api.fishing(['João','Crist']),api.club(['João','Crist'])];
+ }
+ async function initial(){
+   await run('Oito fases e chefes esperados',()=>{
+     assert(window.LEVELS_REF?.length===8);
+     assert(window.LEVELS_REF[5].hasTechBoss);
+     assert(window.LEVELS_REF[6].hasShadowBoss);
+     assert(window.LEVELS_REF[7].hasGodBoss);
+   });
+   await run('Sistema de qualidade adaptativa',()=>{
+     const p=new PerformanceSystem({data:{graphicsQuality:'auto'},save(){}});
+     assert(p.shouldUpdateEnemy({x:800,w:50,life:10},0,1000));
+     p.frameCounter=1;
+     assert(!p.shouldUpdateEnemy({x:8000,w:50,life:10,__perfPhase:0},0,1000));
+     assert(p.shouldUpdateEnemy({x:8000,w:50,life:10,isBoss:true},0,1000));
+   });
+   await run('Fluxo das oito transições de campanha',async()=>{
+     for(let i=0;i<8;i++){
+       let loaded=false;
+       const ok=await window.levelManager.transitionLevel(i,{afterLoad:()=>{loaded=true}});
+       assert(ok&&loaded&&window.levelManager.currentLevelIndex===i,'Falha na transição '+(i+1));
+     }
+     assert(window.__qaReleases.filter(x=>x.startsWith('level:')).length===7,'Liberação de fases anteriores falhou');
+   });
+   await run('Carregamento simulado dos três bônus',async()=>{
+     for(const type of ['bus','club','fishing']){
+       let loaded=false;
+       const ok=await window.levelManager.loadBonus(type,{afterLoad:()=>loaded=true});
+       assert(ok&&loaded,'Bônus não carregou: '+type);
+       window.levelManager.releaseBonus(type);
+     }
+   });
+   await run('Manifestos de todas as fases e bônus',()=>{
+     const all=manifests();
+     assert(all.length===11);
+     for(const m of all) assert(m.images.length>0,'Manifesto vazio: '+m.name);
+   });
+   await run('Pause e retorno ao menu protegidos',async()=>{
+     const src=await readFile('js/main.js');
+     assert(src.includes('window.GameRuntime?.resumeTimers?.()'),'Timer não é retomado');
+     assert(src.includes('window.busSequence?.reset?.()'),'Estado do ônibus não é limpo');
+     assert(src.includes("for (const bonus of ['bus', 'fishing', 'club'])"),'Bônus não são liberados');
+   });
+   await run('Reinício seguro do ônibus',async()=>{
+     const src=await readFile('js/bus-sequence.js');
+     assert(src.includes('reset() {')&&src.includes('window.assetManager.isLoaded(spritePaths.idle)'));
+   });
+   await run('Multitouch e perda de foco',async()=>{
+     const [touch,main]=await Promise.all([readFile('js/touch-controls.js'),readFile('js/main.js')]);
+     assert(touch.includes('activeTouches.has(id)')&&touch.includes('remaining.some('));
+     assert(main.includes("window.addEventListener('blur', releaseHeldInputs)"));
+   });
+   await run('Configurações e saves preservam seus identificadores',async()=>{
+     const [save,settings]=await Promise.all([readFile('js/save-system.js'),readFile('js/settings-system.js')]);
+     assert(save.includes("'joaoCristSave'")&&settings.includes("'joaoCristSettings'"));
+   });
+   await run('PWA atualizado e com cache isolado',async()=>{
+     const sw=await readFile('sw.js');
+     assert(sw.includes('joao-crist-v097-20261030'));
+     assert(sw.includes('key.startsWith(CACHE_PREFIX)')&&sw.includes('SCOPE_PATH'));
+   });
+   await run('Página principal v0.9.7',async()=>{
+     const main=await readFile('index.html');
+     assert(main.includes('v0.9.7 16-BIT EDITION'));
+     assert(main.includes("js/performance-system.js"));
+   });
+ }
+ document.getElementById('verifyAssets').addEventListener('click',async()=>{
+   const button=document.getElementById('verifyAssets'),log=document.getElementById('networkProgress'),out=document.getElementById('networkErrors');
+   button.disabled=true;out.replaceChildren();
+   try{
+     const paths=[...new Set(manifests().flatMap(m=>m.images))];
+     let next=0,done=0;const failed=[];
+     log.textContent='Verificando 0/'+paths.length+' arquivos...';
+     const worker=async()=>{
+       while(next<paths.length){
+         const path=paths[next++];
+         try{
+           const r=await fetch('../'+path,{method:'HEAD',cache:'no-store'});
+           if(!r.ok)failed.push(path+' — HTTP '+r.status);
+         }catch(e){failed.push(path+' — '+String(e?.message||e));}
+         done++;log.textContent='Verificando '+done+'/'+paths.length+' arquivos...';
+       }
+     };
+     await Promise.all(Array.from({length:6},worker));
+     log.textContent=(paths.length-failed.length)+'/'+paths.length+' arquivos HTTP acessíveis; '+failed.length+' falha(s).';
+     for(const f of failed.slice(0,40)){const el=document.createElement('article');el.className='fail';el.textContent=f;out.appendChild(el);}
+     if(failed.length>40){const el=document.createElement('p');el.textContent='Outras '+(failed.length-40)+' falhas não exibidas.';out.appendChild(el);}
+   }catch(e){log.textContent='Falha na auditoria: '+String(e?.message||e);}
+   finally{button.disabled=false;}
+ });
+ initial().catch(e=>{status.textContent='Erro de inicialização: '+String(e?.message||e)});
+})();
+</script></body></html>
