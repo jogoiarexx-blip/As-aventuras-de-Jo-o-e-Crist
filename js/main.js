@@ -97,6 +97,9 @@ const controlsConfigLabels = { left:'Mover esquerda', right:'Mover direita', up:
 let gamepadSystem = new GamepadSystem(sistemControles); window.gamepadSystem = gamepadSystem;
 let soundSystem = new SoundSystem(); window.soundSystem = soundSystem;
 let gameSettings = new SettingsSystem(); window.gameSettings = gameSettings; gameSettings.applyAudio(soundSystem);
+// v0.9.6: reutiliza o controle gráfico existente e limita IA muito distante.
+const gamePerformance = typeof PerformanceSystem === 'function' ? new PerformanceSystem(gameSettings) : null;
+window.gamePerformance = gamePerformance;
 let optionsSelection = 0;
 const optionsItems = ['VOLUME GERAL','MÚSICA','EFEITOS','QUALIDADE GRÁFICA','VIBRAÇÃO','DIFICULDADE','TELA CHEIA'];
 let selectedCharacters = [null, null]; // [Player1, Player2]
@@ -287,6 +290,7 @@ for (let i = 0; i < 50; i++) {
 function getEffectiveGraphicsQuality() {
     const configured = gameSettings?.data?.graphicsQuality || 'auto';
     if (configured !== 'auto') return configured;
+    if (window.gamePerformance) return window.gamePerformance.effectiveTier();
     const fps = Number.isFinite(currentFPS) ? currentFPS : 60;
     if (fps < 42) return 'low';
     if (fps < 54) return 'medium';
@@ -776,6 +780,17 @@ function clearKeys() {
         keys[key] = false;
     });
 }
+
+// v0.9.6: foco perdido não pode deixar movimento/ataque preso no teclado.
+function releaseHeldInputs() {
+    clearKeys();
+    window.sistemControles?.limparTouch?.();
+    window.gamepadSystem?.pressed?.clear?.();
+}
+window.addEventListener('blur', releaseHeldInputs);
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) releaseHeldInputs();
+});
 
 // Funções auxiliares
 function rects(a, b) {
@@ -3304,6 +3319,7 @@ function safeGameLoopFrame(timestamp=performance.now()) {
         drawFatalGameOverlay(window.__gameDebugFatal);
     }
     const frameMs=performance.now()-frameStart;
+    window.gamePerformance?.onFrame?.(dt, currentFPS);
     if(window.GameRuntime?.stats){window.GameRuntime.stats.lastFrameMs=frameMs;window.GameRuntime.stats.maxFrameMs=Math.max(window.GameRuntime.stats.maxFrameMs,frameMs);}
     requestAnimationFrame(safeGameLoopFrame);
 }
@@ -3740,7 +3756,8 @@ function gameLoop() {
         // Atualizar e desenhar inimigos
         enemies.forEach((enemy, index) => {
             try {
-                if (!enemy._sonicKnockdownUntil || performance.now() >= enemy._sonicKnockdownUntil) {
+                if ((!enemy._sonicKnockdownUntil || performance.now() >= enemy._sonicKnockdownUntil) &&
+                    (enemies.length < 10 || window.gamePerformance?.shouldUpdateEnemy?.(enemy, cameraX, canvas.width) !== false)) {
                     enemy.update(players, enemies);
                 }
             } catch (enemyUpdateError) {
@@ -3752,7 +3769,8 @@ function gameLoop() {
                 // PERFORMANCE: atualiza todos, mas só desenha quem está próximo do viewport.
                 // Isso evita dezenas de drawImage/gradientes para inimigos a milhares de px da câmera.
                 const enemyW = enemy.w || 60;
-                const visible = enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180;
+                const visible = window.gamePerformance?.isVisible?.(enemy.x, enemyW, cameraX, canvas.width)
+                    ?? (enemy.x + enemyW >= cameraX - 180 && enemy.x <= cameraX + canvas.width + 180);
                 if (visible) {
                     if (window.GraphicsUpgrade) window.GraphicsUpgrade.drawEnemyPre(ctx, enemy);
                     enemy.draw(ctx); // camera já aplicada via ctx.translate(-cameraX, 0)
