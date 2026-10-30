@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v098-20261030';
+const VERSION='joao-crist-v099-20261030';
 const CORE=[
   './',
   './index.html',
@@ -49,6 +49,7 @@ const CORE=[
   './js/farm-dog-npc.js',
   './js/fishing-bonus.js',
   './js/game-global-bridge.js',
+  './js/performance-monitor.js',
   './js/game-hardening.js',
   './js/game-log.js',
   './js/game-over.js',
