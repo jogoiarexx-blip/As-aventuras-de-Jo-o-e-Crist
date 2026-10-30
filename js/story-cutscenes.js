@@ -18,34 +18,44 @@ const DIALOG_PORTRAITS = {
 
 const SCENES = {
   intro: {
-    bg:0, title:'UMA ÚLTIMA VIAGEM', actors:'farm',
+    bg:0, title:'O BILHETE PREMIADO', actors:'farm',
     lines:[
-      ['NARRADOR','Depois de anos longe das grandes brigas, João e Crist vivem dias tranquilos na fazenda.'],
-      ['JOÃO','Finalmente um pouco de sossego.'],
-      ['CRIST','Você falou isso antes da última confusão.'],
-      ['NARRADOR','Pantera corre pelo quintal quando um envelope dourado chega pelo correio.'],
-      ['JOÃO','“Torneio Lendário de Las Vegas. Prêmio: dez milhões de dólares.”'],
-      ['CRIST','Isso tem cara de armadilha.'],
-      ['JOÃO','Então é melhor irmos preparados.'],
-      ['NARRADOR','Antes que consigam partir, motores rugem do outro lado da cerca. Uma gangue invade a propriedade.'],
-      ['CRIST','Eu avisei.'],
-      ['JOÃO','Pantera, fica atrás da gente.']
+      ['NARRADOR','Na fazenda, João e Crist vivem seus dias tranquilos entre café, prosa e a companhia de Pantera.'],
+      ['CRIST','João, você conferiu aquele bilhete da loteria ou usou pra anotar a compra do mês?'],
+      ['JOÃO','Eu conferi... e acho que a gente ganhou!'],
+      ['NARRADOR','Os números batem. Os dois velhinhos acabaram de ganhar um grande prêmio na loteria.'],
+      ['CRIST','A gente passou a vida sonhando em conhecer Las Vegas. Chegou nossa vez!'],
+      ['JOÃO','Primeiro o bilhete, as malas e os documentos. Depois a rodoviária.'],
+      ['NARRADOR','Mas a notícia corre pelo interior e alguns encrenqueiros aparecem querendo atrapalhar a partida.'],
+      ['CRIST','A primeira viagem internacional e já começou essa confusão!'],
+      ['JOÃO','Pantera, guarda a casa. A gente volta com lembrancinha.']
     ]
   },
   farmFarewell: {
-    bg:0, title:'ATÉ LOGO, PANTERA', actors:'farmFarewell',
+    bg:0, title:'FÉRIAS, ENFIM!', actors:'farmFarewell',
     lines:[
-      ['NARRADOR','Com a fazenda segura, chegou a hora de partir.'],
-      ['JOÃO','Cuida da fazenda pra mim, Pantera.'],
-      ['CRIST','Ela parece mais preocupada com você do que com a fazenda.'],
-      ['NARRADOR','Pantera recebe um último carinho. Ao longe, o ônibus para Vegas espera na cidade.']
+      ['NARRADOR','Bilhete premiado, malas e documentos preparados. A dupla pode finalmente viajar.'],
+      ['JOÃO','Cuida da fazenda, Pantera! E não entra no galinheiro.'],
+      ['CRIST','João, você trouxe o passaporte ou o cartão da venda?'],
+      ['JOÃO','Os dois. Vai que precisa comprar fiado em Vegas.'],
+      ['NARRADOR','Com a fazenda segura, João e Crist seguem para a cidade, procurando a rodoviária.']
+    ]
+  },
+  cityArrival: {
+    bg:1, title:'CADÊ A RODOVIÁRIA?', actors:'vegas',
+    lines:[
+      ['NARRADOR','Na cidade, os dois tentam descobrir de qual plataforma sai o ônibus para Las Vegas.'],
+      ['JOÃO','Crist, por que tem tanta placa de trânsito nessa rua?'],
+      ['CRIST','Porque você está atravessando sem olhar! E tem bicicleta vindo!'],
+      ['NARRADOR','Ainda falta cruzar ruas agitadas, escapar de encrencas e encontrar o ônibus certo.'],
+      ['JOÃO','Nunca pensei que tirar férias ia dar tanto trabalho.']
     ]
   },
   desertArrival: {
     bg:2, title:'ESTRADA BLOQUEADA', actors:'desert',
     lines:[
-      ['NARRADOR','Depois da viagem pela Route 66, o ônibus para diante de uma barreira improvisada no deserto.'],
-      ['CRIST','Isso não estava no itinerário.'],
+      ['NARRADOR','A viagem saiu do controle: João e Crist pegaram um ônibus cheio de artistas a caminho de um espetáculo e foram parar numa rota inesperada pelo deserto.'],
+      ['CRIST','Eu falei que aquele ônibus não era o da agência de turismo!'],
       ['JOÃO','Nem aqueles homens armados.'],
       ['BANDIDO','Ordem do El Colosso. Vocês não passam daqui.'],
       ['CRIST','Agora ficou interessante.']
