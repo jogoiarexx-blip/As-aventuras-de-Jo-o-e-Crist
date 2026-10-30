@@ -96,6 +96,15 @@
             console.error('[BUS] ERRO NO MINIGAME DO ÔNIBUS', err);
         }
 
+        retryAfterError() {
+            if (!this.errorMessage) return false;
+            const checkpoint = this.run?.checkpointReached ? this.run.checkpoint : null;
+            const bonus = this.bonusMode;
+            this.errorMessage = null;
+            this.startMinigame(bonus, checkpoint);
+            return true;
+        }
+
         reset() {
             // Evita que o evento de embarque antigo bloqueie uma nova Fase 2.
             this.phase2Waiting = false;
@@ -614,7 +623,7 @@
         drawRoadSign(ctx,x,y,text){ctx.save();ctx.fillStyle='#59422c';ctx.fillRect(x+38,y+48,8,75);ctx.fillStyle='#f3ead2';ctx.strokeStyle='#463a2d';ctx.lineWidth=4;ctx.fillRect(x,y,84,55);ctx.strokeRect(x,y,84,55);ctx.fillStyle='#332d27';ctx.font='bold 13px Righteous';ctx.textAlign='center';ctx.fillText(text,x+42,y+32);ctx.restore();}
         drawDust(ctx,x,y,count){ctx.save();for(let i=0;i<count;i++){ctx.globalAlpha=.28-i*.05;ctx.fillStyle='#d7b178';ctx.fillRect(x-i*10,y-i*2,7+i*2,4+i);}ctx.restore();}
         drawFade(ctx,a){if(a<=0)return;ctx.save();ctx.fillStyle=`rgba(0,0,0,${Math.max(0,Math.min(1,a))})`;ctx.fillRect(0,0,W,H);ctx.restore();}
-        drawError(ctx){const e=this.errorMessage;if(!e)return;ctx.save();ctx.fillStyle='rgba(20,0,0,.94)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#ff6f6f';ctx.font='bold 42px Bebas Neue';ctx.textAlign='center';ctx.fillText(e.title,500,240);ctx.fillStyle='#fff';ctx.font='18px Consolas';ctx.fillText(e.where,500,285);ctx.font='13px Consolas';ctx.fillText('O save existente foi preservado.',500,325);ctx.restore();}
+        drawError(ctx){const e=this.errorMessage;if(!e)return;ctx.save();ctx.fillStyle='rgba(20,0,0,.94)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#ff6f6f';ctx.font='bold 42px Bebas Neue';ctx.textAlign='center';ctx.fillText(e.title,500,240);ctx.fillStyle='#fff';ctx.font='18px Consolas';ctx.fillText(e.where,500,285);ctx.font='13px Consolas';ctx.fillText('O save existente foi preservado.',500,325);ctx.fillStyle='#8ff3da';ctx.font='bold 18px Righteous';ctx.fillText('R / ENTER / TOQUE: REINICIAR  •  ESC: MENU',500,380);ctx.restore();}
         rects(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
         getSpeedrunTarget(){return SPEEDRUN_TARGET;}
     }
