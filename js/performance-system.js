@@ -19,11 +19,11 @@ class PerformanceSystem {
             low:    { label:'BAIXA', particleLimit:180, drawMargin:80,  activeRadius:1150, updateModulo:4, shadows:false, atmosphere:false, foreground:false, particleShadows:false }
         };
     }
-    mode() { return this.settings?.data?.performanceMode || 'auto'; }
+    mode() { return this.settings?.data?.graphicsQuality || 'auto'; }
     effectiveTier() { const m=this.mode(); return ['high','medium','low'].includes(m)?m:this.autoTier; }
     config() { return this.tiers[this.effectiveTier()] || this.tiers.high; }
     modeLabel() { const labels={auto:'AUTO',high:'ALTA',medium:'MÉDIA',low:'BAIXA'}; const m=this.mode(); return m==='auto'?`AUTO (${this.config().label})`:(labels[m]||'AUTO'); }
-    cycleMode(dir=1) { const order=['auto','high','medium','low']; let i=order.indexOf(this.mode()); if(i<0)i=0; i=(i+dir+order.length)%order.length; this.settings.data.performanceMode=order[i]; this.settings.save(); this.badSeconds=this.goodSeconds=0; return this.mode(); }
+    cycleMode(dir=1) { const order=['auto','high','medium','low']; let i=order.indexOf(this.mode()); if(i<0)i=0; i=(i+dir+order.length)%order.length; this.settings.data.graphicsQuality=order[i]; this.settings.save(); this.badSeconds=this.goodSeconds=0; return this.mode(); }
     onFrame(frameMs,fps) {
         if(!Number.isFinite(frameMs)) return;
         this.frameCounter++;
@@ -54,7 +54,8 @@ class PerformanceSystem {
     particleShadowsEnabled(){return this.config().particleShadows;}
     shouldUpdateEnemy(enemy,cameraX,canvasWidth){
         if(!enemy||enemy.life<=0)return true;
-        if(enemy.isBoss||enemy.attacking||enemy.hitFlash>0)return true;
+        if(enemy.isBoss||enemy.isBossMinion||enemy.attacking||enemy.hitFlash>0||enemy.__attackAllowed||enemy._sonicKnockdownUntil)return true;
+        if(!Number.isFinite(enemy.x)||!Number.isFinite(cameraX))return true;
         const cfg=this.config(), ew=enemy.w||60, left=cameraX-cfg.activeRadius, right=cameraX+canvasWidth+cfg.activeRadius;
         if(enemy.x+ew>=left&&enemy.x<=right)return true;
         const mod=Math.max(2,cfg.updateModulo*3);
