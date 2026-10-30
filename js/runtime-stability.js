@@ -68,11 +68,23 @@
       let loaded=0;
       const failed=[];
       onProgress?.(0,{loaded,total,src:null});
-      await Promise.all(unique.map(async src=>{
-        try{ await this.loadImage(src,group,opts); }
-        catch(error){ failed.push({src,error}); }
-        finally{ loaded++; onProgress?.(loaded/total,{loaded,total,src}); }
-      }));
+      // v0.9.9: evita iniciar 40-60 decodificações de imagens ao mesmo tempo.
+      // Em celulares com pouca RAM, 3 recursos simultâneos; em desktop, até 6.
+      const ram=Number(navigator.deviceMemory);
+      const defaultConcurrency=Number.isFinite(ram)&&ram>0&&ram<=4 ? 3 : 6;
+      const requested=Number(opts.concurrency);
+      const concurrency=Number.isFinite(requested)&&requested>=1
+        ? Math.max(1,Math.min(8,Math.floor(requested))) : defaultConcurrency;
+      let next=0;
+      const worker=async()=>{
+        while(next<total){
+          const src=unique[next++];
+          try{ await this.loadImage(src,group,opts); }
+          catch(error){ failed.push({src,error}); }
+          finally{ loaded++; onProgress?.(loaded/total,{loaded,total,src}); }
+        }
+      };
+      await Promise.all(Array.from({length:Math.min(concurrency,total)},worker));
       if(failed.length){
         const err=new Error(`Falha em ${failed.length} recurso(s)`); err.failures=failed; throw err;
       }
