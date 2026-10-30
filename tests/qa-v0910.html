@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA de campanha e bônus — João & Crist v0.9.10</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0b1422;color:#f3f7ff;font:15px/1.55 system-ui,-apple-system,sans-serif}
+main{max-width:860px;margin:auto;padding:28px 18px 52px}
+h1{font-size:clamp(23px,4vw,31px);line-height:1.2}
+p,small{color:#b7c6da}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+article{border:1px solid #34465d;background:#17273b;padding:11px 14px;border-radius:8px;margin:5px 0}
+.ok{border-left:4px solid #23c69c}.fail{border-left:4px solid #ef6f73}
+button{background:#227fbd;color:#fff;border:0;padding:13px 18px;border-radius:8px;cursor:pointer;font:inherit}
+button:disabled{opacity:.5;cursor:wait}
+#summary{font-size:20px;font-weight:750;margin:18px 0}
+#networkProgress{white-space:pre-wrap}
+a{color:#7fd4ff}
+</style>
+<script>
+window.__qaLoads=[];
+window.__qaReleases=[];
+window.assetManager={
+ loadGroup:async function(group,images,onProgress){
+   window.__qaLoads.push({group:group,count:images.length});
+   if(onProgress) onProgress(1,{loaded:images.length,total:images.length});
+   return {loaded:images.length,total:images.length};
+ },
+ releaseGroup:function(group){window.__qaReleases.push(group);},
+ stats:function(){return {simulated:true,records:0,groups:0}}
+};
+window.soundSystem={preloadTypes:async function(keys,callback){if(callback)callback(keys.length,keys.length)},releaseTypes:function(){}};
+</script>
+<script src="../js/performance-system.js"></script>
+<script src="../js/level.js"></script>
+<script src="../js/level-loader.js"></script>
+</head>
+<body>
+<main>
+<h1>João & Crist — QA v0.9.10</h1>
+<p>Validação independente, sem alterar saves reais. O teste de salvamento usa armazenamento simulado. Transições e carregamentos abaixo são simulados; a verificação opcional de arquivos consulta o site publicado. Esta página não substitui jogar as oito fases.</p>
+<div id="summary">Executando...</div>
+<div id="results" class="grid"></div>
+<h2>Verificação dos arquivos publicados</h2>
+<p>O botão abaixo checa, por requisições HTTP HEAD, todos os recursos únicos declarados pelos carregadores. Não baixa as imagens inteiras.</p>
+<button id="verifyAssets" type="button">Verificar recursos das 8 fases e dos bônus</button>
+<p id="networkProgress"></p>
+<div id="networkErrors"></div>
+<p><a href="../">Voltar ao jogo</a> — <a href="../?perf=1">Abrir o jogo com medidor FPS</a></p>
+</main>
+<script>
+(function(){
+ 'use strict';
+ const output=document.getElementById('results');
+ const status=document.getElementById('summary');
+ const rows=[];
+ const assert=(v,m)=>{if(!v)throw Error(m||'Verificação falhou');};
+ async function run(label,fn){
+   try{await fn();rows.push({label,ok:true});}
+   catch(e){rows.push({label,ok:false,detail:String(e?.message||e)});}
+   output.replaceChildren();
+   for(const row of rows){
+     const el=document.createElement('article');el.className=row.ok?'ok':'fail';
+     el.textContent=(row.ok?'✓ ':'✗ ')+row.label;
+     if(row.detail){const small=document.createElement('small');small.textContent=' — '+row.detail;el.appendChild(small);}
+     output.appendChild(el);
+   }
+   status.textContent=rows.filter(x=>x.ok).length+'/'+rows.length+' testes isolados passaram';
+ }
+ async function readFile(path){
+   const r=await fetch('../'+path,{cache:'no-store'});
+   assert(r.ok,'HTTP '+r.status+': '+path);
+   return r.text();
+ }
+ function manifests(){
+   const api=window.LevelAssetManifests;
+   assert(api&&window.LEVELS_REF?.length===8,'Carregadores das 8 fases indisponíveis');
+   return [...Array.from({length:8},(_,i)=>api.level(i,['João','Crist'])),api.bus(),api.fishing(['João','Crist']),api.club(['João','Crist'])];
+ }
+ async function initial(){
+   await run('Oito fases e chefes esperados',()=>{
+     assert(window.LEVELS_REF?.length===8);
+     assert(window.LEVELS_REF[5].hasTechBoss);
+     assert(window.LEVELS_REF[6].hasShadowBoss);
+     assert(window.LEVELS_REF[7].hasGodBoss);
+   });
+   await run('Sistema de qualidade adaptativa',()=>{
+     const p=new PerformanceSystem({data:{graphicsQuality:'auto'},save(){}});
+     assert(p.shouldUpdateEnemy({x:800,w:50,life:10},0,1000));
+     p.frameCounter=1;
+     assert(!p.shouldUpdateEnemy({x:8000,w:50,life:10,__perfPhase:0},0,1000));
+     assert(p.shouldUpdateEnemy({x:8000,w:50,life:10,isBoss:true},0,1000));
+   });
+   await run('Fluxo das oito transições de campanha',async()=>{
+     for(let i=0;i<8;i++){
+       let loaded=false;
+       const ok=await window.levelManager.transitionLevel(i,{afterLoad:()=>{loaded=true}});
+       assert(ok&&loaded&&window.levelManager.currentLevelIndex===i,'Falha na transição '+(i+1));
+     }
+     assert(window.__qaReleases.filter(x=>x.startsWith('level:')).length===7,'Liberação de fases anteriores falhou');
+   });
+   await run('Carregamento simulado dos três bônus',async()=>{
+     for(const type of ['bus','club','fishing']){
+       let loaded=false;
+       const ok=await window.levelManager.loadBonus(type,{afterLoad:()=>loaded=true});
+       assert(ok&&loaded,'Bônus não carregou: '+type);
+       window.levelManager.releaseBonus(type);
+     }
+   });
+   await run('Manifestos de todas as fases e bônus',()=>{
+     const all=manifests();
+     assert(all.length===11);
+     for(const m of all) assert(m.images.length>0,'Manifesto vazio: '+m.name);
+   });
+   await run('Pause e retorno ao menu protegidos',async()=>{
+     const src=await readFile('js/main.js');
+     assert(src.includes('window.GameRuntime?.resumeTimers?.()'),'Timer não é retomado');
+     assert(src.includes('window.busSequence?.reset?.()'),'Estado do ônibus não é limpo');
+     assert(src.includes("for (const bonus of ['bus', 'fishing', 'club'])"),'Bônus não são liberados');
+   });
+   await run('Reinício seguro do ônibus',async()=>{
+     const src=await readFile('js/bus-sequence.js');
+     assert(src.includes('reset() {')&&src.includes('window.assetManager.isLoaded(spritePaths.idle)'));
+   });
+   await run('Multitouch e perda de foco',async()=>{
+     const [touch,main]=await Promise.all([readFile('js/touch-controls.js'),readFile('js/main.js')]);
+     assert(touch.includes('activeTouches.has(id)')&&touch.includes('remaining.some('));
+     assert(main.includes("window.addEventListener('blur', releaseHeldInputs)"));
+   });
+   await run('Configurações e saves preservam seus identificadores',async()=>{
+     const [save,settings]=await Promise.all([readFile('js/save-system.js'),readFile('js/settings-system.js')]);
+     assert(save.includes("'joaoCristSave'")&&settings.includes("'joaoCristSettings'"));
+   });
+   await run('PWA atualizado e com cache isolado',async()=>{
+     const sw=await readFile('sw.js');
+     assert(sw.includes('joao-crist-v0910-20261030'));
+     assert(sw.includes('key.startsWith(CACHE_PREFIX)')&&sw.includes('SCOPE_PATH'));
+   });
+   await run('Save antigo migrado sem alterar o save real do jogador',async()=>{
+     const source=await readFile('js/save-system.js');
+     const map=new Map();
+     const storage={getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,String(v)),removeItem:k=>map.delete(k)};
+     const Save=new Function('window','localStorage',source+';return SaveSystem;')({DEV:false},storage);
+     map.set('joaoCristSave',JSON.stringify({highestLevel:8,playerProgress:{João:{level:25,xp:60}}}));
+     const migrated=new Save();
+     assert(migrated.load().gameCompleted,'Save legado não foi migrado');
+     assert(migrated.loadPlayerProgress('João').level===25,'Evolução foi perdida');
+     map.set('joaoCristSave',JSON.stringify({highestLevel:8,gameCompleted:false}));
+     assert(new Save().load().gameCompleted===false,'Save incompleto foi marcado como vitória');
+     map.delete('joaoCristSave');
+     const session=new Save();
+     session.saveCampaignCheckpoint({levelIndex:1,playerCount:2,selectedCharacters:['João','Crist'],score:950});
+     const restored=new Save().loadCampaignCheckpoint();
+     assert(restored.levelIndex===1&&restored.playerCount===2&&restored.score===950);
+   });
+   await run('Ônibus recupera erro pelo checkpoint de 50%',async()=>{
+     const source=await readFile('js/bus-sequence.js');
+     const loaded=new Set();
+     const asset={
+       image:path=>{loaded.add(path);return {complete:true,naturalWidth:10};},
+       placeholder:path=>({complete:true,naturalWidth:10}),
+       loadImage:async path=>{loaded.add(path);},
+       isLoaded:path=>loaded.has(path)
+     };
+     const noop=()=>{};
+     const fake={assetManager:asset,GameDebugConsole:{log:noop},soundSystem:{startLoop:noop,stopLoop:noop,stopMusic:noop,startMusic:noop,playSound:noop}};
+     new Function('window','performance',source)(fake,performance);
+     const bus=fake.busSequence;
+     bus.run={state:'running',checkpointReached:true,checkpoint:{progress:50,lane:2,resistance:75,elapsed:42,collisions:1,score:900}};
+     bus.errorMessage={title:'TESTE'};
+     assert(bus.retryAfterError(),'Não reiniciou');
+     assert(bus.run.progress===50&&bus.run.targetLane===2&&bus.run.resistance===75&&bus.errorMessage===null);
+     bus.phase2Waiting=true;bus.reset();
+     assert(bus.run===null&&!bus.phase2Waiting,'Estado do ônibus permaneceu após reset');
+   });
+   await run('Gate da Fase 3 permite voltar à Fase 2 e tentar novamente',async()=>{
+     const src=await readFile('js/main.js');
+     const a=src.indexOf('function loadLevel(index) {'),b=src.indexOf('\nfunction createEnemySafe(',a);
+     assert(a>=0&&b>a,'Função loadLevel não encontrada');
+     const body=src.slice(a,b);
+     const history={resets:0,releases:[],checkpoints:[],blocked:0};
+     const win={GameRuntime:{cancelTimersFor(){}},busSequence:{run:{state:'finish'},reset(){this.run=null;history.resets++;}},levelManager:{releaseBonus:k=>history.releases.push(k)}};
+     const players=[{name:'João',life:100,w:44,h:100,evolution:{level:2}}];
+     const setup=[
+       'let currentLevelIndex=0,currentLevel=null,levelLoadToken=0,cameraX=0,enemySpawnDirector=null,levelGateActive=false,gameState="playing",score=700,playerCount=1,levelIntroTimer=0,levelStartTime=0,levelDamageTaken=0,bossSpawned=false,bossPhase=false,bossDefeated=false,bossWarningTimer=0,phase3ColonelIntroPlayed=false,waveSystem=null;',
+       'const GameState={GAME_OVER:"gameover",VICTORY:"victory"};',
+       'const LEVELS=Array.from({length:8},(_,i)=>({id:i+1,getGround(){return 530},useWaves:false}));',
+       'const selectedCharacters=["João",null];',
+       'let players=PS,enemies=[],particles=[],powerUps=[],destructibles=[];',
+       'const gameOverScreen={activate:()=>history.blocked++};',
+       'const saveSystem={saveCampaignCheckpoint:cp=>history.checkpoints.push(cp)};',
+       'function refreshMenuOptions(){}',
+       'function spawnEnemies(){}',
+       'function spawnPowerUps(){}',
+       'function checkLevelRequirement(index,ps){return index!==2||ps[0].evolution.level>=3;}'
+     ].join('\n');
+     const harness=new Function('window','PS','history',setup+'\n'+body+'\nreturn {loadLevel,get:()=>({index:currentLevelIndex,gate:levelGateActive,state:gameState})};')(win,players,history);
+     harness.loadLevel(2);
+     assert(harness.get().gate&&history.releases.includes('bus')&&history.resets===1);
+     win.busSequence.run={state:'finish'};
+     harness.loadLevel(1);
+     assert(!harness.get().gate&&win.busSequence.run===null&&history.checkpoints.at(-1).levelIndex===1);
+     players[0].evolution.level=3;
+     harness.loadLevel(2);
+     assert(!harness.get().gate&&history.checkpoints.at(-1).levelIndex===2);
+   });
+   await run('Carregamento limitado sem erros de progresso',async()=>{
+     const source=await readFile('js/runtime-stability.js');
+     const ctx={};
+     new Function('window','navigator','performance','Image',source)(ctx,{deviceMemory:2},performance,class{});
+     const manager=ctx.assetManager;
+     let active=0,peak=0,progress=[];
+     manager.loadImage=async path=>{
+       active++;peak=Math.max(peak,active);
+       await Promise.resolve();await Promise.resolve();await Promise.resolve();
+       active--;
+     };
+     const images=Array.from({length:31},(_,i)=>'asset-test-'+i);
+     await manager.loadGroup('qa:memory',images,(p)=>progress.push(p));
+     assert(peak===3,'Carregamento de celular excedeu 3 simultâneos: '+peak);
+     assert(progress.length===32&&progress[0]===0&&progress.at(-1)===1,'Progresso inválido');
+     assert(progress.every((p,i)=>i===0||p>=progress[i-1]),'Progresso regrediu');
+   });
+   await run('Erro de sprite não pode matar chefe',async()=>{
+     const src=await readFile('js/main.js');
+     const first=src.indexOf('function drawEnemyFallback(');
+     const last=src.indexOf('\nfunction safeGameLoopFrame(',first);
+     const start=src.indexOf('        // Atualizar e desenhar inimigos\n');
+     const end=src.indexOf('            // Verificar colisão dos ataques dos jogadores',start);
+     assert(first>=0&&last>first&&start>=0&&end>start,'Rotina de resgate não encontrada');
+     const ctx={save(){},restore(){},fillRect(){},strokeRect(){},fillText(){}};
+     const boss={x:350,y:300,w:80,h:110,isBoss:true,life:200,update(){},draw(){throw Error('sprite indisponível')}};
+     const logs={error(){}};
+     const game={gamePerformance:null,GameDebugConsole:{error(){}}};
+     const test=new Function('ctx','enemies','players','cameraX','canvas','window','performance','currentLevelIndex','console',
+       src.slice(first,last)+'\n'+src.slice(start,end)+'\n        });');
+     test(ctx,[boss],[],0,{width:1000},game,performance,7,logs);
+     assert(boss.life===200&&!boss.dead,'Chefe foi morto por erro de sprite');
+     assert(Number.isFinite(boss.__drawErrorRetryAt),'Tentativa posterior ausente');
+   });
+   await run('Diagnóstico FPS só ativa com ?perf=1',async()=>{
+     const [src,main,index]=await Promise.all([
+       readFile('js/performance-monitor.js'),readFile('js/main.js'),readFile('index.html')
+     ]);
+     assert(src.includes("get('perf') !== '1'"),'Overlay sempre ligado');
+     assert(src.includes("pointer-events:none"),'Overlay pode bloquear toque');
+     assert(main.includes('diagnosticsSnapshot = () =>'), 'Snapshot FPS ausente');
+     assert(index.includes("js/performance-monitor.js"), 'Overlay não incluído');
+   });
+   await run('Limite de invocações dos chefes 6, 7 e 8',async()=>{
+     const source=await readFile('js/boss-expansion.js');
+     let now=10000;
+     class EnemySim{
+       constructor(x,y){this.x=x;this.y=y;this.groundY=y;this.w=50;this.h=70;this.life=100;this.maxLife=100;this.damage=10;this.attackDamage=10;}
+       update(){}
+       getCollisionBox(){return {x:this.x,y:this.y,w:this.w,h:this.h};}
+     }
+     const bossWindow={DEV:false,particles:null,projectiles:[],GameRuntime:{schedule(){}},soundSystem:null};
+     const bosses=new Function('window','Enemy','FastEnemy','GhostEnemy','EliteEnemy','AssassinEnemy','Date',source+
+       '\nreturn {TechBoss,ShadowBoss,GodBoss,activeBossMinions};')(
+       bossWindow,EnemySim,EnemySim,EnemySim,EnemySim,EnemySim,{now:()=>now});
+     const ps=[{x:200,y:430,w:40,h:100,life:200,invulnerable:0,takeDamage(n){this.life-=n;}}];
+     const eng=new bosses.TechBoss(600,530),e=[eng];
+     eng.lastShock=now;
+     for(let i=0;i<7;i++){now+=5000;eng.update(ps,e);}
+     assert(bosses.activeBossMinions(e)===4,'Engenheiro excedeu 4 drones');
+     eng.phase=3;eng.life=100;
+     for(let i=0;i<7;i++){now+=5000;eng.update(ps,e);}
+     assert(bosses.activeBossMinions(e)===6,'Engenheiro excedeu 6 drones');
+     const shadow=new bosses.ShadowBoss(600,530),s=[shadow];shadow.phase=3;shadow.life=100;shadow.cloneCooldown=1000;
+     for(let i=0;i<8;i++){now+=2000;shadow.update(ps,s);}
+     assert(bosses.activeBossMinions(s)===7,'A Sombra excedeu 7 clones');
+     const god=new bosses.GodBoss(600,530),g=[god];god.phase=3;god.life=1200;
+     for(let i=0;i<5;i++)god.performAbility('summon',ps,g);
+     assert(bosses.activeBossMinions(g)===8,'Deus das Apostas excedeu 8 servos');
+   });
+   await run('Choque do Engenheiro acerta chão e poupa jogador no ar',async()=>{
+     const source=await readFile('js/boss-expansion.js');
+     let now=15000;
+     class Base{constructor(x,y){this.x=x;this.y=y;this.groundY=y;this.w=50;this.h=80;this.life=100;this.maxLife=100;}update(){}}
+     const w={DEV:false,particles:null,soundSystem:null};
+     const {TechBoss}=new Function('window','Enemy','FastEnemy','Date',source+'\nreturn {TechBoss};')(w,Base,Base,{now:()=>now});
+     const players=[
+       {x:200,y:430,w:45,h:100,life:100,invulnerable:0,takeDamage(n){this.life-=n;}},
+       {x:200,y:220,w:45,h:100,life:100,invulnerable:0,takeDamage(n){this.life-=n;}}
+     ];
+     const boss=new TechBoss(600,530);boss.lastDrone=now;boss.droneCooldown=999999;boss.lastShock=0;
+     const enemies=[boss];boss.update(players,enemies);
+     for(let i=0;i<14;i++)boss.update(players,enemies);
+     assert(players[0].life===90,'Choque não atingiu jogador no chão');
+     assert(players[1].life===100,'Choque atingiu jogador alto no ar');
+   });
+   await run('Chuva final de projéteis não duplica por FPS',async()=>{
+     const source=await readFile('js/boss-expansion.js');
+     let now=30000;
+     class Base{constructor(x,y){this.x=x;this.y=y;this.groundY=y;this.w=50;this.h=80;this.life=100;this.maxLife=100;}update(){}}
+     const w={DEV:false,projectiles:[],particles:null,soundSystem:null};
+     const {GodBoss}=new Function('window','Enemy','Date',source+'\nreturn {GodBoss};')(w,Base,{now:()=>now});
+     const boss=new GodBoss(600,530);boss.phase=3;boss.life=1800;boss.lastAbility=now+30000;
+     const ps=[{x:200,y:430,w:40,h:100,life:100}],enemy=[boss];
+     boss.update(ps,enemy);boss.update(ps,enemy);
+     assert(w.projectiles.length===5,'Múltiplas chuvas em frames seguidos');
+     now+=4001;boss.update(ps,enemy);
+     assert(w.projectiles.length===10,'Nova chuva não foi disparada após intervalo');
+   });
+   await run('Quatro ondas das Fases 6, 7 e 8 seguem completas',async()=>{
+     const src=await readFile('js/wave-system.js');
+     class Base{constructor(x,y){this.x=x;this.y=y;this.life=100;this.maxLife=100;this.damage=10;this.attackDamage=10;}}
+     const fake={players:[{x:410,w:40,life:100}],particles:null,soundSystem:null};
+     const Wave=new Function('window','Enemy','EliteEnemy','GhostEnemy','AssassinEnemy','EnemyFactory',src+
+       '\nreturn WaveSystem;')(fake,Base,Base,Base,Base,{create:(x,y)=>new Base(x,y)});
+     for(const id of [6,7,8]){
+       const waves=new Wave({id,width:5000,difficultyMultiplier:1.25},530),enemies=[];
+       waves.startNextWave(enemies);
+       for(let k=0;k<12&&!waves.allWavesDone;k++){
+         assert(enemies.some(e=>e.life>0&&!e.dead),'Onda vazia na fase '+id);
+         enemies.forEach(e=>e.dead=true);
+         waves.waveTimer=waves.waveCooldown;
+         waves.update(enemies);
+       }
+       assert(waves.allWavesDone&&waves.currentWave===4,'Fase '+id+' não concluiu 4 ondas');
+     }
+   });
+   await run('Página principal v0.9.10',async()=>{
+     const main=await readFile('index.html');
+     assert(main.includes('v0.9.10 16-BIT EDITION'));
+     assert(main.includes("js/performance-system.js"));
+   });
+ }
+ document.getElementById('verifyAssets').addEventListener('click',async()=>{
+   const button=document.getElementById('verifyAssets'),log=document.getElementById('networkProgress'),out=document.getElementById('networkErrors');
+   button.disabled=true;out.replaceChildren();
+   try{
+     const paths=[...new Set(manifests().flatMap(m=>m.images))];
+     let next=0,done=0;const failed=[];
+     log.textContent='Verificando 0/'+paths.length+' arquivos...';
+     const worker=async()=>{
+       while(next<paths.length){
+         const path=paths[next++];
+         try{
+           const r=await fetch('../'+path,{method:'HEAD',cache:'no-store'});
+           if(!r.ok)failed.push(path+' — HTTP '+r.status);
+         }catch(e){failed.push(path+' — '+String(e?.message||e));}
+         done++;log.textContent='Verificando '+done+'/'+paths.length+' arquivos...';
+       }
+     };
+     await Promise.all(Array.from({length:6},worker));
+     log.textContent=(paths.length-failed.length)+'/'+paths.length+' arquivos HTTP acessíveis; '+failed.length+' falha(s).';
+     for(const f of failed.slice(0,40)){const el=document.createElement('article');el.className='fail';el.textContent=f;out.appendChild(el);}
+     if(failed.length>40){const el=document.createElement('p');el.textContent='Outras '+(failed.length-40)+' falhas não exibidas.';out.appendChild(el);}
+   }catch(e){log.textContent='Falha na auditoria: '+String(e?.message||e);}
+   finally{button.disabled=false;}
+ });
+ initial().catch(e=>{status.textContent='Erro de inicialização: '+String(e?.message||e)});
+})();
+</script></body></html>
