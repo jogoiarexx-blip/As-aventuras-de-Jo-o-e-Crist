@@ -1680,6 +1680,14 @@ function nextLevel() {
 
     if (typeof clearKeys === 'function') clearKeys();
     transitionToLevel(nextIndex, () => {
+        if (nextIndex === 1 && gameState !== GameState.GAME_OVER &&
+            window.storyCutscenes && !window.storyCutscenes.hasSeen?.('cityArrival')) {
+            startStoryScene('cityArrival', () => {
+                gameState = GameState.STORY_LEVEL;
+                levelIntroTimer = 180;
+            });
+            return;
+        }
         if (nextIndex === 7 && gameState !== GameState.GAME_OVER && window.storyCutscenes && !window.storyCutscenes.hasSeen?.('godIntro')) {
             startStoryScene('godIntro', () => { gameState = GameState.LEVEL_INTRO; levelIntroTimer = 180; });
             return;
