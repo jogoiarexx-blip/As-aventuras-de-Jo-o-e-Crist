@@ -932,6 +932,7 @@ function cleanupCurrentLevelForTransition() {
 function releaseCurrentLevelForMenu() {
     cleanupCurrentLevelForTransition();
     window.storyCutscenes?.cancel?.();
+    window.earlyAdventure?.reset?.(-1);
     // Sair durante pause não pode deixar o gerenciador de timers congelado.
     window.GameRuntime?.resumeTimers?.();
     window.busSequence?.reset?.();
@@ -1241,6 +1242,8 @@ function loadLevel(index) {
         if ('rangedChargeFrames' in player) player.rangedChargeFrames = 0;
     });
     
+    // Objetivos da aventura começam de novo ao reiniciar uma fase/checkpoint.
+    window.earlyAdventure?.reset?.(index);
     // NPC amigável exclusivo da Fase 1
     window.farmDogNPCManager?.initForLevel?.(currentLevel);
 
@@ -3520,6 +3523,7 @@ function gameLoop() {
         
         // NPC cachorra da fazenda (apenas Fase 1)
         window.farmDogNPCManager?.update?.(players, keys);
+        if(gameState === GameState.PLAYING) window.earlyAdventure?.update?.(players,currentLevel.getGround());
 
         // Câmera segue jogadores vivos
         const alivePlayers = players.filter(p => p.life > 0);
@@ -3559,6 +3563,7 @@ function gameLoop() {
             window.GraphicsUpgrade.drawBackdropAtmosphere(ctx, currentLevel, cameraX);
         }
         if (currentLevelIndex === 1 && window.busSequence?.isPhase2Waiting?.()) window.busSequence.drawPhase2Bus(ctx);
+        if(gameState === GameState.PLAYING) window.earlyAdventure?.drawWorld?.(ctx,currentLevel.getGround(),cameraX,canvas.width);
         
         // Caixas e barris quebráveis que guardam os power-ups
         destructibles.forEach(obj => {
@@ -4138,6 +4143,7 @@ function gameLoop() {
         
         // Desenhar HUD
         drawHUD();
+        if(gameState === GameState.PLAYING) window.earlyAdventure?.drawHUD?.(ctx);
         
         // Melhoria #14: Debug Panel
         drawDebugPanel();
@@ -4277,7 +4283,8 @@ function gameLoop() {
                 // === FASE SEM BOSS - lógica original ===
                 const allEnemiesDead = enemies.length === 0 || enemies.every(e => e.dead || e.life <= 0);
                 const allScheduledEnemiesSpawned = !enemySpawnDirector || enemySpawnDirector.allSpawned;
-                if (allEnemiesDead && allScheduledEnemiesSpawned) {
+                const tripPrepared = currentLevelIndex !== 0 || window.earlyAdventure?.isStageReady?.(1) !== false;
+                if (allEnemiesDead && allScheduledEnemiesSpawned && tripPrepared) {
                     if (currentLevelIndex === 1) {
                         if (gameState === GameState.PLAYING && !window.busSequence?.isPhase2Waiting?.()) {
                             recordLevelCompletion(currentLevelIndex);
