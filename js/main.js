@@ -425,6 +425,20 @@ document.addEventListener('keydown', e => {
     if ((gameState === GameState.PLAYING || gameState === GameState.BUS_MINIGAME) && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Tab'].includes(e.key)) e.preventDefault();
     keys[normalizedKey] = true;
 
+    // Uma falha no minijogo do ônibus não pode bloquear toda a campanha.
+    // R reinicia do checkpoint interno (se houver); Escape retorna ao menu.
+    if (gameState === GameState.BUS_MINIGAME && window.busSequence?.errorMessage) {
+        if (e.key === 'r' || e.key === 'R' || e.key === 'Enter') {
+            window.busSequence.retryAfterError?.();
+            clearKeys();
+            return;
+        }
+        if (e.key === 'Escape') {
+            returnToMenuFromGameOver();
+            return;
+        }
+    }
+
     if (gameState === GameState.CUTSCENE) {
         e.preventDefault();
         window.storyCutscenes?.handleKey?.(e.key);
@@ -763,6 +777,11 @@ canvas.addEventListener('click', e => {
         const ls=window.LevelLoadState||{};
         if(ls.error){ window.retryCurrentLoad?.(); return; }
         if(!ls.active && loadingProgress>=1 && ls.type==='bootstrap') { gameState=GameState.MENU; soundSystem.playSound('menuSelect'); return; }
+        return;
+    }
+    // Permite recuperação por toque em Android sem precisar de teclado físico.
+    if (gameState === GameState.BUS_MINIGAME && window.busSequence?.errorMessage) {
+        window.busSequence.retryAfterError?.();
         return;
     }
     if (gameState !== GameState.MENU) return;
@@ -1127,6 +1146,8 @@ function loadLevel(index) {
     // Cancela callbacks de gameplay pertencentes à fase anterior antes de trocar de cena.
     window.GameRuntime?.cancelTimersFor?.('level');
     window.GameRuntime?.cancelTimersFor?.('boss');
+    // v0.9.8: repetir a Fase 2 após gate na Fase 3 não pode herdar a corrida concluída.
+    if (index === 1) window.busSequence?.reset?.();
     currentLevelIndex = index;
     currentLevel = LEVELS[index];
     levelLoadToken++;
@@ -1140,6 +1161,12 @@ function loadLevel(index) {
     if (typeof checkLevelRequirement === 'function' && !checkLevelRequirement(index, players)) {
         // Jogador não tem nível suficiente - ativa o gate
         levelGateActive = true;
+        // O jogador pode precisar voltar à Fase 2. Descartar corrida e áudio do ônibus
+        // após negar a entrada, sem remover o checkpoint nem o recorde salvo.
+        if (index === 2) {
+            window.levelManager?.releaseBonus?.('bus');
+            window.busSequence?.reset?.();
+        }
         gameState = GameState.GAME_OVER;
         if (gameOverScreen) {
             gameOverScreen.activate(score, currentLevelIndex + 1);
