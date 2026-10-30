@@ -1,4 +1,4 @@
-const VERSION='joao-crist-v0910-20261030';
+const VERSION='joao-crist-v0911-20261030';
 const CORE=[
   './',
   './index.html',
