@@ -28,4 +28,8 @@
 O preload automático da próxima fase foi desativado. A prioridade é memória, não esconder alguns segundos de loading.
 
 ## Offline/PWA
-A build atual é para GitHub Pages e não possui Service Worker/PWA ativo. Portanto não houve Service Worker a preservar/alterar.
+- O `index.html` registra `sw.js` quando servido por HTTP(S).
+- `sw.js` instala arquivos essenciais e guarda assets visitados em cache próprio (`joao-crist-*`).
+- Recursos exclusivos da boate saíram do pré-cache inicial para reduzir instalação.
+- O cache em disco não impede descarte de imagens desnecessárias da memória RAM pelo AssetManager.
+- PWA deve ser verificado com HTTPS no GitHub Pages; `AUDITORIA-V096.md` descreve testes e limitações.
