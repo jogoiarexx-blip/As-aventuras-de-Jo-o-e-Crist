@@ -1640,6 +1640,8 @@ function startPhase3ColonelIntro(onDone) {
 }
 
 function finishGameWithStory() {
+    // Uma chamada repetida durante os créditos não pode reiniciar a cena final.
+    if (window.storyCutscenes?.active?.id === 'ending') return;
     const finalize = () => {
         // Salvar pontuação, troféus e vitória IMEDIATAMENTE ao concluir a história,
         // sem depender de o navegador renderizar um último frame.
