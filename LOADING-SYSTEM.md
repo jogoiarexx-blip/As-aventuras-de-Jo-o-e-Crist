@@ -33,3 +33,6 @@ O preload automático da próxima fase foi desativado. A prioridade é memória,
 - Recursos exclusivos da boate saíram do pré-cache inicial para reduzir instalação.
 - O cache em disco não impede descarte de imagens desnecessárias da memória RAM pelo AssetManager.
 - PWA deve ser verificado com HTTPS no GitHub Pages; `AUDITORIA-V096.md` descreve testes e limitações.
+
+## Limite de concorrência — v0.9.9
+O AssetManager carrega imagens com concorrência limitada por grupo: até 3 quando `navigator.deviceMemory` informa até 4 GB, ou 6 por padrão em outros dispositivos. A opção `concurrency` permite um limite explícito entre 1 e 8. O progresso e as falhas individuais continuam registrados. A redução de picos de decodificação é uma expectativa técnica, não um ganho de memória medido em hardware real.
