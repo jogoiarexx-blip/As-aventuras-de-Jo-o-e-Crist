@@ -931,6 +931,7 @@ function cleanupCurrentLevelForTransition() {
 
 function releaseCurrentLevelForMenu() {
     cleanupCurrentLevelForTransition();
+    window.storyCutscenes?.cancel?.();
     // Sair durante pause não pode deixar o gerenciador de timers congelado.
     window.GameRuntime?.resumeTimers?.();
     window.busSequence?.reset?.();
@@ -1598,15 +1599,21 @@ function drawGameplayHitboxes(ctx){
 function startStoryScene(sceneId, onComplete) {
     clearKeys?.();
     soundSystem?.stopMusic?.();
-    const started = window.storyCutscenes?.start?.(sceneId, () => {
+    // Se faltar a cena, StoryCutsceneManager.start também pode executar o callback.
+    // A proteção impede transições duplicadas de fase e gravações de vitória repetidas.
+    let completed = false;
+    const completeOnce = () => {
+        if (completed) return;
+        completed = true;
         clearKeys?.();
         onComplete?.();
-    });
+    };
+    const started = window.storyCutscenes?.start?.(sceneId, completeOnce);
     if (started) {
         gameState = GameState.CUTSCENE;
         return true;
     }
-    onComplete?.();
+    completeOnce();
     return false;
 }
 
@@ -1633,19 +1640,17 @@ function startPhase3ColonelIntro(onDone) {
 }
 
 function finishGameWithStory() {
+    const finalize = () => {
+        // Salvar pontuação, troféus e vitória IMEDIATAMENTE ao concluir a história,
+        // sem depender de o navegador renderizar um último frame.
+        commitVictoryOnce();
+        gameState = GameState.VICTORY;
+    };
     if (window.storyCutscenes && !window.storyCutscenes.hasSeen?.('ending')) {
-        startStoryScene('ending', () => {
-            if (saveSystem?.markGameCompleted) saveSystem.markGameCompleted();
-            saveSystem?.clearCampaignCheckpoint?.();
-            refreshMenuOptions();
-            gameState = GameState.VICTORY;
-        });
+        startStoryScene('ending', finalize);
         return;
     }
-    if (saveSystem?.markGameCompleted) saveSystem.markGameCompleted();
-    saveSystem?.clearCampaignCheckpoint?.();
-    refreshMenuOptions();
-    gameState = GameState.VICTORY;
+    finalize();
 }
 
 function nextLevel() {
