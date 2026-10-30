@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QA v0.9.6 | João & Crist</title>
+<style>
+body{font:16px system-ui,sans-serif;margin:0;background:#101826;color:#e7eef8}
+main{max-width:810px;margin:35px auto;padding:20px}
+h1{font-size:1.6rem}p{color:#acbcd0;line-height:1.5}
+article{background:#1b293e;border:1px solid #33485e;border-radius:12px;padding:14px;margin:8px 0}
+.ok{border-left:5px solid #23c58b}.fail{border-left:5px solid #f37d7d}
+small{color:#b8c6d5}a{color:#80c9ff}#summary{font-weight:bold;font-size:1.2rem}
+</style>
+<script src="../js/performance-system.js"></script>
+</head>
+<body><main>
+<h1>João & Crist — QA v0.9.6</h1>
+<p>Verificações rápidas de estrutura, recursos e comportamento isolado. Não substituem jogar a campanha e os minijogos.</p>
+<div id="summary">Executando verificações...</div>
+<section id="results"></section>
+<p><a href="../">Voltar ao jogo</a></p>
+</main>
+<script>
+(async function(){
+  const results=[];
+  function assert(value, message){if(!value)throw new Error(message || 'Falhou');}
+  async function test(label,fn){
+    try{await fn();results.push({label,ok:true});}
+    catch(err){results.push({label,ok:false,details:String(err.message||err)});}
+  }
+  async function getFile(path){
+    const response=await fetch('../'+path,{cache:'no-store'});
+    assert(response.ok,'HTTP '+response.status+' em '+path);
+    return response.text();
+  }
+  await test('PerformanceSystem disponível',()=>{
+    assert(typeof PerformanceSystem==='function','Classe não carregada');
+  });
+  await test('Inimigos próximos continuam ativos',()=>{
+    const perf=new PerformanceSystem({data:{graphicsQuality:'auto'},save(){}});
+    assert(perf.shouldUpdateEnemy({x:600,w:60,life:10},0,1000));
+  });
+  await test('IA distante pode ser escalonada sem interromper chefes',()=>{
+    const perf=new PerformanceSystem({data:{graphicsQuality:'auto'},save(){}});
+    perf.frameCounter=1;
+    const e={x:6000,w:60,life:10,__perfPhase:0};
+    assert(!perf.shouldUpdateEnemy(e,0,1000),'Inimigo distante não foi escalonado');
+    assert(perf.shouldUpdateEnemy({...e,isBoss:true},0,1000),'Chefe afetado');
+    assert(perf.shouldUpdateEnemy({...e,attacking:true},0,1000),'Ataque afetado');
+  });
+  await test('Qualidade gráfica usa a configuração existente',()=>{
+    let saves=0;
+    const settings={data:{graphicsQuality:'auto'},save(){saves++}};
+    const perf=new PerformanceSystem(settings);
+    assert(perf.cycleMode()==='high'&&settings.data.graphicsQuality==='high'&&saves===1);
+  });
+  await test('Página principal inclui sistema adaptativo',async()=>{
+    const index=await getFile('index.html');
+    assert(index.includes('js/performance-system.js'));
+    assert(index.includes('v0.9.6'));
+    assert(!index.includes('</html><script'),'Script após fechamento HTML');
+  });
+  await test('Campanha mantém oito configurações de fase',async()=>{
+    const file=await getFile('js/level.js');
+    assert((file.match(/new Level\(\{/g)||[]).length===8,'Quantidade de fases alterada');
+  });
+  await test('Minijogos ainda estão presentes',async()=>{
+    await Promise.all(['js/bus-sequence.js','js/club-sequence.js','js/fishing-bonus.js'].map(getFile));
+  });
+  await test('Cache offline não exclui outros projetos',async()=>{
+    const sw=await getFile('sw.js');
+    assert(sw.includes("key.startsWith(CACHE_PREFIX)"),'Limpeza de cache sem namespace');
+    assert(sw.includes('request.mode === \'navigate\''),'Fallback de HTML não isolado');
+    assert(sw.includes('SCOPE_PATH'),'Escopo de recursos ausente');
+  });
+  await test('Manifest e ícones principais acessíveis',async()=>{
+    const manifest=JSON.parse(await getFile('manifest.webmanifest'));
+    assert(manifest.start_url==='./');
+    await Promise.all(['icon-192.png','icon-512.png'].map(async path=>{
+      const r=await fetch('../'+path,{method:'HEAD',cache:'no-store'});
+      assert(r.ok,path+' indisponível');
+    }));
+  });
+  const ok=results.filter(r=>r.ok).length;
+  document.getElementById('summary').textContent=ok+'/'+results.length+' verificações passaram';
+  const target=document.getElementById('results');
+  for(const item of results){
+    const node=document.createElement('article');
+    node.className=item.ok?'ok':'fail';
+    node.textContent=(item.ok?'✓ ':'✗ ')+item.label;
+    if(item.details){const detail=document.createElement('small');detail.textContent=' — '+item.details;node.appendChild(detail);}
+    target.appendChild(node);
+  }
+})();
+</script></body></html>
