@@ -234,7 +234,7 @@ class SaveSystem {
                 if(!Array.isArray(this.data.clubBestHype))this.data.clubBestHype=[0,0,0]; if(!Array.isArray(this.data.clubBestScore))this.data.clubBestScore=[0,0,0]; this.data.clubBestCombo=Number(this.data.clubBestCombo)||0; if(!this.data.clubRecords||typeof this.data.clubRecords!=='object')this.data.clubRecords={joao:{score:0,rank:'D',combo:0,hype:0},crist:{score:0,rank:'D',combo:0,hype:0}};
                 if (!this.data.playerProgress['Chico Fumaça']) this.data.playerProgress['Chico Fumaça'] = { version: 2, level: 1, xp: 0, xpToNextLevel: 100, totalXpEarned: 0, killStats: { melee:0, ranged:0, assist:0, boss:0 }, unlockedSkills: [] };
                 // Migração de saves antigos: quem já alcançou/zerou a última fase também recebe o seletor.
-                if (typeof this.data.gameCompleted !== 'boolean') {
+                if (typeof parsed.gameCompleted !== 'boolean') {
                     this.data.gameCompleted = Number(this.data.highestLevel || 0) >= 8;
                 }
                 if (!this.data.campaignCheckpoint || typeof this.data.campaignCheckpoint !== 'object') this.data.campaignCheckpoint = null;
