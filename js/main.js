@@ -308,6 +308,21 @@ function graphicsQualityDisplay() {
     return configured === 'auto' ? `${base} (${getEffectiveGraphicsQuality().toUpperCase()})` : base;
 }
 
+// Diagnóstico sob demanda (?perf=1): leitura somente; não toca save nem simulação.
+window.GameRuntime.diagnosticsSnapshot = () => ({
+    fps: currentFPS,
+    frameCostMs: Number((window.GameRuntime.stats?.lastFrameMs || 0).toFixed(1)),
+    maxFrameCostMs: Number((window.GameRuntime.stats?.maxFrameMs || 0).toFixed(1)),
+    slowFrames: window.GameRuntime.stats?.slowFrames || 0,
+    fatalErrors: window.GameRuntime.stats?.fatalErrors || 0,
+    quality: getEffectiveGraphicsQuality(),
+    state: gameState,
+    level: currentLevelIndex + 1,
+    enemies: enemies.filter(e => e && e.life > 0 && !e.dead).length,
+    heapMB: Number.isFinite(performance.memory?.usedJSHeapSize)
+        ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null
+});
+
 /**
  * Limpa partículas mortas e excesso de partículas
  */
