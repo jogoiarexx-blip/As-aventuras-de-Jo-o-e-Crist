@@ -700,12 +700,12 @@ document.addEventListener('keydown', e => {
         showModal = true;
         modalMessage = 'Deseja voltar ao menu principal?\nSeu progresso será perdido.';
         modalCallback = () => {
-            soundSystem?.stopAllLoops?.();
+            // Mesmo fluxo do botão "Voltar ao menu": timers e grupos não ficam presos.
+            releaseCurrentLevelForMenu();
             soundSystem?.resumeAll?.();
-            pauseStartedAt = 0;
-            pauseSnapshot = null;
             gameState = GameState.MENU;
             menuSelection = 0;
+            refreshMenuOptions?.();
         };
     }
     
@@ -897,7 +897,18 @@ function cleanupCurrentLevelForTransition() {
 
 function releaseCurrentLevelForMenu() {
     cleanupCurrentLevelForTransition();
+    // Sair durante pause não pode deixar o gerenciador de timers congelado.
+    window.GameRuntime?.resumeTimers?.();
+    window.busSequence?.reset?.();
+    window.clubSequence?.dispose?.(false);
+    if (window.fishingBonus) {
+        window.fishingBonus.active = false;
+        if (Array.isArray(window.fishingBonus.players)) window.fishingBonus.players.length = 0;
+    }
     const lm=window.levelManager;
+    for (const bonus of ['bus', 'fishing', 'club']) lm?.releaseBonus?.(bonus);
+    pauseStartedAt=0;
+    pauseSnapshot=null;
     if(lm?.currentGroup){
         window.assetManager?.releaseGroup?.(lm.currentGroup);
         window.soundSystem?.releaseTypes?.(lm.currentSounds||[]);
@@ -979,8 +990,7 @@ window.setClubCombatState=()=>{ gameState=GameState.CLUB_COMBAT; enemySpawnDirec
 window.setClubSequenceState=()=>{ gameState=GameState.CLUB; enemySpawnDirector=null; };
 window.continueAfterClub=()=>{ window.levelManager?.releaseBonus?.('club'); transitionToLevel(5,()=>{if(gameState!==GameState.GAME_OVER){gameState=GameState.STORY_LEVEL;levelIntroTimer=180;}}); };
 window.returnFromClubBonus=(returnTo='stage_select')=>{
-    window.levelManager?.releaseBonus?.('club');
-    cleanupCurrentLevelForTransition();
+    releaseCurrentLevelForMenu();
     players.length=0;
     currentLevel=null;
     if(returnTo==='menu'){
@@ -4257,12 +4267,16 @@ function gameLoop() {
             });
         } else if (busResult === 'BONUS_DONE') {
             window.levelManager?.releaseBonus?.('bus');
+            window.busSequence?.reset?.();
             gameState = GameState.MENU; refreshMenuOptions(); menuSelection = Math.max(0, menuOptions.indexOf('BÔNUS — ESTRADA PARA VEGAS'));
         }
     }
     else if (gameState === GameState.BUS_ARRIVAL) {
         const busResult = window.busSequence?.updateDrawArrival(ctx, currentLevel, players);
         if (busResult === 'DONE') {
+            // Os sprites do ônibus só podem ser descartados DEPOIS da animação de chegada.
+            window.levelManager?.releaseBonus?.('bus');
+            window.busSequence?.reset?.();
             levelStartTime = Date.now(); levelDamageTaken = 0;
             if (window.storyCutscenes && !window.storyCutscenes.hasSeen?.('desertArrival')) {
                 startStoryScene('desertArrival', () => { gameState = GameState.PLAYING; levelStartTime = Date.now(); startLevelMusic(); });
